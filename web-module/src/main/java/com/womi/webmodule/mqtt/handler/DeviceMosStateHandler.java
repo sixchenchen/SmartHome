@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.womi.businessmodule.model.MosStateRecord;
 import com.womi.businessmodule.service.DeviceDataService;
 import com.womi.businessmodule.vo.DeviceData;
+import com.womi.commonmodule.device.DeviceConstants;
+import com.womi.commonmodule.mqtt.MqttConstants;
 import com.womi.commonmodule.utils.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,13 +19,13 @@ import java.util.HashMap;
 @RequiredArgsConstructor
 public class DeviceMosStateHandler implements MqttMessageHandler {
 
-    private static final String TOPIC_PATTERN = "device/+/mos_state";
+    private static final String TOPIC_PATTERN = MqttConstants.MOS_TOPIC_PATTERN;
     private final DeviceDataService deviceDataService;
     private final JsonUtils jsonUtils;
 
     @Override
     public boolean supports(String topic) {
-        return topic != null && topic.matches("device/[^/]+/mos_state");
+        return topic != null && topic.matches(MqttConstants.MOS_TOPIC_PATTERN);
     }
 
     @Override
@@ -36,7 +38,7 @@ public class DeviceMosStateHandler implements MqttMessageHandler {
             }
 
             JsonNode jsonNode = parsePayload(payload);
-            JsonNode dataNode = jsonNode.get("data");
+            JsonNode dataNode = jsonNode.get(MqttConstants.FIELD_DATA);
 
             if (dataNode != null) {
                 DeviceData deviceData = deviceDataService.getOrCreateDevice(deviceId);
@@ -44,8 +46,8 @@ public class DeviceMosStateHandler implements MqttMessageHandler {
                 deviceData.setLastPayload(payload);
 
                 // 更新MOS状态
-                for (int i = 0; i <= 7; i++) {
-                    String key = "mos" + i;
+                for (int i = 0; i < MqttConstants.MOS_CHANNEL_COUNT; i++) {
+                    String key = MqttConstants.FIELD_MOS + i;
                     if (dataNode.has(key)) {
                         int value = dataNode.get(key).asInt();
                         deviceData.getMosStates().put(key, value);
@@ -60,7 +62,7 @@ public class DeviceMosStateHandler implements MqttMessageHandler {
                 deviceData.getMosStateHistory().add(record);
 
                 // 限制历史记录数量
-                if (deviceData.getMosStateHistory().size() > 100) {
+                if (deviceData.getMosStateHistory().size() > DeviceConstants.HEARTBEAT_HISTORY_LIMIT) {
                     deviceData.getMosStateHistory().remove(0);
                 }
 

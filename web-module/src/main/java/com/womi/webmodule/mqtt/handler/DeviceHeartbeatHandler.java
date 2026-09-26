@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.womi.businessmodule.model.HeartbeatRecord;
 import com.womi.businessmodule.service.DeviceDataService;
 import com.womi.businessmodule.vo.DeviceData;
+import com.womi.commonmodule.device.DeviceConstants;
+import com.womi.commonmodule.mqtt.MqttConstants;
 import com.womi.webmodule.mqtt.MqttMessageHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +23,7 @@ public class DeviceHeartbeatHandler implements MqttMessageHandler {
 
     @Override
     public boolean supports(String topic) {
-        return topic != null && topic.matches("device/[^/]+/heart");
+        return topic != null && topic.matches(MqttConstants.HEART_TOPIC_PATTERN);
     }
 
     @Override
@@ -34,10 +36,10 @@ public class DeviceHeartbeatHandler implements MqttMessageHandler {
             }
 
             JsonNode jsonNode = objectMapper.readTree(payload);
-            JsonNode dataNode = jsonNode.get("data");
+            JsonNode dataNode = jsonNode.get(MqttConstants.FIELD_DATA);
 
-            if (dataNode != null && dataNode.has("uptime")) {
-                long uptime = dataNode.get("uptime").asLong();
+            if (dataNode != null && dataNode.has(MqttConstants.FIELD_UPTIME)) {
+                long uptime = dataNode.get(MqttConstants.FIELD_UPTIME).asLong();
 
                 // 获取或创建设备数据
                 DeviceData deviceData = deviceDataService.getOrCreateDevice(deviceId);
@@ -54,7 +56,7 @@ public class DeviceHeartbeatHandler implements MqttMessageHandler {
                 deviceData.getHeartbeatHistory().add(record);
 
                 // 限制历史记录数量
-                if (deviceData.getHeartbeatHistory().size() > 100) {
+                if (deviceData.getHeartbeatHistory().size() > DeviceConstants.HEARTBEAT_HISTORY_LIMIT) {
                     deviceData.getHeartbeatHistory().remove(0);
                 }
 

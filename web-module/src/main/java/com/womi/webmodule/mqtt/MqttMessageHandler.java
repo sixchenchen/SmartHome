@@ -2,6 +2,7 @@ package com.womi.webmodule.mqtt;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.womi.commonmodule.mqtt.MqttConstants;
 
 /**
  * MQTT 消息处理器接口
@@ -48,7 +49,7 @@ public interface MqttMessageHandler {
     default String extractDeviceId(String topic) {
         if (topic == null) return null;
         String[] parts = topic.split("/");
-        if (parts.length >= 3 && "device".equals(parts[0])) {
+        if (parts.length >= 3 && MqttConstants.DEVICE_TOPIC_PREFIX.equals(parts[0])) {
             return parts[1];
         }
         return null;

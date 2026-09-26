@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.womi.businessmodule.mapper.DeviceCommandMapper;
 import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.commonmodule.command.CommandConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,11 +20,7 @@ import java.util.*;
 public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, DeviceCommand>
         implements DeviceCommandService {
 
-    /** 注意：这里已经没有任何 MqttPublisher / MqttGateway 的引用！ */
     private final ObjectMapper objectMapper;
-
-    private static final int DEFAULT_EXPIRE_SECONDS = 300;
-    private static final int DEFAULT_MAX_RETRY = 3;
 
     // ==================== 仅入库 ====================
 
@@ -38,20 +35,20 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
 
         String commandId = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
-        int expire = expireSeconds > 0 ? expireSeconds : DEFAULT_EXPIRE_SECONDS;
+        int expire = expireSeconds > 0 ? expireSeconds : CommandConstants.DEFAULT_EXPIRE_SECONDS;
 
         DeviceCommand command = new DeviceCommand();
         command.setCommandId(commandId);
         command.setDeviceId(deviceId);
         command.setCommandType(commandType);
         command.setPayload(payload != null ? payload : Collections.emptyMap());
-        command.setQos(1);
-        command.setRetain(0);
-        command.setStatus(0); // 待下发
+        command.setQos(CommandConstants.DEFAULT_QOS);
+        command.setRetain(CommandConstants.DEFAULT_RETAIN);
+        command.setStatus(CommandConstants.STATUS_PENDING); // 待下发
         command.setRetryCount(0);
-        command.setMaxRetry(DEFAULT_MAX_RETRY);
-        command.setOperator(operator != null ? operator : "system");
-        command.setSource(source != null ? source : "WEB");
+        command.setMaxRetry(CommandConstants.DEFAULT_MAX_RETRY);
+        command.setOperator(operator != null ? operator : CommandConstants.DEFAULT_OPERATOR);
+        command.setSource(source != null ? source : CommandConstants.DEFAULT_SOURCE);
         command.setExpireTime(now.plusSeconds(expire));
 
         save(command);
@@ -123,7 +120,7 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
             log.info("指令执行成功 - commandId: {}", commandId);
         } else {
             baseMapper.markAsFailed(commandId, now,
-                    errorMsg != null ? errorMsg : "设备执行失败");
+                    errorMsg != null ? errorMsg : CommandConstants.DEFAULT_FAIL_MSG);
             log.warn("指令执行失败 - commandId: {}, error: {}", commandId, errorMsg);
         }
     }
@@ -171,7 +168,7 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
         for (DeviceCommand c : expired) {
             ids.add(c.getId());
         }
-        int updated = baseMapper.batchUpdateStatus(ids, 5); // 5 = 已超时
+        int updated = baseMapper.batchUpdateStatus(ids, CommandConstants.STATUS_TIMEOUT); // 5 = 已超时
         log.warn("标记超时指令 - 共 {} 条", updated);
         return updated;
     }
@@ -182,7 +179,7 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
     @Transactional(rollbackFor = Exception.class)
     public int cleanHistory(int retentionDays) {
         LocalDateTime beforeTime = LocalDateTime.now().minusDays(retentionDays);
-        List<Integer> finishedStatuses = Arrays.asList(3, 4, 5, 6);
+        List<Integer> finishedStatuses = CommandConstants.FINISHED_STATUSES;
         int deleted = baseMapper.deleteFinishedBefore(beforeTime, finishedStatuses);
         if (deleted > 0) {
             log.info("清理历史指令 - 共 {} 条", deleted);

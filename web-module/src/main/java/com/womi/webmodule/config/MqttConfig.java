@@ -1,5 +1,6 @@
 package com.womi.webmodule.config;
 
+import com.womi.commonmodule.mqtt.MqttConstants;
 import com.womi.webmodule.mqtt.core.MqttMessageRouter;
 import com.womi.webmodule.mqtt.core.MqttProperties;
 import lombok.RequiredArgsConstructor;
@@ -79,7 +80,7 @@ public class MqttConfig {
 
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
-                        mqttProperties.getClientId() + "-inbound",
+                        mqttProperties.getClientId() + MqttConstants.INBOUND_SUFFIX,
                         mqttClientFactory(),
                         topics
                 );
@@ -100,8 +101,8 @@ public class MqttConfig {
     public MessageHandler mqttInputChannelHandler() {
         return message -> {
             String payload = message.getPayload().toString();
-            String topic = (String) message.getHeaders().get("mqtt_receivedTopic");
-            Integer qos = (Integer) message.getHeaders().get("mqtt_receivedQos");
+            String topic = (String) message.getHeaders().get(MqttConstants.MQTT_RECEIVED_TOPIC);
+            Integer qos = (Integer) message.getHeaders().get(MqttConstants.MQTT_RECEIVED_QOS);
 
             log.debug("收到 MQTT 消息 - Topic: {}, QoS: {}", topic, qos);
             messageRouter.route(topic, payload, qos);
@@ -124,7 +125,7 @@ public class MqttConfig {
     public MessageHandler mqttOutbound() {
         MqttPahoMessageHandler handler =
                 new MqttPahoMessageHandler(
-                        mqttProperties.getClientId() + "-outbound",
+                        mqttProperties.getClientId() + MqttConstants.OUTBOUND_SUFFIX,
                         mqttClientFactory()
                 );
         handler.setAsync(true);

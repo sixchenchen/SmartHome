@@ -2,6 +2,7 @@ package com.womi.webmodule.mqtt.core;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.womi.commonmodule.mqtt.MqttConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.integration.support.MessageBuilder;
@@ -23,7 +24,7 @@ public class MqttPublisher {
      * 发布消息
      */
     public void publish(String topic, Object payload) {
-        publish(topic, payload, 1, false);
+        publish(topic, payload, MqttConstants.DEFAULT_QOS, MqttConstants.DEFAULT_RETAINED);
     }
 
     /**
@@ -42,9 +43,9 @@ public class MqttPublisher {
                     (String) payload : objectMapper.writeValueAsString(payload);
 
             Map<String, Object> headers = new HashMap<>();
-            headers.put("mqtt_topic", topic);
-            headers.put("mqtt_qos", qos);
-            headers.put("mqtt_retained", retained);
+            headers.put(MqttConstants.MQTT_HEADER_TOPIC, topic);
+            headers.put(MqttConstants.MQTT_HEADER_QOS, qos);
+            headers.put(MqttConstants.MQTT_HEADER_RETAINED, retained);
 
             mqttOutputChannel.send(
                     MessageBuilder.withPayload(message)
@@ -63,11 +64,11 @@ public class MqttPublisher {
      * 发布命令到设备
      */
     public void sendCommand(String deviceId, String command, Object data) {
-        String topic = String.format("device/%s/command", deviceId);
+        String topic = String.format(MqttConstants.COMMAND_TOPIC_FORMAT, deviceId);
         Map<String, Object> payload = new HashMap<>();
-        payload.put("command", command);
-        payload.put("data", data);
-        payload.put("timestamp", System.currentTimeMillis());
+        payload.put(MqttConstants.FIELD_COMMAND, command);
+        payload.put(MqttConstants.FIELD_DATA, data);
+        payload.put(MqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
         publish(topic, payload);
     }
 
@@ -81,13 +82,13 @@ public class MqttPublisher {
      */
     public void sendCommandWithId(String deviceId, String commandId,
                                   String commandType, Object data) {
-        String topic = String.format("device/%s/command", deviceId);
+        String topic = String.format(MqttConstants.COMMAND_TOPIC_FORMAT, deviceId);
         Map<String, Object> payload = new HashMap<>();
-        payload.put("commandId", commandId);
-        payload.put("command", commandType);
-        payload.put("data", data);
-        payload.put("timestamp", System.currentTimeMillis());
-        publish(topic, payload, 1, false);
+        payload.put(MqttConstants.FIELD_COMMAND_ID, commandId);
+        payload.put(MqttConstants.FIELD_COMMAND, commandType);
+        payload.put(MqttConstants.FIELD_DATA, data);
+        payload.put(MqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
+        publish(topic, payload, MqttConstants.DEFAULT_QOS, MqttConstants.DEFAULT_RETAINED);
 
         log.info("MQTT 指令下发 - Topic: {}, commandId: {}, type: {}",
                 topic, commandId, commandType);

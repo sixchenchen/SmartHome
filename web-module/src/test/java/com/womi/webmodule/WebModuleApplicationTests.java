@@ -232,7 +232,6 @@ class WebModuleApplicationTests {
         failPayload.put("mosIndex", 5);
         failPayload.put("action", 0);
 
-        // 🌟 改成 deviceCommandSender
         String failCmdId = deviceCommandSender.sendCommand(TEST_DEVICE_ID, "MOS_CONTROL", failPayload, "test-runner", "TEST", 300);
         deviceCommandService.handleAck(failCmdId, false, null, "GPIO write timeout");
 

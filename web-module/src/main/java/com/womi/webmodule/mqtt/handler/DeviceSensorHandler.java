@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.womi.businessmodule.model.SensorSlaveData;
 import com.womi.businessmodule.service.DeviceDataService;
 import com.womi.businessmodule.vo.DeviceData;
+import com.womi.commonmodule.mqtt.MqttConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,12 +18,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DeviceSensorHandler implements MqttMessageHandler {
 
-    private static final String TOPIC_PATTERN = "device/+/sensor";
+    private static final String TOPIC_PATTERN = MqttConstants.SENSOR_TOPIC_PATTERN;
     private final DeviceDataService deviceDataService;
 
     @Override
     public boolean supports(String topic) {
-        return topic != null && topic.matches("device/[^/]+/sensor");
+        return topic != null && topic.matches(MqttConstants.SENSOR_TOPIC_PATTERN);
     }
 
     @Override
@@ -35,7 +36,7 @@ public class DeviceSensorHandler implements MqttMessageHandler {
             }
 
             JsonNode jsonNode = parsePayload(payload);
-            JsonNode dataNode = jsonNode.get("data");
+            JsonNode dataNode = jsonNode.get(MqttConstants.FIELD_DATA);
 
             if (dataNode != null) {
                 DeviceData deviceData = deviceDataService.getOrCreateDevice(deviceId);
@@ -64,17 +65,17 @@ public class DeviceSensorHandler implements MqttMessageHandler {
         List<SensorSlaveData> result = new ArrayList<>();
 
         try {
-            if (dataNode.has("slaves") && dataNode.get("slaves").isArray()) {
-                for (JsonNode slaveNode : dataNode.get("slaves")) {
+            if (dataNode.has(MqttConstants.FIELD_SLAVES) && dataNode.get(MqttConstants.FIELD_SLAVES).isArray()) {
+                for (JsonNode slaveNode : dataNode.get(MqttConstants.FIELD_SLAVES)) {
                     SensorSlaveData slave = new SensorSlaveData();
-                    if (slaveNode.has("addr")) {
-                        slave.setAddress(slaveNode.get("addr").asInt());
+                    if (slaveNode.has(MqttConstants.FIELD_ADDR)) {
+                        slave.setAddress(slaveNode.get(MqttConstants.FIELD_ADDR).asInt());
                     }
-                    if (slaveNode.has("online")) {
-                        slave.setOnline(slaveNode.get("online").asInt());
+                    if (slaveNode.has(MqttConstants.FIELD_ONLINE)) {
+                        slave.setOnline(slaveNode.get(MqttConstants.FIELD_ONLINE).asInt());
                     }
-                    if (slaveNode.has("count")) {
-                        slave.setCount(slaveNode.get("count").asInt());
+                    if (slaveNode.has(MqttConstants.FIELD_COUNT)) {
+                        slave.setCount(slaveNode.get(MqttConstants.FIELD_COUNT).asInt());
                     }
                     result.add(slave);
                 }

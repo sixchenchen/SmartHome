@@ -7,6 +7,7 @@ import com.womi.businessmodule.mapper.*;
 import com.womi.businessmodule.model.*;
 import com.womi.businessmodule.service.DeviceDataService;
 import com.womi.businessmodule.vo.DeviceData;
+import com.womi.commonmodule.device.DeviceConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -59,8 +60,8 @@ public class DeviceDataServiceImpl implements DeviceDataService {
             if (deviceInfo == null) {
                 deviceInfo = new DeviceInfo();
                 deviceInfo.setDeviceId(deviceId);
-                deviceInfo.setDeviceName("设备-" + deviceId);
-                deviceInfo.setStatus(1);
+                deviceInfo.setDeviceName(DeviceConstants.DEVICE_NAME_PREFIX + deviceId);
+                deviceInfo.setStatus(DeviceConstants.DEVICE_STATUS_ONLINE);
                 deviceInfo.setCreateTime(LocalDateTime.now());
             }
 
@@ -69,7 +70,7 @@ public class DeviceDataServiceImpl implements DeviceDataService {
             deviceInfo.setLastUpdateTime(deviceData.getLastUpdateTime());
             deviceInfo.setLastPayload(deviceData.getLastPayload());
             deviceInfo.setSensorData(deviceData.getSensorData());
-            deviceInfo.setStatus(deviceData.getStatus() != null ? deviceData.getStatus() : 1);
+            deviceInfo.setStatus(deviceData.getStatus() != null ? deviceData.getStatus() : DeviceConstants.DEVICE_STATUS_ONLINE);
             deviceInfo.setUpdateTime(LocalDateTime.now());
 
             if (deviceInfo.getId() == null) {
@@ -230,7 +231,7 @@ public class DeviceDataServiceImpl implements DeviceDataService {
     @Transactional(rollbackFor = Exception.class)
     public void cleanExpiredData() {
         // 清理30天前的历史数据
-        LocalDateTime expireTime = LocalDateTime.now().minusDays(30);
+        LocalDateTime expireTime = LocalDateTime.now().minusDays(DeviceConstants.DATA_RETENTION_DAYS);
 
         LambdaQueryWrapper<HeartbeatRecord> heartbeatWrapper = new LambdaQueryWrapper<>();
         heartbeatWrapper.lt(HeartbeatRecord::getTimestamp, expireTime);
@@ -275,17 +276,17 @@ public class DeviceDataServiceImpl implements DeviceDataService {
         }
 
         // 加载从机数据
-        List<SensorSlaveData> slaveList = sensorSlaveDataMapper.selectRecentByDeviceId(deviceId, 20);
+        List<SensorSlaveData> slaveList = sensorSlaveDataMapper.selectRecentByDeviceId(deviceId, DeviceConstants.RECENT_SLAVE_LIMIT);
         deviceData.setSlaveDataList(slaveList);
 
         // 加载历史数据（最近100条）
-        List<HeartbeatRecord> heartbeats = heartbeatRecordMapper.selectRecentByDeviceId(deviceId, 100);
+        List<HeartbeatRecord> heartbeats = heartbeatRecordMapper.selectRecentByDeviceId(deviceId, DeviceConstants.HEARTBEAT_HISTORY_LIMIT);
         deviceData.setHeartbeatHistory(heartbeats);
 
-        List<MosStateRecord> mosHistory = mosStateRecordMapper.selectRecentByDeviceId(deviceId, 100);
+        List<MosStateRecord> mosHistory = mosStateRecordMapper.selectRecentByDeviceId(deviceId, DeviceConstants.HEARTBEAT_HISTORY_LIMIT);
         deviceData.setMosStateHistory(mosHistory);
 
-        List<SensorRecord> sensorHistory = sensorRecordMapper.selectRecentByDeviceId(deviceId, 100);
+        List<SensorRecord> sensorHistory = sensorRecordMapper.selectRecentByDeviceId(deviceId, DeviceConstants.HEARTBEAT_HISTORY_LIMIT);
         deviceData.setSensorHistory(sensorHistory);
 
         // 加入缓存

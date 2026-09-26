@@ -2,6 +2,7 @@ package com.womi.webmodule.schedule;
 
 import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.commonmodule.schedule.ScheduleConstants;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,9 +20,9 @@ public class CommandScheduler {
     private final MqttPublisher mqttPublisher;
 
     /** 每 5 秒扫描待下发指令 */
-    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedDelay = ScheduleConstants.DISPATCH_FIXED_DELAY)
     public void dispatchPending() {
-        List<DeviceCommand> pending = deviceCommandService.listPending(50);
+        List<DeviceCommand> pending = deviceCommandService.listPending(ScheduleConstants.BATCH_SIZE);
         for (DeviceCommand command : pending) {
             try {
                 mqttPublisher.sendCommandWithId(
@@ -39,9 +40,9 @@ public class CommandScheduler {
     }
 
     /** 每 30 秒检查一次超时未 ACK 的指令并重试 */
-    @Scheduled(fixedDelay = 30000)
+    @Scheduled(fixedDelay = ScheduleConstants.RETRY_FIXED_DELAY)
     public void retryTimeout() {
-        List<DeviceCommand> retryable = deviceCommandService.listRetryable(30, 50);
+        List<DeviceCommand> retryable = deviceCommandService.listRetryable(ScheduleConstants.RETRY_TIMEOUT_SECONDS, ScheduleConstants.BATCH_SIZE);
         for (DeviceCommand command : retryable) {
             try {
                 mqttPublisher.sendCommandWithId(
@@ -60,7 +61,7 @@ public class CommandScheduler {
     }
 
     /** 每 60 秒标记一次过期指令 */
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelay = ScheduleConstants.MARK_EXPIRED_FIXED_DELAY)
     public void markExpired() {
         try {
             deviceCommandService.markExpiredCommands();
@@ -70,10 +71,10 @@ public class CommandScheduler {
     }
 
     /** 每天凌晨 2 点清理 30 天前的历史指令 */
-    @Scheduled(cron = "0 0 2 * * ?")
+    @Scheduled(cron = ScheduleConstants.CLEAN_HISTORY_CRON)
     public void cleanHistory() {
         try {
-            deviceCommandService.cleanHistory(30);
+            deviceCommandService.cleanHistory(ScheduleConstants.CLEAN_RETENTION_DAYS);
         } catch (Exception e) {
             log.error("清理历史指令失败", e);
         }
