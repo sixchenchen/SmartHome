@@ -1,0 +1,92 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/wm_laohua?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&useUnicode=true
+    username: root
+    password: 123456
+    type: com.alibaba.druid.pool.DruidDataSource  # 显式指定 Druid
+
+    druid:
+      # 连接池大小配置（对应 Hikari）
+      initial-size: 5           # 初始化连接数
+      min-idle: 5               # 最小空闲连接（对应 minimum-idle）
+      max-active: 10            # 最大活跃连接（对应 maximum-pool-size）
+      max-wait: 30000           # 获取连接最大等待时间，单位毫秒（对应 connection-timeout）
+
+      # 连接检测与回收
+      time-between-eviction-runs-millis: 60000   # 多久检测一次空闲连接
+      min-evictable-idle-time-millis: 300000     # 连接最小存活时间（5分钟）
+      max-evictable-idle-time-millis: 900000     # 连接最大存活时间（15分钟，类似 max-lifetime）
+
+      # 连接有效性检测
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+
+      # PreparedStatement 缓存（Druid 特有优势）
+      pool-prepared-statements: true
+      max-pool-prepared-statement-per-connection-size: 20
+
+      # 过滤器：stat(监控统计)、wall(SQL防火墙)、slf4j(日志)
+      filters: stat,wall,slf4j
+
+      # 合并 Druid 监控数据（多数据源时需配）
+      use-global-data-source-stat: true
+
+      # 连接属性（可选）
+      connection-properties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
+
+  # Jackson JSON 配置
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: true
+    default-property-inclusion: non_null
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath*:mapper/*.xml
+  type-aliases-package: com.womi.businessmodule.model
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# MQTT 配置
+mqtt:
+  host: 192.168.124.6
+  port: 1883
+  client-id: wm-laohua-server
+  username: MQTT1
+  password: 123456
+  topics:
+    - device/+/heart
+    - device/+/mos_state
+    - device/+/sensor
+  qos:
+    - 1
+    - 1
+    - 1
+  default-qos: 1
+  keep-alive-interval: 60
+  connection-timeout: 30
+  automatic-reconnect: true
+  clean-session: true
+
+# 日志配置
+logging:
+  level:
+    com.womi: debug
+    com.womi.business.mapper: debug
