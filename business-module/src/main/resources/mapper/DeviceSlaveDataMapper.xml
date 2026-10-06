@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.womi.businessmodule.mapper.DeviceSlaveDataMapper">
+
+    <select id="selectByDeviceId" resultType="com.womi.businessmodule.model.DeviceSlaveData">
+        SELECT *
+        FROM device_slave_data
+        WHERE device_id = #{deviceId}
+        ORDER BY address, slave_type, channel
+    </select>
+
+    <delete id="deleteByDeviceAndAddress">
+        DELETE FROM device_slave_data
+        WHERE device_id = #{deviceId}
+          AND address = #{address}
+    </delete>
+
+    <delete id="deleteByDeviceId">
+        DELETE FROM device_slave_data
+        WHERE device_id = #{deviceId}
+    </delete>
+
+</mapper>

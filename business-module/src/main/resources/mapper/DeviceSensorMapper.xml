@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.womi.businessmodule.mapper.DeviceSensorMapper">
+
+    <select id="selectByDeviceId" resultType="com.womi.businessmodule.model.DeviceSensor">
+        SELECT *
+        FROM device_sensor
+        WHERE device_id = #{deviceId}
+        ORDER BY source, slave_address, sensor_id
+    </select>
+
+    <select id="selectBySlaveAddress" resultType="com.womi.businessmodule.model.DeviceSensor">
+        SELECT *
+        FROM device_sensor
+        WHERE device_id = #{deviceId}
+          AND slave_address = #{slaveAddress}
+        ORDER BY sensor_id
+    </select>
+
+</mapper>

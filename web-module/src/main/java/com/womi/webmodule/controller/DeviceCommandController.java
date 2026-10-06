@@ -2,10 +2,8 @@ package com.womi.webmodule.controller;
 
 import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.service.DeviceCommandService;
-import com.womi.commonmodule.command.CommandConstants;
-import com.womi.webmodule.dto.request.SendCommandRequest;
-import com.womi.webmodule.service.DeviceCommandSender;
-import lombok.Data;
+import com.womi.commonmodule.constants.CommandConstants;
+import com.womi.webmodule.dto.mqtt.request.SendCommandRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,20 +15,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DeviceCommandController {
 
-    private final DeviceCommandSender deviceCommandSender;
     private final DeviceCommandService deviceCommandService;
 
     /** 下发指令 */
     @PostMapping("/send")
     public String send(@RequestBody SendCommandRequest req) {
-        return deviceCommandSender.sendCommand(
-                req.getDeviceId(),
-                req.getCommandType(),
-                req.getPayload(),
-                req.getOperator() != null ? req.getOperator() : CommandConstants.WEB_DEFAULT_OPERATOR,
-                CommandConstants.DEFAULT_SOURCE,
-                req.getExpireSeconds() != null ? req.getExpireSeconds() : CommandConstants.DEFAULT_EXPIRE_SECONDS
-        );
+       return null;
     }
 
     /** 查询指令详情 */
@@ -57,7 +47,7 @@ public class DeviceCommandController {
     /** 状态统计 */
     @GetMapping("/stats/{deviceId}")
     public Map<Integer, Long> stats(@PathVariable String deviceId) {
-        return deviceCommandService.countByStatus(deviceId);
+        return null;
     }
 
 

@@ -1,12 +1,11 @@
 package com.womi.webmodule.controller;
 
 
-import com.womi.commonmodule.response.ApiResponse;
+import com.womi.webmodule.dto.http.response.ApiResponse;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -24,8 +23,7 @@ public class MqttTestController {
             @PathVariable String deviceId,
             @RequestParam String command,
             @RequestBody Map<String, Object> data) {
-        mqttPublisher.sendCommand(deviceId, command, data);
-        return ApiResponse.success("命令发送成功", null);
+        return null;
     }
 
     /**
@@ -44,10 +42,6 @@ public class MqttTestController {
      */
     @PostMapping("/test/control")
     public ApiResponse<Void> testControl(@RequestParam String deviceId) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("action", "restart");
-        data.put("delay", 5);
-        mqttPublisher.sendCommand(deviceId, "control", data);
-        return ApiResponse.success("控制命令已发送", null);
+        return null;
     }
 }

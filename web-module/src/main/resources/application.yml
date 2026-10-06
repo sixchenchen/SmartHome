@@ -6,7 +6,7 @@ server:
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/wm_laohua?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&useUnicode=true
+    url: jdbc:mysql://localhost:3306/smart_device?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&useUnicode=true
     username: root
     password: 123456
     type: com.alibaba.druid.pool.DruidDataSource  # 显式指定 Druid
@@ -41,7 +41,19 @@ spring:
 
       # 连接属性（可选）
       connection-properties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
-
+  data:
+    redis:
+      host: 192.168.6.6
+      port: 6379
+      password:            # 没密码就留空
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: 3000ms
   # Jackson JSON 配置
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
@@ -72,13 +84,25 @@ mqtt:
   username: MQTT1
   password: 123456
   topics:
-    - device/+/heart
-    - device/+/mos_state
+    - /provision/device/+/register
+    - device/+/online
+    - device/+/offline
+    - device/+/will
+    - device/+/heartbeat
+    - device/+/state
+    - device/+/ack
+    - device/+/event
     - device/+/sensor
   qos:
     - 1
     - 1
     - 1
+    - 1
+    - 0
+    - 1
+    - 1
+    - 1
+    - 0
   default-qos: 1
   keep-alive-interval: 60
   connection-timeout: 30

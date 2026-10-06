@@ -1,206 +1,91 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-
 <mapper namespace="com.womi.businessmodule.mapper.DeviceCommandMapper">
 
-    <!-- ==================== 基础字段 ==================== -->
-    <sql id="Base_Column_List">
-        id, command_id, device_id, command_type, payload, qos, retain,
-        status, retry_count, max_retry, error_msg, response_payload,
-        operator, source, expire_time, send_time, ack_time,
-        create_time, update_time
-    </sql>
-
-    <!-- ==================== 结果映射（🌟 显式指定 JSON 字段的 TypeHandler） ==================== -->
-    <resultMap id="BaseResultMap" type="com.womi.businessmodule.model.DeviceCommand">
-        <id column="id" property="id"/>
-        <result column="command_id" property="commandId"/>
-        <result column="device_id" property="deviceId"/>
-        <result column="command_type" property="commandType"/>
-        <result column="payload" property="payload"
-                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
-        <result column="qos" property="qos"/>
-        <result column="retain" property="retain"/>
-        <result column="status" property="status"/>
-        <result column="retry_count" property="retryCount"/>
-        <result column="max_retry" property="maxRetry"/>
-        <result column="error_msg" property="errorMsg"/>
-        <result column="response_payload" property="responsePayload"
-                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
-        <result column="operator" property="operator"/>
-        <result column="source" property="source"/>
-        <result column="expire_time" property="expireTime"/>
-        <result column="send_time" property="sendTime"/>
-        <result column="ack_time" property="ackTime"/>
-        <result column="create_time" property="createTime"/>
-        <result column="update_time" property="updateTime"/>
-    </resultMap>
-
-    <!-- ==================== 查询方法 ==================== -->
-
-    <select id="selectByCommandId" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM device_command
-        WHERE command_id = #{commandId}
-        LIMIT 1
+    <select id="selectByCommandId" resultType="com.womi.businessmodule.model.DeviceCommand">
+        SELECT * FROM device_command WHERE command_id = #{commandId} LIMIT 1
     </select>
 
-    <select id="selectLatestByDeviceId" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM device_command
-        WHERE device_id = #{deviceId}
-        ORDER BY create_time DESC
-        LIMIT 1
-    </select>
-
-    <select id="selectByDeviceAndStatus" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM device_command
-        WHERE device_id = #{deviceId}
-        <if test="status != null">
-            AND status = #{status}
-        </if>
-        ORDER BY create_time DESC
-    </select>
-
-    <select id="selectByTimeRange" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM device_command
-        WHERE device_id = #{deviceId}
-        AND create_time BETWEEN #{startTime} AND #{endTime}
-        ORDER BY create_time DESC
-    </select>
-
-    <select id="selectPendingCommands" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
+    <select id="selectPendingCommands" resultType="com.womi.businessmodule.model.DeviceCommand">
+        SELECT *
         FROM device_command
         WHERE status = 0
         ORDER BY create_time ASC
         LIMIT #{limit}
     </select>
 
-    <select id="selectRetryableCommands" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
+    <select id="selectRetryableCommands" resultType="com.womi.businessmodule.model.DeviceCommand">
+        SELECT *
         FROM device_command
-        WHERE status IN (1, 2)
-        AND retry_count &lt; max_retry
-        AND (send_time IS NULL OR send_time &lt; DATE_SUB(NOW(), INTERVAL #{timeoutSeconds} SECOND))
+        WHERE status = 1
+          AND retry_count &lt; max_retry
+          AND send_time &lt; NOW(3) - INTERVAL #{timeoutSeconds} SECOND
+          AND expire_time &gt; NOW(3)
         ORDER BY send_time ASC
         LIMIT #{limit}
     </select>
 
-    <select id="selectExpiredCommands" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
+    <select id="selectExpiredCommands" resultType="com.womi.businessmodule.model.DeviceCommand">
+        SELECT *
         FROM device_command
-        WHERE status IN (0, 1, 2)
-        AND expire_time IS NOT NULL
-        AND expire_time &lt; #{now}
+        WHERE status IN (0, 1)
+          AND expire_time &lt; #{now}
     </select>
 
-    <!-- ==================== 更新方法（不变） ==================== -->
     <update id="markAsSent">
         UPDATE device_command
         SET status = 1,
             send_time = #{sendTime},
-            update_time = NOW()
+            update_time = NOW(3)
         WHERE id = #{id}
-          AND status = 0
-    </update>
-
-    <update id="markAsReceived">
-        UPDATE device_command
-        SET status = 2,
-        ack_time = #{ackTime},
-        <if test="responsePayload != null">
-            response_payload = #{responsePayload},
-        </if>
-        update_time = NOW()
-        WHERE command_id = #{commandId}
-    </update>
-
-    <update id="markAsSuccess">
-        UPDATE device_command
-        SET status = 3,
-        ack_time = #{ackTime},
-        <if test="responsePayload != null">
-            response_payload = #{responsePayload},
-        </if>
-        update_time = NOW()
-        WHERE command_id = #{commandId}
-    </update>
-
-    <update id="markAsFailed">
-        UPDATE device_command
-        SET status = 4,
-            ack_time = #{ackTime},
-            error_msg = #{errorMsg},
-            update_time = NOW()
-        WHERE command_id = #{commandId}
     </update>
 
     <update id="incrementRetryCount">
         UPDATE device_command
         SET retry_count = retry_count + 1,
+            status = 1,
             send_time = #{sendTime},
-            update_time = NOW()
+            update_time = NOW(3)
         WHERE id = #{id}
+    </update>
+
+    <update id="markAsSuccess">
+        UPDATE device_command
+        SET status = 2,
+            ack_time = #{ackTime},
+            response_payload = #{responsePayload},
+            update_time = NOW(3)
+        WHERE command_id = #{commandId}
+    </update>
+
+    <update id="markAsFailed">
+        UPDATE device_command
+        SET status = 3,
+            ack_time = #{ackTime},
+            error_msg = #{errorMsg},
+            update_time = NOW(3)
+        WHERE command_id = #{commandId}
+    </update>
+
+    <update id="markAsTimeout">
+        UPDATE device_command
+        SET status = 4,
+        update_time = NOW(3)
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
     </update>
 
     <update id="batchUpdateStatus">
         UPDATE device_command
         SET status = #{status},
-        update_time = NOW()
+        update_time = NOW(3)
         WHERE id IN
-        <foreach collection="ids" item="id" open="(" close=")" separator=",">
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
     </update>
-
-    <update id="cancelCommand">
-        UPDATE device_command
-        SET status = 6,
-            operator = #{operator},
-            update_time = NOW()
-        WHERE id = #{id}
-          AND status IN (0, 1, 2)
-    </update>
-
-    <!-- ==================== 统计方法（保持 resultType） ==================== -->
-    <select id="countByStatus" resultType="java.util.Map">
-        SELECT
-        status,
-        COUNT(*) AS count
-        FROM device_command
-        <if test="deviceId != null">
-            WHERE device_id = #{deviceId}
-        </if>
-        GROUP BY status
-    </select>
-
-    <select id="countByType" resultType="java.util.Map">
-        SELECT
-            command_type,
-            COUNT(*) AS count
-        FROM device_command
-        WHERE create_time BETWEEN #{startTime} AND #{endTime}
-        GROUP BY command_type
-    </select>
-
-    <delete id="deleteFinishedBefore">
-        DELETE FROM device_command
-        WHERE create_time &lt; #{beforeTime}
-        AND status IN
-        <foreach collection="statusList" item="status" open="(" close=")" separator=",">
-            #{status}
-        </foreach>
-    </delete>
 
 </mapper>

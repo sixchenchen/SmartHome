@@ -1,107 +1,58 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-
 <mapper namespace="com.womi.businessmodule.mapper.SensorRecordMapper">
 
-    <!-- ==================== 结果映射 ==================== -->
-
-    <resultMap id="BaseResultMap" type="com.womi.businessmodule.model.SensorRecord">
-        <id column="id" property="id" jdbcType="BIGINT"/>
-        <result column="device_id" property="deviceId" jdbcType="VARCHAR"/>
-        <result column="sensor_data" property="sensorData" jdbcType="VARCHAR"/>
-        <result column="timestamp" property="timestamp" jdbcType="TIMESTAMP"/>
-        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
-    </resultMap>
-
-    <!-- ==================== 基础字段 ==================== -->
-
-    <sql id="Base_Column_List">
-        id, device_id, sensor_data, timestamp, create_time
-    </sql>
-
-    <!-- ==================== 查询方法 ==================== -->
-
-    <!-- 查询设备最近的传感器数据 -->
-    <select id="selectRecentByDeviceId" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
+    <select id="selectBySensorKey" resultType="com.womi.businessmodule.model.SensorRecord">
+        SELECT *
         FROM sensor_record
         WHERE device_id = #{deviceId}
-        ORDER BY timestamp DESC
-        LIMIT #{limit}
-    </select>
-
-    <!-- 查询设备最新的传感器数据 -->
-    <select id="selectLatestByDeviceId" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM sensor_record
-        WHERE device_id = #{deviceId}
-        ORDER BY timestamp DESC
-        LIMIT 1
-    </select>
-
-    <!-- ==================== 额外有用的方法 ==================== -->
-
-    <!-- 查询设备指定时间段的传感器数据 -->
-    <select id="selectByTimeRange" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM sensor_record
-        WHERE device_id = #{deviceId}
-        AND timestamp BETWEEN #{startTime} AND #{endTime}
+        AND sensor_key = #{sensorKey}
+        <if test="start != null">
+            AND timestamp &gt;= #{start}
+        </if>
+        <if test="end != null">
+            AND timestamp &lt;= #{end}
+        </if>
         ORDER BY timestamp DESC
     </select>
 
-    <!-- 查询设备最新的传感器数据（解析特定字段） -->
-    <select id="selectLatestSensorField" resultType="java.lang.String">
-        SELECT
-            JSON_EXTRACT(sensor_data, '$.${fieldPath}') as field_value
+    <select id="selectBySlaveChannel" resultType="com.womi.businessmodule.model.SensorRecord">
+        SELECT *
         FROM sensor_record
         WHERE device_id = #{deviceId}
-          AND JSON_EXTRACT(sensor_data, '$.${fieldPath}') IS NOT NULL
-        ORDER BY timestamp DESC
-        LIMIT 1
+        AND source = 'slave'
+        AND slave_address = #{slaveAddress}
+        <if test="channel != null">
+            AND channel = #{channel}
+        </if>
+        <if test="sensorType != null">
+            AND sensor_type = #{sensorType}
+        </if>
+        <if test="start != null">
+            AND timestamp &gt;= #{start}
+        </if>
+        <if test="end != null">
+            AND timestamp &lt;= #{end}
+        </if>
+        ORDER BY channel, timestamp DESC
     </select>
 
-    <!-- 查询设备传感器数据中的从机列表 -->
-    <select id="selectLatestSlaves" resultType="java.lang.String">
-        SELECT
-            JSON_EXTRACT(sensor_data, '$.slaves') as slaves
-        FROM sensor_record
-        WHERE device_id = #{deviceId}
-          AND JSON_EXTRACT(sensor_data, '$.slaves') IS NOT NULL
-        ORDER BY timestamp DESC
-        LIMIT 1
-    </select>
+    <delete id="deleteBefore">
+        DELETE FROM sensor_record WHERE timestamp &lt; #{time}
+    </delete>
 
-    <!-- 查询设备传感器数据中的特定从机地址 -->
-    <select id="selectLatestSlaveByAddress" resultType="java.util.Map">
-        SELECT
-            JSON_EXTRACT(sensor_data, CONCAT('$.slaves[', #{index}, ']')) as slave_data
+    <select id="selectAvgBySensorKey" resultType="java.lang.Double">
+        SELECT AVG(sensor_value)
         FROM sensor_record
         WHERE device_id = #{deviceId}
-          AND JSON_EXTRACT(sensor_data, CONCAT('$.slaves[', #{index}, ']')) IS NOT NULL
-        ORDER BY timestamp DESC
-        LIMIT 1
-    </select>
-
-    <!-- 统计设备传感器数据记录数 -->
-    <select id="countByDeviceId" resultType="java.lang.Long">
-        SELECT COUNT(*)
-        FROM sensor_record
-        WHERE device_id = #{deviceId}
-    </select>
-
-    <!-- 查询设备最近N小时的传感器数据 -->
-    <select id="selectRecentHours" resultMap="BaseResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM sensor_record
-        WHERE device_id = #{deviceId}
-        AND timestamp >= DATE_SUB(NOW(), INTERVAL #{hours} HOUR)
-        ORDER BY timestamp DESC
+        AND sensor_key = #{sensorKey}
+        <if test="start != null">
+            AND timestamp &gt;= #{start}
+        </if>
+        <if test="end != null">
+            AND timestamp &lt;= #{end}
+        </if>
     </select>
 
 </mapper>

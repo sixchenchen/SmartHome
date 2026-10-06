@@ -2,84 +2,46 @@ package com.womi.businessmodule.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.womi.businessmodule.model.DeviceInfo;
+import com.womi.commonmodule.enums.OfflineReason;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public interface DeviceInfoService extends IService<DeviceInfo> {
 
     /**
-     * 根据设备ID查询设备信息
+     * 获取或创建设备
+     */
+    DeviceInfo getOrCreateDevice(String deviceId);
+
+    /**
+     * 根据 deviceId 查询
      */
     DeviceInfo getByDeviceId(String deviceId);
 
     /**
-     * 查询所有在线设备
+     * 标记设备上线
      */
-    List<DeviceInfo> getOnlineDevices();
+    void markOnline(String deviceId, String product, String firmware, Map<String, Object> capabilities);
 
     /**
-     * 根据设备名称模糊查询
+     * 标记设备离线
      */
-    List<DeviceInfo> getByDeviceName(String deviceName);
+    void markOffline(String deviceId, OfflineReason reason);
 
     /**
-     * 根据状态查询设备列表
+     * 更新心跳
      */
-    List<DeviceInfo> getByStatus(Integer status);
+    void updateHeartbeat(String deviceId, Long uptime, String payload);
 
     /**
-     * 查询最近更新的设备
+     * 查询心跳超时的在线设备
      */
-    List<DeviceInfo> getRecentDevices(int limit);
+    List<DeviceInfo> listHeartbeatTimeoutDevices(int timeoutSeconds);
 
     /**
-     * 查询离线设备（心跳超时）
+     * 标记过期心跳设备离线
      */
-    List<DeviceInfo> getOfflineDevices(int timeoutSeconds);
-
-    /**
-     * 统计设备数量
-     */
-    int countByStatus(Integer status);
-
-    /**
-     * 更新设备在线状态
-     */
-    int updateStatus(String deviceId, Integer status, LocalDateTime heartbeatTime, LocalDateTime updateTime);
-
-    /**
-     * 更新设备信息
-     */
-    int updateDeviceInfo(DeviceInfo deviceInfo);
-
-    /**
-     * 批量更新设备状态
-     */
-    int batchUpdateStatus(List<String> deviceIds, Integer status);
-
-    /**
-     * 插入或更新设备
-     */
-    int insertOrUpdateDevice(DeviceInfo deviceInfo);
-
-    /**
-     * 删除设备
-     */
-    int deleteByDeviceId(String deviceId);
-
-    /**
-     * 批量删除设备
-     */
-    int batchDeleteDevices(List<String> deviceIds);
-
-    /**
-     * 检查设备是否存在
-     */
-    boolean existsByDeviceId(String deviceId);
-
-    /**
-     * 获取设备总数
-     */
-    long getTotalCount();
+    int markHeartbeatTimeoutOffline(int timeoutSeconds);
 }

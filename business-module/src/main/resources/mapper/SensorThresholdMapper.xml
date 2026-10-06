@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.womi.businessmodule.mapper.SensorThresholdMapper">
+
+    <select id="selectByDeviceId" resultType="com.womi.businessmodule.model.SensorThreshold">
+        SELECT *
+        FROM sensor_threshold
+        WHERE device_id = #{deviceId}
+        ORDER BY sensor_type, sensor_key
+    </select>
+
+    <select id="selectBySensorKey" resultType="com.womi.businessmodule.model.SensorThreshold">
+        SELECT *
+        FROM sensor_threshold
+        WHERE device_id = #{deviceId}
+          AND sensor_key = #{sensorKey}
+        LIMIT 1
+    </select>
+
+    <select id="selectAllEnabled" resultType="com.womi.businessmodule.model.SensorThreshold">
+        SELECT *
+        FROM sensor_threshold
+        WHERE enabled = 1
+    </select>
+
+</mapper>

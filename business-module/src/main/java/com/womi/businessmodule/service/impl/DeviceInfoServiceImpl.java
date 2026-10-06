@@ -1,141 +1,126 @@
 package com.womi.businessmodule.service.impl;
 
-
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.womi.businessmodule.mapper.DeviceInfoMapper;
 import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceInfoService;
-import lombok.RequiredArgsConstructor;
+import com.womi.commonmodule.constants.DeviceConstants;
+import com.womi.commonmodule.enums.OfflineReason;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
-public class DeviceInfoServiceImpl extends ServiceImpl<DeviceInfoMapper, DeviceInfo> implements DeviceInfoService {
+public class DeviceInfoServiceImpl
+        extends ServiceImpl<DeviceInfoMapper, DeviceInfo>
+        implements DeviceInfoService {
 
-    private final DeviceInfoMapper deviceInfoMapper;
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DeviceInfo getOrCreateDevice(String deviceId) {
+        DeviceInfo info = getByDeviceId(deviceId);
+        if (info == null) {
+            info = new DeviceInfo();
+            info.setDeviceId(deviceId);
+            info.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
+            save(info);
+            log.info("创建新设备 - deviceId: {}", deviceId);
+        }
+        return info;
+    }
 
     @Override
     public DeviceInfo getByDeviceId(String deviceId) {
-        if (!StringUtils.hasText(deviceId)) {
-            return null;
-        }
-        return deviceInfoMapper.selectByDeviceId(deviceId);
-    }
-
-    @Override
-    public List<DeviceInfo> getOnlineDevices() {
-        return deviceInfoMapper.selectOnlineDevices();
-    }
-
-    @Override
-    public List<DeviceInfo> getByDeviceName(String deviceName) {
-        if (!StringUtils.hasText(deviceName)) {
-            return list();
-        }
-        return deviceInfoMapper.selectByDeviceName(deviceName);
-    }
-
-    @Override
-    public List<DeviceInfo> getByStatus(Integer status) {
-        if (status == null) {
-            return list();
-        }
-        return deviceInfoMapper.selectByStatus(status);
-    }
-
-    @Override
-    public List<DeviceInfo> getRecentDevices(int limit) {
-        return deviceInfoMapper.selectRecentDevices(limit);
-    }
-
-    @Override
-    public List<DeviceInfo> getOfflineDevices(int timeoutSeconds) {
-        return deviceInfoMapper.selectOfflineDevices(timeoutSeconds);
-    }
-
-    @Override
-    public int countByStatus(Integer status) {
-        if (status == null) {
-            return (int) count();
-        }
-        return deviceInfoMapper.countDevicesByStatus(status);
+        return getOne(new LambdaQueryWrapper<DeviceInfo>()
+                .eq(DeviceInfo::getDeviceId, deviceId)
+                .last("LIMIT 1"));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int updateStatus(String deviceId, Integer status,
-                            LocalDateTime heartbeatTime, LocalDateTime updateTime) {
-        if (!StringUtils.hasText(deviceId) || status == null) {
-            return 0;
+    public void markOnline(String deviceId, String product, String firmware, Map<String, Object> capabilities) {
+        DeviceInfo info = getOrCreateDevice(deviceId);
+        LocalDateTime now = LocalDateTime.now();
+        info.setOnline(DeviceConstants.DEVICE_STATUS_ONLINE);
+        info.setOfflineReason(null);
+        info.setLastOnlineTime(now);
+        info.setLastHeartbeatTime(now);
+        info.setLastUpdateTime(now);
+        if (product != null) info.setProduct(product);
+        if (firmware != null) info.setFirmware(firmware);
+        if (capabilities != null && !capabilities.isEmpty()) {
+            info.setCapabilities(capabilities);
         }
-        return deviceInfoMapper.updateStatus(deviceId, status, heartbeatTime, updateTime);
+        updateById(info);
+        log.info("设备上线 - deviceId: {}", deviceId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int updateDeviceInfo(DeviceInfo deviceInfo) {
-        if (deviceInfo == null || !StringUtils.hasText(deviceInfo.getDeviceId())) {
-            return 0;
-        }
-        return deviceInfoMapper.updateDeviceInfo(deviceInfo);
+    public void markOffline(String deviceId, OfflineReason  reason) {
+        DeviceInfo info = getOrCreateDevice(deviceId);
+        LocalDateTime now = LocalDateTime.now();
+        info.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
+        info.setOfflineReason(reason.getCode());
+        info.setLastOfflineTime(now);
+        info.setLastUpdateTime(now);
+        updateById(info);
+        log.info("设备离线 - deviceId: {}, reason: {}", deviceId, reason);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int batchUpdateStatus(List<String> deviceIds, Integer status) {
-        if (deviceIds == null || deviceIds.isEmpty() || status == null) {
-            return 0;
-        }
-        return deviceInfoMapper.batchUpdateStatus(deviceIds, status);
+    public void updateHeartbeat(String deviceId, Long uptime, String payload) {
+        DeviceInfo info = getOrCreateDevice(deviceId);
+        LocalDateTime now = LocalDateTime.now();
+        info.setUptime(uptime);
+        info.setLastHeartbeatTime(now);
+        info.setLastUpdateTime(now);
+        info.setLastPayload(payload);
+        info.setOnline(DeviceConstants.DEVICE_STATUS_ONLINE);
+        info.setOfflineReason(null);
+        updateById(info);
+    }
+
+    @Override
+    public List<DeviceInfo> listHeartbeatTimeoutDevices(int timeoutSeconds) {
+        LocalDateTime threshold = LocalDateTime.now().minusSeconds(timeoutSeconds);
+        return baseMapper.selectHeartbeatTimeoutDevices(threshold);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int insertOrUpdateDevice(DeviceInfo deviceInfo) {
-        if (deviceInfo == null || !StringUtils.hasText(deviceInfo.getDeviceId())) {
+    public int markHeartbeatTimeoutOffline(int timeoutSeconds) {
+        List<DeviceInfo> devices = listHeartbeatTimeoutDevices(timeoutSeconds);
+        if (devices.isEmpty()) {
             return 0;
         }
-        return deviceInfoMapper.insertOrUpdateDevice(deviceInfo);
-    }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public int deleteByDeviceId(String deviceId) {
-        if (!StringUtils.hasText(deviceId)) {
-            return 0;
+        LocalDateTime now = LocalDateTime.now();
+        for (DeviceInfo device : devices) {
+            markAsTimeoutOffline(device, now);
         }
-        return deviceInfoMapper.deleteByDeviceId(deviceId);
+        updateBatchById(devices);
+
+        log.warn("心跳超时标记离线 - 共 {} 台", devices.size());
+        return devices.size();
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public int batchDeleteDevices(List<String> deviceIds) {
-        if (deviceIds == null || deviceIds.isEmpty()) {
-            return 0;
-        }
-        return deviceInfoMapper.batchDeleteDevices(deviceIds);
-    }
 
-    @Override
-    public boolean existsByDeviceId(String deviceId) {
-        if (!StringUtils.hasText(deviceId)) {
-            return false;
-        }
-        LambdaQueryWrapper<DeviceInfo> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(DeviceInfo::getDeviceId, deviceId);
-        return count(wrapper) > 0;
-    }
-
-    @Override
-    public long getTotalCount() {
-        return count();
+    /**
+     * 把设备标记为"心跳超时离线"
+     */
+    private void markAsTimeoutOffline(DeviceInfo device, LocalDateTime now) {
+        device.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
+        device.setOfflineReason(OfflineReason.HEARTBEAT_TIMEOUT.getCode());
+        device.setLastOfflineTime(now);
+        device.setLastUpdateTime(now);
     }
 }

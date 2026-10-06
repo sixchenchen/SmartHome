@@ -7,54 +7,38 @@ import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Mapper
 public interface SensorRecordMapper extends BaseMapper<SensorRecord> {
 
     /**
-     * 查询设备最近的传感器数据
+     * 按 sensor_key 查询指定时间范围的数据
      */
-    List<SensorRecord> selectRecentByDeviceId(@Param("deviceId") String deviceId,
-                                              @Param("limit") int limit);
+    List<SensorRecord> selectBySensorKey(@Param("deviceId") String deviceId,
+                                         @Param("sensorKey") String sensorKey,
+                                         @Param("start") LocalDateTime start,
+                                         @Param("end") LocalDateTime end);
 
     /**
-     * 查询设备最新的传感器数据
+     * 按从机地址 + 通道查询
      */
-    SensorRecord selectLatestByDeviceId(@Param("deviceId") String deviceId);
+    List<SensorRecord> selectBySlaveChannel(@Param("deviceId") String deviceId,
+                                            @Param("slaveAddress") Integer slaveAddress,
+                                            @Param("channel") Integer channel,
+                                            @Param("sensorType") String sensorType,
+                                            @Param("start") LocalDateTime start,
+                                            @Param("end") LocalDateTime end);
 
     /**
-     * 查询设备指定时间段的传感器数据
+     * 删除指定时间之前的数据
      */
-    List<SensorRecord> selectByTimeRange(@Param("deviceId") String deviceId,
-                                         @Param("startTime") LocalDateTime startTime,
-                                         @Param("endTime") LocalDateTime endTime);
+    int deleteBefore(@Param("time") LocalDateTime time);
 
     /**
-     * 查询设备最新的传感器数据（解析特定字段）
+     * 统计某传感器在指定时间范围内的平均值
      */
-    String selectLatestSensorField(@Param("deviceId") String deviceId,
-                                   @Param("fieldPath") String fieldPath);
-
-    /**
-     * 查询设备传感器数据中的从机列表
-     */
-    String selectLatestSlaves(@Param("deviceId") String deviceId);
-
-    /**
-     * 查询设备传感器数据中的特定从机地址
-     */
-    Map<String, Object> selectLatestSlaveByAddress(@Param("deviceId") String deviceId,
-                                                   @Param("index") int index);
-
-    /**
-     * 统计设备传感器数据记录数
-     */
-    Long countByDeviceId(@Param("deviceId") String deviceId);
-
-    /**
-     * 查询设备最近N小时的传感器数据
-     */
-    List<SensorRecord> selectRecentHours(@Param("deviceId") String deviceId,
-                                         @Param("hours") int hours);
+    Double selectAvgBySensorKey(@Param("deviceId") String deviceId,
+                                @Param("sensorKey") String sensorKey,
+                                @Param("start") LocalDateTime start,
+                                @Param("end") LocalDateTime end);
 }
