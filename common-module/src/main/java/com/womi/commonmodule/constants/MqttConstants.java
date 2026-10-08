@@ -276,14 +276,29 @@ public final class MqttConstants {
     public static final boolean PRESENCE_RETAINED = true;
 
     // ---------- MQTT 客户端参数 ----------
-    /**
-     * 入站客户端后缀
-     */
-    public static final String INBOUND_SUFFIX = "-inbound";
-    /**
-     * 出站客户端后缀
-     */
-    public static final String OUTBOUND_SUFFIX = "-outbound";
+    /** 运行时入站客户端后缀 */
+    public static final String RUNTIME_INBOUND_SUFFIX = "-runtime-in";
+
+    /** 运行时出站客户端后缀 */
+    public static final String RUNTIME_OUTBOUND_SUFFIX = "-runtime-out";
+
+    /** 注册入站客户端后缀 */
+    public static final String PROVISION_INBOUND_SUFFIX = "-provision-in";
+
+    /** 注册出站客户端后缀 */
+    public static final String PROVISION_OUTBOUND_SUFFIX = "-provision-out";
+
+    /** 运行时输入通道 Bean 名 */
+    public static final String RUNTIME_INPUT_CHANNEL = "runtimeInputChannel";
+
+    /** 运行时输出通道 Bean 名 */
+    public static final String RUNTIME_OUTPUT_CHANNEL = "runtimeOutputChannel";
+
+    /** 注册输入通道 Bean 名 */
+    public static final String PROVISION_INPUT_CHANNEL = "provisionInputChannel";
+
+    /** 注册输出通道 Bean 名 */
+    public static final String PROVISION_OUTPUT_CHANNEL = "provisionOutputChannel";
 
     // ---------- 硬件参数 ----------
     /**

@@ -2,6 +2,7 @@ package com.womi.webmodule.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -27,8 +28,7 @@ public class NonceService {
             return false;
         }
         String key = KEY_PREFIX + nonce;
-        Boolean success = redisTemplate.opsForValue()
-                .setIfAbsent(key, "used", TTL);
+        Boolean success = redisTemplate.opsForValue().setIfAbsent(key, "used", TTL);
         return Boolean.TRUE.equals(success);
     }
 }

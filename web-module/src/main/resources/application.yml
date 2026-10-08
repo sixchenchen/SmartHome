@@ -43,7 +43,7 @@ spring:
       connection-properties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
   data:
     redis:
-      host: 192.168.6.6
+      host: localhost
       port: 6379
       password:            # 没密码就留空
       database: 0
@@ -78,36 +78,53 @@ mybatis-plus:
 
 # MQTT 配置
 mqtt:
-  host: 192.168.124.6
-  port: 1883
-  client-id: wm-laohua-server
-  username: MQTT1
-  password: 123456
-  topics:
-    - /provision/device/+/register
-    - device/+/online
-    - device/+/offline
-    - device/+/will
-    - device/+/heartbeat
-    - device/+/state
-    - device/+/ack
-    - device/+/event
-    - device/+/sensor
-  qos:
-    - 1
-    - 1
-    - 1
-    - 1
-    - 0
-    - 1
-    - 1
-    - 1
-    - 0
-  default-qos: 1
-  keep-alive-interval: 60
-  connection-timeout: 30
-  automatic-reconnect: true
-  clean-session: true
+  # ============ 运行时 Broker（1883） ============
+  runtime:
+    host: 192.168.1.15
+    port: 1883
+    client-id: wm-laohua-server
+    username: RUNTIME_USER
+    password: 123456
+    topics:
+      - device/+/online
+      - device/+/offline
+      - device/+/will
+      - device/+/heartbeat
+      - device/+/state
+      - device/+/ack
+      - device/+/event
+      - device/+/sensor
+    qos:
+      - 1
+      - 1
+      - 1
+      - 0
+      - 1
+      - 1
+      - 1
+      - 0
+    default-qos: 1
+    keep-alive-interval: 60
+    connection-timeout: 30
+    automatic-reconnect: true
+    clean-session: true
+
+  # ============ 注册 Broker（1884） ============
+  provision:
+    host: 192.168.1.15
+    port: 1884
+    client-id: wm-laohua-provision
+    username: PROVISION_USER
+    password: 123456
+    topics:
+      - /provision/device/+/register
+    qos:
+      - 1
+    default-qos: 1
+    keep-alive-interval: 60
+    connection-timeout: 30
+    automatic-reconnect: true
+    clean-session: true
 
 # 日志配置
 logging:

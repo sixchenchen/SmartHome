@@ -88,11 +88,9 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         }
     }
 
-    // ==================== 私有方法 ====================
-
     /**
      * 校验签名
-     * <p>待签数据：{device}|{timestamp}|{nonce}（注册业务专属格式）
+     * 待签数据：{device}|{timestamp}|{nonce}（注册业务专属格式）
      */
     private boolean verifySignature(RegisterRequest request) {
         if (request.getPubkey() == null || request.getSignature() == null) {
@@ -119,13 +117,15 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     }
 
     private Map<String, Object> buildMqttConfig(String clientId, String username, String password) {
+        MqttProperties.Broker runtime = mqttProperties.getRuntime();
+
         Map<String, Object> mqtt = new LinkedHashMap<>();
-        mqtt.put(MqttConstants.FIELD_MQTT_HOST, mqttProperties.getHost());
-        mqtt.put(MqttConstants.FIELD_MQTT_PORT, mqttProperties.getPort());
+        mqtt.put(MqttConstants.FIELD_MQTT_HOST, runtime.getHost());
+        mqtt.put(MqttConstants.FIELD_MQTT_PORT, runtime.getPort());
         mqtt.put(MqttConstants.FIELD_MQTT_CLIENT_ID, clientId);
         mqtt.put(MqttConstants.FIELD_MQTT_USERNAME, username);
         mqtt.put(MqttConstants.FIELD_MQTT_PASSWORD, password);
-        mqtt.put(MqttConstants.FIELD_MQTT_KEEP_ALIVE, mqttProperties.getKeepAliveInterval());
+        mqtt.put(MqttConstants.FIELD_MQTT_KEEP_ALIVE, runtime.getKeepAliveInterval());
         return mqtt;
     }
 

@@ -18,6 +18,9 @@ import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 
+/**
+ * MQTT 配置：运行时（1883）+ 注册（1884）双通道
+ */
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
@@ -26,88 +29,134 @@ public class MqttConfig {
 
     private final MqttProperties mqttProperties;
 
-    /**
-     * MQTT 客户端工厂
-     */
-    @Bean
-    public MqttPahoClientFactory mqttClientFactory() {
+    // ==================== 通用：连接工厂 ====================
+    private MqttPahoClientFactory createClientFactory(MqttProperties.Broker broker, String label) {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions options = new MqttConnectOptions();
 
-        String serverURI = String.format("tcp://%s:%d",
-                mqttProperties.getHost(), mqttProperties.getPort());
+        String serverURI = String.format("tcp://%s:%d", broker.getHost(), broker.getPort());
         options.setServerURIs(new String[]{serverURI});
 
-        if (mqttProperties.getUsername() != null) {
-            options.setUserName(mqttProperties.getUsername());
+        if (broker.getUsername() != null) {
+            options.setUserName(broker.getUsername());
         }
-        if (mqttProperties.getPassword() != null) {
-            options.setPassword(mqttProperties.getPassword().toCharArray());
+        if (broker.getPassword() != null) {
+            options.setPassword(broker.getPassword().toCharArray());
         }
 
-        options.setKeepAliveInterval(mqttProperties.getKeepAliveInterval());
-        options.setConnectionTimeout(mqttProperties.getConnectionTimeout());
-        options.setAutomaticReconnect(mqttProperties.isAutomaticReconnect());
-        options.setCleanSession(mqttProperties.isCleanSession());
-        options.setMaxInflight(mqttProperties.getMaxInflight());
+        options.setKeepAliveInterval(broker.getKeepAliveInterval());
+        options.setConnectionTimeout(broker.getConnectionTimeout());
+        options.setAutomaticReconnect(broker.isAutomaticReconnect());
+        options.setCleanSession(broker.isCleanSession());
+        options.setMaxInflight(broker.getMaxInflight());
 
-        log.info("MQTT 客户端初始化完成, Broker: {}", serverURI);
+        log.info("[{}] MQTT 客户端工厂初始化完成, Broker: {}", label, serverURI);
         factory.setConnectionOptions(options);
         return factory;
     }
 
-    /**
-     * 入站消息通道
-     */
-    @Bean
-    public MessageChannel mqttInputChannel() {
+    // ==================== 运行时 Broker（1883） ====================
+    @Bean("runtimeClientFactory")
+    public MqttPahoClientFactory runtimeClientFactory() {
+        return createClientFactory(mqttProperties.getRuntime(), "RUNTIME");
+    }
+
+    @Bean("runtimeInputChannel")
+    public MessageChannel runtimeInputChannel() {
         return new DirectChannel();
     }
 
-    /**
-     * MQTT 入站适配器（订阅消息）
-     */
-    @Bean
-    public MessageProducer mqttInbound() {
-        String[] topics = mqttProperties.getTopics().toArray(new String[0]);
-        int[] qos = mqttProperties.getQos().stream().mapToInt(Integer::intValue).toArray();
+    @Bean("runtimeInbound")
+    public MessageProducer runtimeInbound() {
+        MqttProperties.Broker broker = mqttProperties.getRuntime();
+        String[] topics = broker.getTopics().toArray(new String[0]);
+        int[] qos = broker.getQos().stream().mapToInt(Integer::intValue).toArray();
 
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
-                        mqttProperties.getClientId() + MqttConstants.INBOUND_SUFFIX,
-                        mqttClientFactory(),
+                        broker.getClientId() + MqttConstants.RUNTIME_INBOUND_SUFFIX,
+                        runtimeClientFactory(),
                         topics
                 );
 
         adapter.setConverter(new DefaultPahoMessageConverter());
         adapter.setQos(qos);
-        adapter.setOutputChannel(mqttInputChannel());
+        adapter.setOutputChannel(runtimeInputChannel());
 
-        log.info("MQTT 订阅主题: {}", mqttProperties.getTopics());
+        log.info("[RUNTIME] 订阅主题: {}", broker.getTopics());
         return adapter;
     }
 
-    /**
-     * MQTT 出站通道（发送消息）
-     */
-    @Bean
-    public MessageChannel mqttOutputChannel() {
+    @Bean("runtimeOutputChannel")
+    public MessageChannel runtimeOutputChannel() {
         return new DirectChannel();
     }
 
-    /**
-     * MQTT 出站处理器（发送消息）
-     */
-    @Bean
-    @ServiceActivator(inputChannel = "mqttOutputChannel")
-    public MessageHandler mqttOutbound() {
+    @Bean("runtimeOutbound")
+    @ServiceActivator(inputChannel = "runtimeOutputChannel")
+    public MessageHandler runtimeOutbound() {
+        MqttProperties.Broker broker = mqttProperties.getRuntime();
+
         MqttPahoMessageHandler handler =
                 new MqttPahoMessageHandler(
-                        mqttProperties.getClientId() + MqttConstants.OUTBOUND_SUFFIX,
-                        mqttClientFactory()
+                        broker.getClientId() + MqttConstants.RUNTIME_OUTBOUND_SUFFIX,
+                        runtimeClientFactory()
                 );
         handler.setAsync(true);
-        handler.setDefaultQos(mqttProperties.getDefaultQos());
+        handler.setDefaultQos(broker.getDefaultQos());
+        handler.setDefaultRetained(false);
+        return handler;
+    }
+
+    // ==================== 注册 Broker（1884） ====================
+    @Bean("provisionClientFactory")
+    public MqttPahoClientFactory provisionClientFactory() {
+        return createClientFactory(mqttProperties.getProvision(), "PROVISION");
+    }
+
+    @Bean("provisionInputChannel")
+    public MessageChannel provisionInputChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean("provisionInbound")
+    public MessageProducer provisionInbound() {
+        MqttProperties.Broker broker = mqttProperties.getProvision();
+        String[] topics = broker.getTopics().toArray(new String[0]);
+        int[] qos = broker.getQos().stream().mapToInt(Integer::intValue).toArray();
+
+        MqttPahoMessageDrivenChannelAdapter adapter =
+                new MqttPahoMessageDrivenChannelAdapter(
+                        broker.getClientId() + MqttConstants.PROVISION_INBOUND_SUFFIX,
+                        provisionClientFactory(),
+                        topics
+                );
+
+        adapter.setConverter(new DefaultPahoMessageConverter());
+        adapter.setQos(qos);
+        adapter.setOutputChannel(provisionInputChannel());
+
+        log.info("[PROVISION] 订阅主题: {}", broker.getTopics());
+        return adapter;
+    }
+
+    @Bean("provisionOutputChannel")
+    public MessageChannel provisionOutputChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean("provisionOutbound")
+    @ServiceActivator(inputChannel = "provisionOutputChannel")
+    public MessageHandler provisionOutbound() {
+        MqttProperties.Broker broker = mqttProperties.getProvision();
+
+        MqttPahoMessageHandler handler =
+                new MqttPahoMessageHandler(
+                        broker.getClientId() + MqttConstants.PROVISION_OUTBOUND_SUFFIX,
+                        provisionClientFactory()
+                );
+        handler.setAsync(true);
+        handler.setDefaultQos(broker.getDefaultQos());
         handler.setDefaultRetained(false);
         return handler;
     }

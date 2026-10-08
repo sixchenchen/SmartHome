@@ -13,26 +13,25 @@ import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
-/**
- * 设备上线处理器
- * topic: device/{mac}/online
- * <p>
- * payload:
- * {
- * "device": "B4BFE90CDBA0",
- * "product": "SmartHome-v1",
- * "type": "online",
- * "timestamp": 1710000000000,
- * "data": {
- * "firmware": "1.0.29",
- * "capabilities": {
- * "mos": 8,
- * "led": 3,
- * "servo": 2
- * }
- * }
- * }
- */
+/*
+  设备上线处理器
+  topic: device/{mac}/online
+  payload:
+  {
+  "device": "B4BFE90CDBA0",
+  "product": "SmartHome-v1",
+  "type": "online",
+  "timestamp": 1710000000000,
+  "data": {
+  "firmware": "1.0.29",
+  "capabilities": {
+  "mos": 8,
+  "led": 3,
+  "servo": 2
+  }
+ }
+}
+*/
 @Slf4j
 @Component
 @Order(1)

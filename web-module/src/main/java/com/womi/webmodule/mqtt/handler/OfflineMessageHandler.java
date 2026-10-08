@@ -12,20 +12,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * 设备离线处理器
- * topic: device/{mac}/offline
- * <p>
- * payload:
- * {
- * "device": "B4BFE90CDBA0",
- * "product": "SmartHome-v1",
- * "type": "offline",
- * "timestamp": 1710000000000,
- * "data": {
- * "reason": "shutdown"
- * }
- * }
+/*
+  设备离线处理器
+  topic: device/{mac}/offline  device/{mac}/will
+  payload:
+  {
+  "device": "B4BFE90CDBA0",
+  "product": "SmartHome-v1",
+  "type": "offline",
+  "timestamp": 1710000000000,
+  "data": {
+  "reason": "shutdown"
+  }
+}
  */
 @Slf4j
 @Component
@@ -62,22 +61,17 @@ public class OfflineMessageHandler implements MqttMessageHandler {
             if (json != null) {
                 JsonNode dataNode = json.path(MqttConstants.FIELD_DATA);
                 String reasonCode = jsonUtils.getString(dataNode, MqttConstants.FIELD_REASON);
-                reason = OfflineReason.fromCode(reasonCode);   // ← 用 fromCode 反查
+                reason = OfflineReason.fromCode(reasonCode);
             }
 
             // 4. 兜底
             if (reason == null) {
                 reason = isWill ? OfflineReason.MQTT_LWT : OfflineReason.SHUTDOWN;
-                log.warn("离线原因缺失，使用兜底值 - deviceId: {}, topic: {}, reason: {}",
-                        deviceId, topic, reason.getCode());
+                log.warn("离线原因缺失，使用兜底值 - deviceId: {}, topic: {}, reason: {}",deviceId, topic, reason.getCode());
             }
-
             // 5. 标记离线
             deviceInfoService.markOffline(deviceId, reason);
-
-            log.info("设备离线 - deviceId: {}, reason: {}, topic: {}",
-                    deviceId, reason.getCode(), topic);
-
+            log.info("设备离线 - deviceId: {}, reason: {}, topic: {}",deviceId, reason.getCode(), topic);
         } catch (Exception e) {
             log.error("处理离线消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
         }

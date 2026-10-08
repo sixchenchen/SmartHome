@@ -17,26 +17,25 @@ import org.springframework.stereotype.Component;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * 设备注册处理器
- *
- *payload:
- * {
- *   "device": "B4BFE90CDBA0",
- *   "product": "SmartHome-v1",
- *   "type": "register",
- *   "timestamp": 1710000000700,
- *   "data": {
- *     "firmware": "1.0.29",
- *     "chip": "ESP32",
- *     "hardware_version": "V1.0",
- *     "nonce": "550e8400-...",
- *     "pubkey": "-----BEGIN PUBLIC KEY-----...",
- *     "signature": "MEUCIQDxYz..."
- *   }
- * }
- * </pre>
- */
+/*
+  设备注册处理器:通过一下目录文件获取 resources/python/key_json.py -> python key_json.py
+  topic: /provision/device/{mac}/register
+  payload:
+  {
+    "device": "B4BFE90CDBA0",
+    "product": "SmartHome-v1",
+    "type": "register",
+    "timestamp": 1710000000700,
+    "data": {
+      "firmware": "1.0.29",
+      "chip": "ESP32",
+      "hardware_version": "V1.0",
+      "nonce": "550e8400-...",
+      "pubkey": "-----BEGIN PUBLIC KEY-----...",
+      "signature": "MEUCIQDxYz..."
+    }
+  }
+*/
 @Slf4j
 @Component
 @Order(1)
@@ -61,7 +60,6 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
                 log.warn("无法提取设备ID - Topic: {}", topic);
                 return;
             }
-
             // 2. 解析 payload
             JsonNode json = jsonUtils.parse(payload);
             if (json == null) {
@@ -69,25 +67,18 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
                 sendResponse(deviceId, RegisterResponse.error(MqttErrorCode.INVALID_PAYLOAD));
                 return;
             }
-
             // 3. 提取字段 → 组装 RegisterRequest
             RegisterRequest request = buildRequest(deviceId, json);
-
             // 4. 调业务层（含验签、防重放、分配凭据）
             RegisterResponse response = deviceRegisterService.register(request);
-
             // 5. 发送响应
             sendResponse(deviceId, response);
-
-            log.info("设备注册处理完成 - deviceId: {}, success: {}",
-                    deviceId, response.isSuccess());
+            log.info("设备注册处理完成 - deviceId: {}, success: {}",deviceId, response.isSuccess());
 
         } catch (Exception e) {
             log.error("处理注册请求失败 - topic: {}, error: {}", topic, e.getMessage(), e);
         }
     }
-
-    // ==================== 私有方法 ====================
 
     /**
      * 从 JSON 构建 RegisterRequest
@@ -113,8 +104,7 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
      * 发送注册响应到 /provision/device/{mac}/config
      */
     private void sendResponse(String deviceId, RegisterResponse response) {
-        String responseTopic = String.format(
-                MqttConstants.PROVISION_CONFIG_TOPIC_FORMAT, deviceId);
+        String responseTopic = String.format(MqttConstants.PROVISION_CONFIG_TOPIC_FORMAT, deviceId);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put(MqttConstants.FIELD_DEVICE, deviceId);
@@ -130,7 +120,7 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
         }
         payload.put(MqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
 
-        mqttPublisher.publish(responseTopic, payload, MqttConstants.DEFAULT_QOS, false);
+        mqttPublisher.publishProvision(responseTopic, payload, MqttConstants.DEFAULT_QOS, false);
 
         log.info("注册响应已发送 - deviceId: {}, topic: {}", deviceId, responseTopic);
     }

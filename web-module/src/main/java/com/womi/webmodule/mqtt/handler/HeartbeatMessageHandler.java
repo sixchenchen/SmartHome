@@ -12,19 +12,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * 心跳处理器
- * topic: device/{mac}/heartbeat
- * <p>
- * payload:
- * {
- * "device": "B4BFE90CDBA0",
- * "product": "SmartHome-v1",
- * "type": "heartbeat",
- * "timestamp": 1710000000000,
- * "data": { "uptime": 1234, "rssi": -65 }
- * }
- */
+/*
+ 心跳处理器
+ topic: device/{mac}/heartbeat
+ payload:
+  {
+  "device": "B4BFE90CDBA0",
+  "product": "SmartHome-v1",
+  "type": "heartbeat",
+  "timestamp": 1710000000000,
+  "data": { "uptime": 1234, "rssi": -65 }
+  }
+*/
 @Slf4j
 @Component
 @Order(3)
