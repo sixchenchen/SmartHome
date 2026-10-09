@@ -5,8 +5,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.womi.businessmodule.mapper.DeviceCommandMapper;
 import com.womi.businessmodule.model.DeviceCommand;
+import com.womi.businessmodule.service.CommandSender;
 import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.commonmodule.constants.CommandConstants;
 import com.womi.commonmodule.enums.CommandStatus;
+import com.womi.commonmodule.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +26,7 @@ public class DeviceCommandServiceImpl
         implements DeviceCommandService {
 
     private final ObjectMapper objectMapper;
+    private final CommandSender commandSender;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -30,7 +34,7 @@ public class DeviceCommandServiceImpl
                                         Integer channel, Map<String, Object> params,
                                         String operator, String source, int expireSeconds) {
         if (deviceId == null || action == null || target == null) {
-            throw new IllegalArgumentException("deviceId/action/target 不能为空");
+            throw new BusinessException("deviceId/action/target 不能为空");
         }
 
         String commandId = UUID.randomUUID().toString();
@@ -48,13 +52,22 @@ public class DeviceCommandServiceImpl
         cmd.setStatus(CommandStatus.PENDING.getCode());
         cmd.setRetryCount(0);
         cmd.setMaxRetry(3);
-        cmd.setOperator(operator != null ? operator : "system");
-        cmd.setSource(source != null ? source : "WEB");
+        cmd.setOperator(operator != null ? operator : CommandConstants.DEFAULT_OPERATOR);
+        cmd.setSource(source != null ? source : CommandConstants.DEFAULT_SOURCE);
         cmd.setExpireTime(now.plusSeconds(expireSeconds > 0 ? expireSeconds : 30));
 
         save(cmd);
-        log.info("指令已入库 - commandId: {}, deviceId: {}, action: {}, target: {}",
-                commandId, deviceId, action, target);
+
+        // 尝试立即下发
+        try {
+            commandSender.send(cmd);
+            markAsSent(cmd.getId());
+        } catch (Exception e) {
+            // 失败不管，留给定时器
+            log.warn("立即下发失败，等待定时器重试 - commandId: {}", cmd.getCommandId());
+        }
+
+        log.info("指令已入库 - commandId: {}, deviceId: {}, action: {}, target: {}", commandId, deviceId, action, target);
         return cmd;
     }
 

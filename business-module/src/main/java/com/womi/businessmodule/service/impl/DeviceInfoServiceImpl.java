@@ -64,7 +64,7 @@ public class DeviceInfoServiceImpl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void markOffline(String deviceId, OfflineReason  reason) {
+    public void markOffline(String deviceId, OfflineReason reason) {
         DeviceInfo info = getOrCreateDevice(deviceId);
         LocalDateTime now = LocalDateTime.now();
         info.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
@@ -122,5 +122,30 @@ public class DeviceInfoServiceImpl
         device.setOfflineReason(OfflineReason.HEARTBEAT_TIMEOUT.getCode());
         device.setLastOfflineTime(now);
         device.setLastUpdateTime(now);
+    }
+
+    /**
+     * 更新设备OTA状态
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateOtaState(String deviceId, String state, Integer progress, String version) {
+        DeviceInfo info = getByDeviceId(deviceId);
+        if (info == null) {
+            log.warn("设备不存在 - deviceId: {}", deviceId);
+            return;
+        }
+
+        info.setOtaState(state);
+        if (progress != null) {
+            info.setOtaProgress(progress);
+        }
+        if (version != null) {
+            info.setOtaVersion(version);
+        }
+        info.setLastUpdateTime(LocalDateTime.now());
+        updateById(info);
+
+        log.info("设备 OTA 状态更新 - deviceId: {}, state: {}, progress: {}", deviceId, state, progress);
     }
 }

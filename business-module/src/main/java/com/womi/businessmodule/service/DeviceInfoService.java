@@ -44,4 +44,13 @@ public interface DeviceInfoService extends IService<DeviceInfo> {
      * 标记过期心跳设备离线
      */
     int markHeartbeatTimeoutOffline(int timeoutSeconds);
+    /**
+     * 更新 OTA 状态
+     *
+     * @param deviceId 设备ID
+     * @param state    OTA 状态
+     * @param progress 进度 0-100（可空）
+     * @param version  目标版本（可空）
+     */
+    void updateOtaState(String deviceId, String state, Integer progress, String version);
 }

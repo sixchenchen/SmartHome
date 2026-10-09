@@ -1,0 +1,68 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/smart_device?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&useUnicode=true
+    username: root
+    password: 123456
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:
+      database: 0
+
+mqtt:
+  runtime:
+    host: 192.168.1.15
+    port: 1883
+    client-id: wm-laohua-server-dev
+    username: RUNTIME_USER
+    password: 123456
+    topics:
+      - device/+/online
+      - device/+/offline
+      - device/+/will
+      - device/+/heartbeat
+      - device/+/state
+      - device/+/ack
+      - device/+/event
+      - device/+/sensor
+    qos:
+      - 1
+      - 1
+      - 1
+      - 0
+      - 1
+      - 1
+      - 1
+      - 0
+    default-qos: 1
+    keep-alive-interval: 60
+    connection-timeout: 30
+    automatic-reconnect: true
+    clean-session: true
+
+  provision:
+    host: 192.168.1.15
+    port: 1884
+    client-id: wm-laohua-provision-dev
+    username: PROVISION_USER
+    password: 123456
+    topics:
+      - /provision/device/+/register
+    qos:
+      - 1
+    default-qos: 1
+    keep-alive-interval: 60
+    connection-timeout: 30
+    automatic-reconnect: true
+    clean-session: true
+
+firmware:
+  upload-dir: D:/data/firmware/
+  base-url: http://192.168.1.15:8000/firmware/
+
+logging:
+  level:
+    com.womi: debug
+    com.womi.business.mapper: debug

@@ -1,4 +1,4 @@
-package com.womi.webmodule.dto.http;
+package com.womi.commonmodule.constants;
 
 public final class HttpStatusConstants {
     private HttpStatusConstants() {} // 防止实例化

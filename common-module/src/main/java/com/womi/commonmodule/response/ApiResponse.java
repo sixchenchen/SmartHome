@@ -1,10 +1,11 @@
-package com.womi.webmodule.dto.http.response;
+package com.womi.commonmodule.response;
 
 
-import com.womi.webmodule.dto.http.HttpStatusConstants;
+import com.womi.commonmodule.constants.HttpStatusConstants;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -18,20 +19,11 @@ public class ApiResponse<T> {
     private String timestamp;
 
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(
-                HttpStatusConstants.SUCCESS_CODE,
-                HttpStatusConstants.SUCCESS_MESSAGE,
-                data,
-                getCurrentTimestamp()
-        );
+        return new ApiResponse<>(HttpStatusConstants.SUCCESS_CODE, HttpStatusConstants.SUCCESS_MESSAGE, data, getCurrentTimestamp());
     }
 
     public static <T> ApiResponse<T> success(String message, T data) {
-        return new ApiResponse<>(
-                HttpStatusConstants.SUCCESS_CODE,
-                message,
-                data,
-                getCurrentTimestamp()
+        return new ApiResponse<>(HttpStatusConstants.SUCCESS_CODE, message, data, getCurrentTimestamp()
         );
     }
 

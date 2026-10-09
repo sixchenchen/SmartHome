@@ -79,7 +79,6 @@ public class MqttPublisher {
     }
 
     // ==================== 业务方法 ====================
-
     public void sendControlCommand(String deviceId, String commandId,
                                    String action, String target,
                                    Integer channel, Map<String, Object> params) {
@@ -96,11 +95,8 @@ public class MqttPublisher {
             payload.put(MqttConstants.FIELD_PARAMS, params);
         }
         payload.put(MqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
-
         publish(topic, payload, MqttConstants.DEFAULT_QOS, false);
-
-        log.info("MQTT 控制指令下发 - Topic: {}, commandId: {}, action: {}, target: {}, channel: {}",
-                topic, commandId, action, target, channel);
+        log.info("MQTT 控制指令下发 - Topic: {}, commandId: {}, action: {}, target: {}, channel: {}", topic, commandId, action, target, channel);
     }
 
     public void sendOtaCommand(String deviceId, String commandId,

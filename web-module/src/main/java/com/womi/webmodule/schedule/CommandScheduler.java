@@ -1,6 +1,7 @@
 package com.womi.webmodule.schedule;
 
 import com.womi.businessmodule.model.DeviceCommand;
+import com.womi.businessmodule.service.CommandSender;
 import com.womi.businessmodule.service.DeviceCommandService;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import com.womi.webmodule.schedule.constants.ScheduleConstants;
@@ -17,7 +18,7 @@ import java.util.List;
 public class CommandScheduler {
 
     private final DeviceCommandService deviceCommandService;
-    private final MqttPublisher mqttPublisher;
+    private final CommandSender commandSender;
 
     /**
      * 每 5 秒扫描待下发指令
@@ -29,14 +30,7 @@ public class CommandScheduler {
 
         for (DeviceCommand command : pending) {
             try {
-                mqttPublisher.sendControlCommand(
-                        command.getDeviceId(),
-                        command.getCommandId(),
-                        command.getAction(),
-                        command.getTarget(),
-                        command.getChannel(),
-                        command.getParams()
-                );
+                commandSender.send(command);
                 deviceCommandService.markAsSent(command.getId());
                 log.info("定时下发成功 - commandId: {}", command.getCommandId());
             } catch (Exception e) {
@@ -57,14 +51,7 @@ public class CommandScheduler {
 
         for (DeviceCommand command : retryable) {
             try {
-                mqttPublisher.sendControlCommand(
-                        command.getDeviceId(),
-                        command.getCommandId(),
-                        command.getAction(),
-                        command.getTarget(),
-                        command.getChannel(),
-                        command.getParams()
-                );
+                commandSender.send(command);
                 deviceCommandService.incrementRetryCount(command.getId());
                 log.info("指令重试成功 - commandId: {}, 第 {} 次",
                         command.getCommandId(), command.getRetryCount() + 1);

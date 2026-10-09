@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.womi.businessmodule.mapper.FirmwareMapper">
+
+    <select id="selectByVersionAndProduct" resultType="com.womi.businessmodule.model.Firmware">
+        SELECT * FROM firmware
+        WHERE version = #{version}
+        <if test="product != null">
+            AND product = #{product}
+        </if>
+        <if test="product == null">
+            AND product IS NULL
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="selectAllEnabled" resultType="com.womi.businessmodule.model.Firmware">
+        SELECT * FROM firmware
+        WHERE status = 1
+        ORDER BY upload_time DESC
+    </select>
+
+    <select id="selectLatestByProduct" resultType="com.womi.businessmodule.model.Firmware">
+        SELECT * FROM firmware
+        WHERE status = 1 AND product = #{product}
+        ORDER BY upload_time DESC
+        LIMIT 1
+    </select>
+
+</mapper>

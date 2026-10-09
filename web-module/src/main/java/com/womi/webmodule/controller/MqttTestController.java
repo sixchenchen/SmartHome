@@ -1,7 +1,7 @@
 package com.womi.webmodule.controller;
 
 
-import com.womi.webmodule.dto.http.response.ApiResponse;
+import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
