@@ -44,6 +44,502 @@
 - `extractMessageType(topic)`：取 `parts[2]`（如 heartbeat）
 
 ---
+# MQTT 收发架构（双 Broker 双通道 + 全链路安全）
+
+> 本文档描述客户端（Java 后端 / ESP32 设备）与 EMQX 之间的完整通信架构，涵盖**双 Broker 双通道设计**、**客户端认证**、**授权（ACL）**、**监听器配置**、**端口级认证隔离**、**TLS 证书**六大部分。
+
+---
+
+## 一、总体架构图
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│                            EMQX 5.3.0 (192.168.1.15)                      │
+│                                                                           │
+│  ┌────────────────────────────┐        ┌────────────────────────────┐    │
+│  │  注册通道 (provision)      │        │  业务通道 (runtime)         │    │
+│  │                            │        │                            │    │
+│  │  ● 8884 (ssl:provision)    │        │  ● 8883 (ssl:default)      │    │
+│  │  ● 认证器: is_superuser=1  │        │  ● 认证器: is_superuser=0  │    │
+│  │  ● 客户端: PROVISION_USER  │        │  ● 客户端: dev_* 设备       │    │
+│  │  ● ACL: /provision/#       │        │  ● ACL: device/#           │    │
+│  │                            │        │                            │    │
+│  │  ❌ 1884 明文端口已禁用     │        │  ❌ 1883 明文端口已禁用     │    │
+│  └────────────┬───────────────┘        └────────────┬───────────────┘    │
+│               │                                     │                    │
+│               └──────────────┬──────────────────────┘                    │
+│                              │                                           │
+│                  ┌───────────▼───────────┐                               │
+│                  │  MySQL: mqtt_auth     │                               │
+│                  │  ├─ PROVISION_USER    │                               │
+│                  │  ├─ RUNTIME_USER      │                               │
+│                  │  └─ dev_* (设备)      │                               │
+│                  └───────────────────────┘                               │
+│                                                                           │
+│  证书: cert.pem / key.pem (SAN 含 192.168.1.15)                          │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 二、MQTT 收发架构（双 Broker 双通道）
+
+| 通道 | Broker | 客户端后缀 | 订阅主题 | QoS |
+| --- | --- | --- | --- | --- |
+| runtime（运行时） | `ssl://192.168.1.15:8883` | `-runtime-in` / `-runtime-out` | `device/+/online`、`offline`、`will`、`heartbeat`、`state`、`ack`、`event`、`sensor` | 1,1,1,0,1,1,1,0 |
+| provision（注册） | `ssl://192.168.1.15:8884` | `-provision-in` / `-provision-out` | `/provision/device/+/register` | 1 |
+
+**入站链路**：
+```
+inbound MqttPahoMessageDrivenChannelAdapter
+    → runtimeInputChannel / provisionInputChannel
+    → MqttMessageReceiver（读 header mqtt_receivedTopic / mqtt_receivedQos）
+    → MqttMessageRouter.route()
+    → 命中 supports() 的 Handler
+```
+
+**出站链路**：
+```
+MqttPahoMessageHandler（runtimeOutputChannel / provisionOutputChannel，setAsync(true)）
+    → 通过 header mqtt_topic / mqtt_qos / mqtt_retained 透传发布参数
+```
+
+**Topic 解析（公共接口 `MqttMessageHandler` 默认方法）**：
+- `extractDeviceId(topic)`：`device/{mac}/{type}` → 取 `parts[1]` 为 MAC
+- `extractProvisionDeviceId(topic)`：`/provision/device/{mac}/register` → 取 `parts[3]`
+- `extractMessageType(topic)`：取 `parts[2]`（如 heartbeat）
+
+---
+
+## 三、客户端认证（Authentication）
+
+### 3.1 认证器配置
+
+**位置**：EMQX Dashboard → 访问控制 → 客户端认证
+
+**数据源**：MySQL（统一管理服务器账号与设备账号）
+
+| 配置项 | 值 |
+|--------|-----|
+| 服务 | `127.0.0.1:3306` |
+| 数据库 | `smart_device` |
+| 用户名 | `root` |
+| 密码 | `******` |
+| 密码加密方式 | `sha256` |
+| 加盐方式 | `prefix` |
+
+**统一 SQL**：
+
+```sql
+SELECT password, salt, is_superuser
+FROM mqtt_auth
+WHERE username = ${username}
+  AND enabled = 1
+LIMIT 1
+```
+
+### 3.2 数据库认证表
+
+```sql
+CREATE TABLE `mqtt_auth` (
+  `id`           bigint       NOT NULL AUTO_INCREMENT,
+  `username`     varchar(64)  NOT NULL COMMENT 'MQTT用户名',
+  `password`     varchar(128) NULL     COMMENT 'MQTT密码(SHA-256哈希)',
+  `salt`         varchar(32)  NULL     COMMENT '密码盐值',
+  `is_superuser` tinyint      NOT NULL DEFAULT 0 COMMENT '1-服务器 0-设备',
+  `enabled`      tinyint      NOT NULL DEFAULT 1 COMMENT '是否启用',
+  `device_id`    varchar(64)  NULL     COMMENT '关联设备ID(MAC)，服务器为NULL',
+  `create_time`  datetime(3)  DEFAULT CURRENT_TIMESTAMP(3),
+  `update_time`  datetime(3)  DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_username` (`username` ASC) USING BTREE,
+  UNIQUE INDEX `uk_device_id` (`device_id` ASC) USING BTREE
+) ENGINE = InnoDB COMMENT = '统一MQTT认证账号表';
+```
+
+### 3.3 密码加密规范
+
+与 Java 后端 `SaltPasswordUtils` 保持一致：
+
+```
+password_hash = SHA-256( salt + password )    # prefix 模式
+存储格式：
+  - salt     : 16 字节 → 32 位小写十六进制
+  - password : 32 字节 → 64 位小写十六进制
+```
+
+---
+
+## 四、客户端授权（Authorization / ACL）
+
+### 4.1 授权源
+
+**位置**：EMQX Dashboard → 访问控制 → 客户端授权 → 内置数据库
+
+### 4.2 ACL 规则列表（从上往下匹配，命中即止）
+
+| 序号 | 主体 | 匹配值 | 动作 | 主题 | 权限 |
+|------|------|--------|------|------|------|
+| 1 | 用户名 | `PROVISION_USER` | 发布和订阅 | `/provision/#` | ✅ 允许 |
+| 2 | 用户名 | `RUNTIME_USER` | 发布和订阅 | `#` | ✅ 允许 |
+| 3 | 用户名 | `dev_*` | 发布和订阅 | `device/#` | ✅ 允许 |
+| 4 | 所有用户 | （空） | 发布和订阅 | `#` | ❌ **拒绝** |
+
+> **规则 4 是兜底拒绝，必须放在最后。**
+
+### 4.3 规则说明
+
+| 账号 | 允许主题 | 用途 |
+|------|---------|------|
+| `PROVISION_USER` | `/provision/#` | 服务器处理设备注册请求、下发凭据 |
+| `RUNTIME_USER` | `#` | 服务器全局监听所有设备消息（在线、离线、心跳、状态、指令、传感器等） |
+| `dev_*` | `device/#` | 设备只能订阅/发布 `device/` 开头的主题 |
+
+---
+
+## 五、监听器配置
+
+**位置**：EMQX Dashboard → 管理 → 监听器
+
+| 名称 | 类型 | 端口 | 用途 | 状态 | 加密 |
+|------|------|------|------|------|------|
+| `tcp:default` | tcp | 1883 | 业务（旧） | ❌ **已禁用** | 无 |
+| `tcp:provision` | tcp | 1884 | 注册（旧） | ❌ **已禁用** | 无 |
+| `ssl:default` | ssl | **8883** | 业务（新） | ✅ 启用 | TLS |
+| `ssl:provision` | ssl | **8884** | 注册（新） | ✅ 启用 | TLS |
+| `ws:default` | ws | 8083 | WebSocket | 保持默认 | 无 |
+| `wss:default` | wss | 8084 | WebSocket + TLS | 保持默认 | TLS |
+
+### 5.1 监听器绑定认证器
+
+**位置**：EMQX Dashboard → 访问控制 → 客户端授权（每个监听器可单独绑定认证链）
+
+| 监听器 | 绑定的认证链 | SQL 条件 |
+|--------|-------------|---------|
+| `ssl:default` (8883) | 设备认证链 | `AND is_superuser = 0` |
+| `ssl:provision` (8884) | 服务器认证链 | `AND is_superuser = 1` |
+
+---
+
+## 六、端口级认证隔离（关键）
+
+### 6.1 背景
+
+EMQX Dashboard **不支持**在监听器级别绑定不同的认证器，必须**直接修改配置文件** `etc/emqx.conf`。该文件优先级高于 `data/configs/cluster.hocon`。
+
+### 6.2 配置文件追加内容
+
+**文件路径**：`d:\software\emqx-5.3.0-windows-amd64\etc\emqx.conf`
+
+```hocon
+# ===== 端口隔离配置 =====
+
+# 1. 禁用明文的 TCP 端口 (1883, 1884)
+listeners.tcp.default.enable = false
+listeners.tcp.provision.enable = false
+
+# 2. 为 8884 (注册端口) 只允许服务器账号 (is_superuser = 1)
+listeners.ssl.provision.authentication = [
+  {
+    backend = mysql
+    mechanism = password_based
+    enable = true
+    server = "127.0.0.1:3306"
+    database = "smart_device"
+    username = "root"
+    password = "******"
+    query = "SELECT password, salt, is_superuser FROM mqtt_auth WHERE username = ${username} AND enabled = 1 AND is_superuser = 1 LIMIT 1"
+    password_hash_algorithm {
+      name = sha256
+      salt_position = prefix
+    }
+  }
+]
+
+# 3. 为 8883 (业务端口) 只允许设备账号 (is_superuser = 0)
+listeners.ssl.default.authentication = [
+  {
+    backend = mysql
+    mechanism = password_based
+    enable = true
+    server = "127.0.0.1:3306"
+    database = "smart_device"
+    username = "root"
+    password = "******"
+    query = "SELECT password, salt, is_superuser FROM mqtt_auth WHERE username = ${username} AND enabled = 1 AND is_superuser = 0 LIMIT 1"
+    password_hash_algorithm {
+      name = sha256
+      salt_position = prefix
+    }
+  }
+]
+```
+
+### 6.3 语法注意
+
+| 写法 | 是否推荐 | 原因 |
+|------|---------|------|
+| ✅ `listeners.ssl.provision.authentication = [...]` | **推荐** | 只覆盖 `authentication` 子键，不破坏 Dashboard 上配置的证书路径 |
+| ❌ `listeners.ssl.provision { bind = ...; authentication = [...] }` | 不推荐 | 块语法会覆盖整个监听器节点，可能导致 `ssl.certfile` 丢失 |
+
+### 6.4 重启 EMQX
+
+```powershell
+cd /d d:\software\emqx-5.3.0-windows-amd64\bin
+emqx restart
+```
+
+---
+
+## 七、TLS 证书
+
+### 7.1 证书要求
+
+| 项目 | 要求 | 原因 |
+|------|------|------|
+| Common Name | `192.168.1.15` | 客户端用 IP 连接 |
+| Subject Alternative Name | `IP:192.168.1.15, IP:127.0.0.1, DNS:localhost` | **必须**，否则报 `ERR_TLS_CERT_ALTNAME_INVALID` |
+| 有效期 | 测试期 10 年，量产建议 1 年 | 减少重签频率 |
+| 密钥长度 | 4096 bit RSA | 安全合规 |
+
+### 7.2 生成命令
+
+```powershell
+cd /d d:\software\emqx-5.3.0-windows-amd64\etc\certs
+
+# 备份原证书
+copy cert.pem cert.pem.bak
+copy key.pem key.pem.bak
+
+# 生成新证书（含 IP SAN）
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 3650 -nodes `
+  -subj "/CN=192.168.1.15" `
+  -addext "subjectAltName=IP:192.168.1.15,IP:127.0.0.1,DNS:localhost"
+```
+
+### 7.3 验证 SAN
+
+```powershell
+openssl x509 -in cert.pem -noout -text | Select-String "192.168.1.15"
+```
+
+**期望输出**：包含 `IP Address:192.168.1.15`。
+
+### 7.4 更新 Dashboard
+
+编辑 `ssl:default`（8883）和 `ssl:provision`（8884）：
+
+| 字段 | 上传的文件 |
+|------|-----------|
+| TLS Cert | `etc/certs/cert.pem` |
+| TLS Key | `etc/certs/key.pem` |
+| CA Cert | `etc/certs/cert.pem` |
+| 没有证书则 SSL 失败 | `false`（当前阶段） |
+| SSL 版本 | `tlsv1.2`、`tlsv1.3` |
+
+### 7.5 客户端校验
+
+**Java 端（MQTT 客户端）**：
+
+```java
+SSLContext sslContext = SSLContext.getInstance("TLS");
+TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+ks.load(new FileInputStream("cert.pem"), null);
+tmf.init(ks);
+sslContext.init(null, tmf.getTrustManagers(), null);
+
+MqttConnectOptions options = new MqttConnectOptions();
+options.setSocketFactory(sslContext.getSocketFactory());
+```
+
+**ESP32 端（mbedTLS）**：
+
+```cpp
+WiFiClientSecure client;
+client.setCACert(ROOT_CA_CERT);  // cert.pem 内容转为 C 字符串
+client.connect("192.168.1.15", 8883);
+```
+
+---
+
+## 八、Java 后端 MQTT 配置（整合版）
+
+### 8.1 application.yml
+
+```yaml
+mqtt:
+  runtime:
+    host: ssl://192.168.1.15
+    port: 8883
+    username: RUNTIME_USER
+    password: ${MQTT_RUNTIME_PASSWORD}
+    ca-cert: classpath:certs/cert.pem
+    keep-alive-interval: 60
+  provision:
+    host: ssl://192.168.1.15
+    port: 8884
+    username: PROVISION_USER
+    password: ${MQTT_PROVISION_PASSWORD}
+    ca-cert: classpath:certs/cert.pem
+    keep-alive-interval: 60
+```
+
+### 8.2 Java 配置类
+
+```java
+@Configuration
+public class MqttConfig {
+
+    @Bean("runtimeMqttClientFactory")
+    public MqttPahoClientFactory runtimeMqttClientFactory(MqttProperties props) throws Exception {
+        DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
+        MqttConnectOptions options = new MqttConnectOptions();
+        options.setServerURIs(new String[]{props.getRuntime().getHost() + ":" + props.getRuntime().getPort()});
+        options.setUserName(props.getRuntime().getUsername());
+        options.setPassword(props.getRuntime().getPassword().toCharArray());
+        options.setCleanSession(true);
+        options.setAutomaticReconnect(true);
+        options.setSocketFactory(sslSocketFactory(props.getRuntime().getCaCert()));
+        factory.setConnectionOptions(options);
+        return factory;
+    }
+
+    @Bean("provisionMqttClientFactory")
+    public MqttPahoClientFactory provisionMqttClientFactory(MqttProperties props) throws Exception {
+        DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
+        MqttConnectOptions options = new MqttConnectOptions();
+        options.setServerURIs(new String[]{props.getProvision().getHost() + ":" + props.getProvision().getPort()});
+        options.setUserName(props.getProvision().getUsername());
+        options.setPassword(props.getProvision().getPassword().toCharArray());
+        options.setCleanSession(true);
+        options.setAutomaticReconnect(true);
+        options.setSocketFactory(sslSocketFactory(props.getProvision().getCaCert()));
+        factory.setConnectionOptions(options);
+        return factory;
+    }
+
+    private SSLSocketFactory sslSocketFactory(String caCertPath) throws Exception {
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        InputStream is = new ClassPathResource(caCertPath).getInputStream();
+        Certificate ca = cf.generateCertificate(is);
+        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+        ks.load(null, null);
+        ks.setCertificateEntry("ca", ca);
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(ks);
+        SSLContext ctx = SSLContext.getInstance("TLS");
+        ctx.init(null, tmf.getTrustManagers(), null);
+        return ctx.getSocketFactory();
+    }
+}
+```
+
+---
+
+## 九、设备端 MQTT 收发时序
+
+```
+┌─────────────┐                                    ┌─────────────┐
+│  ESP32      │                                    │  EMQX       │
+│  (设备)     │                                    │             │
+└──────┬──────┘                                    └──────┬──────┘
+       │                                                  │
+       │ ① TLS 握手 (8884)                                │
+       │    CN=192.168.1.15, SAN 校验通过                 │
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │ ② CONNECT: PROVISION_USER / <password>           │
+       │    clientId = wm-laohua-provision-dev-provision-in│
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │    EMQX 查询 mqtt_auth:                          │
+       │    is_superuser=1 → 通过 (认证器绑定 8884)        │
+       │                                                  │
+       │ ③ SUBSCRIBE: /provision/device/{MAC}/config      │
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │ ④ PUBLISH: /provision/device/{MAC}/register      │
+       │    { device, product, pubkey, signature, ... }   │
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │    RUNTIME_USER (另一通道) 监听 /provision/#      │
+       │    验签、生成凭据、写入 mqtt_auth                 │
+       │                                                  │
+       │ ⑤ 收到 /provision/device/{MAC}/config            │
+       │    { username, password, port: 8883, ... }       │
+       │<─────────────────────────────────────────────────┤
+       │                                                  │
+       │ ⑥ 断开 8884 连接                                  │
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │ ⑦ TLS 握手 (8883)                                │
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │ ⑧ CONNECT: dev_{MAC} / <new_password>            │
+       │    clientId = device-{MAC}                       │
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │    EMQX 查询 mqtt_auth:                          │
+       │    is_superuser=0 → 通过 (认证器绑定 8883)        │
+       │                                                  │
+       │ ⑨ SUBSCRIBE: device/{MAC}/#                      │
+       ├─────────────────────────────────────────────────>│
+       │                                                  │
+       │ ⑩ 开始业务通信 (心跳、状态、传感器数据)            │
+       │<────────────────────────────────────────────────>│
+```
+
+---
+
+## 十、验证清单
+
+| 验证项 | 方法 | 期望结果 |
+|--------|------|---------|
+| 明文端口 1883 已禁用 | MQTTX 连 1883 | 连接失败 |
+| 明文端口 1884 已禁用 | MQTTX 连 1884 | 连接失败 |
+| `PROVISION_USER` 连 8884 | MQTTX | ✅ 成功 |
+| `PROVISION_USER` 连 8883 | MQTTX | ❌ 失败（`is_superuser=0` 查不到） |
+| 设备账号 `dev_*` 连 8883 | MQTTX | ✅ 成功 |
+| 设备账号 `dev_*` 连 8884 | MQTTX | ❌ 失败（`is_superuser=1` 查不到） |
+| TLS 证书 SAN 校验 | MQTTX 打开 SSL 安全 | ✅ 成功（无 ALTNAME 报错） |
+| ACL 主题隔离 | 设备订阅 `device/OTHER/state` | ❌ 权限拒绝 |
+
+---
+
+## 十一、关键文件与命令
+
+### 11.1 文件路径
+
+| 文件 | 路径 |
+|------|------|
+| 主配置文件 | `d:\software\emqx-5.3.0-windows-amd64\etc\emqx.conf` |
+| 动态配置 | `d:\software\emqx-5.3.0-windows-amd64\data\configs\cluster.hocon` |
+| 证书目录 | `d:\software\emqx-5.3.0-windows-amd64\etc\certs\` |
+| 日志文件 | `d:\software\emqx-5.3.0-windows-amd64\log\emqx.log` |
+
+### 11.2 关键命令
+
+```powershell
+# 重启 EMQX
+cd /d d:\software\emqx-5.3.0-windows-amd64\bin
+emqx restart
+
+# 查看 EMQX 状态
+emqx ctl status
+
+# 查看监听器
+emqx ctl listeners
+
+# 验证证书 SAN
+openssl x509 -in cert.pem -noout -text | Select-String "192.168.1.15"
+```
+
+---
+
+**文档结束**
+
+> 本文档描述了双 Broker 双通道 MQTT 收发架构与 EMQX 全链路安全加固方案。**认证、授权、监听器、端口隔离、TLS 证书**五大安全要素已全部集成到架构中。后续需完成 Java 后端与 ESP32 固件的适配（端口从 1883/1884 切换到 8883/8884，并内嵌 CA 证书）。
 
 ## 三、设备注册（PROVISION）
 
