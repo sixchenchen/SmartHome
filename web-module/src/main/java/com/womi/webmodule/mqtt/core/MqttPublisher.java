@@ -48,7 +48,6 @@ public class MqttPublisher {
     }
 
     // ==================== 注册：发布 ====================
-
     /**
      * 注册响应发布（走 1884）
      */
@@ -57,9 +56,7 @@ public class MqttPublisher {
     }
 
     // ==================== 内部方法 ====================
-
-    private void doPublish(MessageChannel channel, String topic, Object payload,
-                           int qos, boolean retained, String label) {
+    private void doPublish(MessageChannel channel, String topic, Object payload, int qos, boolean retained, String label) {
         try {
             String message = payload instanceof String
                     ? (String) payload

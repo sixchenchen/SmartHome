@@ -15,6 +15,12 @@ public final class DeviceConstants {
     /** 设备状态 - 故障 */
     public static final int DEVICE_STATUS_FAULT = 2;
 
+    /** MQTT状态 - 启用 */
+    public static final int MQTT_STATUS_ENABLE = 1;
+
+    /** MQTT状态 - 禁用 */
+    public static final int MQTT_STATUS_DISABLE = 0;
+
     /** 新建设备默认名称前缀 */
     public static final String DEVICE_NAME_PREFIX = "设备-";
 

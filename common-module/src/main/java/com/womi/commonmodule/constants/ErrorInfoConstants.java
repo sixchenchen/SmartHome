@@ -18,6 +18,10 @@ public final class ErrorInfoConstants {
     public static final String PARAM_MISSING = "缺少必要参数";
     /** 参数非法 */
     public static final String PARAM_INVALID = "参数值非法";
+    /** 密码长度不能少于6位 */
+    public static final String PASSWORD_TOO_SHOW = "密码长度不能少于6位";
+    /** 密码为空 */
+    public static final String PASSWORD_EMPTY = "密码不能为空";
 
     // ==================== 文件相关 ====================
     /** 文件为空 */

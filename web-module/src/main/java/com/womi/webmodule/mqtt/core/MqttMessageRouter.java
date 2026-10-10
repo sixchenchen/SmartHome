@@ -33,7 +33,7 @@ public class MqttMessageRouter {
      */
     private MqttMessageHandler findHandler(String topic) {
         for (MqttMessageHandler handler : handlers) {
-            if (handler.supports(topic)) {
+            if (handler.supports(topic)) { // 遍历匹配当前处理器
                 return handler;
             }
         }

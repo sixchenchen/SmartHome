@@ -3,9 +3,9 @@ package com.womi.commonmodule.utils;
 /**
  * 时间戳校验工具
  */
-public final class TimestampValidator {
+public final class TimestampValidatorUtils {
 
-    private TimestampValidator() {}
+    private TimestampValidatorUtils() {}
 
     /**
      * 校验时间戳是否在指定窗口内

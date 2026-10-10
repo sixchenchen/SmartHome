@@ -309,4 +309,8 @@ public final class MqttConstants {
      * 默认心跳间隔（秒）
      */
     public static final int DEFAULT_HEARTBEAT_INTERVAL = 30;
+    /**
+     * 时间戳清零
+     */
+    public static final Long WILL_TIMESTAMP_DEFAULT = 0L;
 }

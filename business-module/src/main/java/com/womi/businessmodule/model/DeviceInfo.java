@@ -7,6 +7,9 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * 设备信息
+ */
 @Data
 @TableName(value = "device_info", autoResultMap = true)
 public class DeviceInfo {
@@ -26,6 +29,9 @@ public class DeviceInfo {
 
     private String location;
 
+    @TableField("pubkey")
+    private String pubkey;
+
     private Integer online;
 
     @TableField("offline_reason")
@@ -39,9 +45,6 @@ public class DeviceInfo {
 
     @TableField("last_heartbeat_time")
     private LocalDateTime lastHeartbeatTime;
-
-    @TableField("last_update_time")
-    private LocalDateTime lastUpdateTime;
 
     private Long uptime;
 

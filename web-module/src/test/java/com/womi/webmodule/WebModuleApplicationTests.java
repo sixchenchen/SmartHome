@@ -3,6 +3,7 @@ package com.womi.webmodule;
 
 import com.womi.businessmodule.model.*;
 import com.womi.businessmodule.service.*;
+import com.womi.commonmodule.utils.SaltPasswordUtils;
 import com.womi.webmodule.schedule.CommandScheduler;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
@@ -22,15 +23,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebModuleApplicationTests {
 
 
-    private static final String TEST_DEVICE_ID = "TEST_DEVICE_001";
-
     @Test
-    void testAllTables() {
-        log.info("========== 测试所有表 ==========");
+    public void testHash() {
+        String salt = "767f13ac5e1c4dbdddb7f4c288bb085b";
+        String password = "123456";
 
-
-        log.info("========== 所有测试通过 ==========");
+        String hash = SaltPasswordUtils.hash(password, salt);
+        System.out.println("计算哈希: " + hash);
+        System.out.println("数据库值: f43c57babf15d80cd5e961e6dee8b1795dcff8805ca9a4aabc2d048d2499f172");
+        System.out.println("是否一致: " + hash.equals("f43c57babf15d80cd5e961e6dee8b1795dcff8805ca9a4aabc2d048d2499f172"));
     }
-
-
 }

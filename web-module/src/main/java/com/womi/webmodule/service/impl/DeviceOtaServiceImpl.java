@@ -103,7 +103,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         vo.setOtaState(device.getOtaState());
         vo.setOtaProgress(device.getOtaProgress());
         vo.setOtaVersion(device.getOtaVersion());
-        vo.setLastUpdateTime(device.getLastUpdateTime());
+        vo.setUpdateTime(device.getUpdateTime());
         return vo;
     }
 

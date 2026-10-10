@@ -10,7 +10,8 @@ public enum ErrorCode {
     PARAM_ERROR(1000, "参数错误"),
     PARAM_MISSING(1001, "缺少必要参数"),
     PARAM_INVALID(1002, "参数值非法"),
-
+    PASSWORD_EMPTY(1003, "参数为空"),
+    PASSWORD_TOO_SHORT(1004, "密码长度不能少于6位"),
     // ==================== 业务异常 ====================
     BUSINESS_ERROR(2000, "业务异常"),
 

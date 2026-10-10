@@ -3,7 +3,7 @@
 > 本文档描述 **WM_LAOHUA 服务端**（Java，Maven 多模块）与 **ESP32 设备固件**（ESP-IDF v6.0.2）之间的完整通信协议，以及服务端对外提供的 HTTP 接口。
 >
 > - 架构：`common-module`（公共常量/工具/加密）/ `business-module`（业务与数据层）/ `web-module`（HTTP 接口、MQTT 收发、定时任务）
-> - 应用：`web-module`，端口 **8080**，context-path **/api**
+> - 应用：`web-module`，端口 **8080**，上下文路径 **/api**
 > - MQTT 采用**双 Broker 双通道**：运行 Broker **1883** 与注册 Broker **1884** 隔离
 
 ## 文档信息
@@ -16,7 +16,6 @@
 | 下行入口 | `device/{mac}/command`、`$broadcast/command` |
 | 上行 Topic | `online` / `offline` / `will` / `heartbeat` / `state` / `ack` / `event` / `sensor` |
 | 注册 Topic | `/provision/device/{mac}/register`、`/provision/device/{mac}/config` |
-| 注册安全 | ECDSA(P-256) 验签 + nonce 防重放 + timestamp 时间窗口 |
 
 > **设计原则**
 >
@@ -29,8 +28,6 @@
 ---
 
 ## 二、MQTT 收发架构（双 Broker 双通道）
-
-服务端同时维护两套 MQTT 连接，由 `MqttProperties(@ConfigurationProperties("mqtt"))` 配置，订阅主题**来自配置文件**（非硬编码）：
 
 | 通道 | Broker | 客户端后缀 | 订阅主题 | QoS |
 | --- | --- | --- | --- | --- |

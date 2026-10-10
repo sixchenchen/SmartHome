@@ -11,5 +11,5 @@ public class OtaProgressVO {
     private String otaState;
     private Integer otaProgress;
     private String otaVersion;
-    private LocalDateTime lastUpdateTime;
+    private LocalDateTime updateTime;
 }

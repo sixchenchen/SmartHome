@@ -15,12 +15,12 @@ import java.util.Base64;
  * 支持 ECDSA (SHA256withECDSA) + PEM 公钥
  */
 @Slf4j
-public final class SignatureVerifier {
+public final class SignatureVerifierUtils {
 
     private static final String SIGN_ALGORITHM = "SHA256withECDSA";
     private static final String KEY_ALGORITHM = "EC";
 
-    private SignatureVerifier() {}
+    private SignatureVerifierUtils() {}
 
     /**
      * ECDSA 验签

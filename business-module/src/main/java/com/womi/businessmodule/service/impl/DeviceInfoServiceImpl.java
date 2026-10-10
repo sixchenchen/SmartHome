@@ -52,7 +52,6 @@ public class DeviceInfoServiceImpl
         info.setOfflineReason(null);
         info.setLastOnlineTime(now);
         info.setLastHeartbeatTime(now);
-        info.setLastUpdateTime(now);
         if (product != null) info.setProduct(product);
         if (firmware != null) info.setFirmware(firmware);
         if (capabilities != null && !capabilities.isEmpty()) {
@@ -70,7 +69,6 @@ public class DeviceInfoServiceImpl
         info.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
         info.setOfflineReason(reason.getCode());
         info.setLastOfflineTime(now);
-        info.setLastUpdateTime(now);
         updateById(info);
         log.info("设备离线 - deviceId: {}, reason: {}", deviceId, reason);
     }
@@ -82,7 +80,6 @@ public class DeviceInfoServiceImpl
         LocalDateTime now = LocalDateTime.now();
         info.setUptime(uptime);
         info.setLastHeartbeatTime(now);
-        info.setLastUpdateTime(now);
         info.setLastPayload(payload);
         info.setOnline(DeviceConstants.DEVICE_STATUS_ONLINE);
         info.setOfflineReason(null);
@@ -121,7 +118,6 @@ public class DeviceInfoServiceImpl
         device.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
         device.setOfflineReason(OfflineReason.HEARTBEAT_TIMEOUT.getCode());
         device.setLastOfflineTime(now);
-        device.setLastUpdateTime(now);
     }
 
     /**
@@ -143,7 +139,6 @@ public class DeviceInfoServiceImpl
         if (version != null) {
             info.setOtaVersion(version);
         }
-        info.setLastUpdateTime(LocalDateTime.now());
         updateById(info);
 
         log.info("设备 OTA 状态更新 - deviceId: {}, state: {}, progress: {}", deviceId, state, progress);
