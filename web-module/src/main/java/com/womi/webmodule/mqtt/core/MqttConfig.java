@@ -7,6 +7,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.integration.channel.DirectChannel;
 import org.springframework.integration.core.MessageProducer;
@@ -17,6 +18,14 @@ import org.springframework.integration.mqtt.outbound.MqttPahoMessageHandler;
 import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 
 /**
  * MQTT 配置：运行时（1883）+ 注册（1884）双通道
@@ -34,7 +43,7 @@ public class MqttConfig {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         MqttConnectOptions options = new MqttConnectOptions();
 
-        String serverURI = String.format("tcp://%s:%d", broker.getHost(), broker.getPort());
+        String serverURI = String.format("ssl://%s:%d", broker.getHost(), broker.getPort());
         options.setServerURIs(new String[]{serverURI});
 
         if (broker.getUsername() != null) {
@@ -49,7 +58,11 @@ public class MqttConfig {
         options.setAutomaticReconnect(broker.isAutomaticReconnect());
         options.setCleanSession(broker.isCleanSession());
         options.setMaxInflight(broker.getMaxInflight());
-
+        try {
+            options.setSocketFactory(buildSslSocketFactory(broker.getCaCert()));
+        } catch (Exception e) {
+            throw new IllegalStateException("[" + label + "] 初始化 TLS SocketFactory 失败", e);
+        }
         log.info("[{}] MQTT 客户端工厂初始化完成, Broker: {}", label, serverURI);
         factory.setConnectionOptions(options);
         return factory;
@@ -159,5 +172,25 @@ public class MqttConfig {
         handler.setDefaultQos(broker.getDefaultQos());
         handler.setDefaultRetained(false);
         return handler;
+    }
+
+    /**
+     * 从 classpath 加载 CA 证书，构建 SSLSocketFactory
+     */
+    private SSLSocketFactory buildSslSocketFactory(String caCertPath) throws Exception {
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        try (InputStream is = new ClassPathResource(caCertPath).getInputStream()) {
+            Certificate ca = cf.generateCertificate(is);
+            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+            ks.load(null, null);
+            ks.setCertificateEntry("ca", ca);
+
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(ks);
+
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            ctx.init(null, tmf.getTrustManagers(), null);
+            return ctx.getSocketFactory();
+        }
     }
 }

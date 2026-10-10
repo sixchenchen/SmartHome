@@ -13,7 +13,7 @@ public final class MqttConstants {
      */
     public static final String MQTT_CLIENT_ID_PREFIX = "device-";
     /**
-     * MQTT 用户名前缀
+     * MQTT 用户名前缀 (后面主题订阅运行规则是以"dev_*"开头,不能随便改)
      */
     public static final String MQTT_USERNAME_PREFIX = "dev_";
     // ---------- 注册响应字段：MQTT 配置 ----------

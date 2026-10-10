@@ -14,11 +14,17 @@ spring:
 mqtt:
   runtime:
     host: ${MQTT_HOST}
-    port: 1883
+    port: 8883
     client-id: wm-laohua-server-prod
     username: ${MQTT_USERNAME}
     password: ${MQTT_PASSWORD}
-
+  provision:
+    host: ${MQTT_HOST}
+    port: 8884
+    client-id: wm-laohua-provision-prod
+    username: ${MQTT_PROVISION_USERNAME}
+    password: ${MQTT_PROVISION_PASSWORD}
+    ca-cert: certs/cert.pem
 firmware:
   upload-dir: /data/firmware/
   base-url: https://ota.yourdomain.com/firmware/

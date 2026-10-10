@@ -10,16 +10,17 @@ import java.util.List;
 @ConfigurationProperties(prefix = "mqtt")
 public class MqttProperties {
 
-    /** 运行时 Broker（1883） */
+    /** 运行时 Broker（8883） */
     private Broker runtime = new Broker();
 
-    /** 注册 Broker（1884） */
+    /** 注册 Broker（8884） */
     private Broker provision = new Broker();
 
 
     @Data
     public static class Broker {
         private String host = "192.168.124.6";
+        private String caCert = "certs/cert.pem";
         private int port;
         private String clientId;
         private String username;

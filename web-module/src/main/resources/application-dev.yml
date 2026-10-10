@@ -14,10 +14,11 @@ spring:
 mqtt:
   runtime:
     host: 192.168.1.15
-    port: 1883
+    port: 8883
     client-id: wm-laohua-server-dev
     username: RUNTIME_USER
     password: 123456
+    ca-cert: certs/cert.pem
     topics:
       - device/+/online
       - device/+/offline
@@ -44,10 +45,11 @@ mqtt:
 
   provision:
     host: 192.168.1.15
-    port: 1884
+    port: 8884
     client-id: wm-laohua-provision-dev
     username: PROVISION_USER
     password: 123456
+    ca-cert: certs/cert.pem
     topics:
       - /provision/device/+/register
     qos:

@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
+import static com.womi.commonmodule.utils.SaltPasswordUtils.DEFAULT_PASSWORD_LENGTH;
+
 /**
  * MQTT 凭据生成器
  * 负责生成设备连接正式 Broker 所需的客户端 ID、用户名、密码。
@@ -20,20 +22,13 @@ public class MqttCredentialGenerator {
     private static final int PASSWORD_LENGTH = 16;
 
     /**
-     * 生成客户端 ID：device-{mac}
-     */
-    public String generateClientId(String deviceId) {
-        return MqttConstants.MQTT_CLIENT_ID_PREFIX + deviceId;
-    }
-
-    /**
      * 生成完整的 MQTT 凭据
      */
     public MqttCredential generate(String deviceId) {
         String clientId = MqttConstants.MQTT_CLIENT_ID_PREFIX + deviceId;
         String username = MqttConstants.MQTT_USERNAME_PREFIX + deviceId;
 
-        String plainPassword = SaltPasswordUtils.generatePassword();
+        String plainPassword = SaltPasswordUtils.generatePassword(DEFAULT_PASSWORD_LENGTH);
         String salt = SaltPasswordUtils.generateSalt();
         String passwordHash = SaltPasswordUtils.hash(plainPassword, salt);
 

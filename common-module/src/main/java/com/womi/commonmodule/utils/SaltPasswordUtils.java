@@ -103,16 +103,6 @@ public final class SaltPasswordUtils {
     }
 
     // ==================== 生成密码 ====================
-
-    /**
-     * 生成随机密码
-     *
-     * @return 16 位随机字符串
-     */
-    public static String generatePassword() {
-        return generatePassword(DEFAULT_PASSWORD_LENGTH);
-    }
-
     /**
      * 生成指定长度的随机密码
      */
