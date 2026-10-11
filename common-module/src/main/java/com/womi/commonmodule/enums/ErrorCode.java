@@ -10,9 +10,12 @@ public enum ErrorCode {
     PARAM_ERROR(1000, "参数错误"),
     PARAM_MISSING(1001, "缺少必要参数"),
     PARAM_INVALID(1002, "参数值非法"),
-    PASSWORD_EMPTY(1003, "参数为空"),
-    PASSWORD_TOO_SHORT(1004, "密码长度不能少于6位"),
-    // ==================== 业务异常 ====================
+    PARAM_EMPTY(1003, "参数不能为空"),
+
+    PASSWORD_EMPTY(1010, "密码不能为空"),
+    PASSWORD_TOO_SHORT(1011, "密码长度不能少于6位"),
+
+    // ==================== 业务 ====================
     BUSINESS_ERROR(2000, "业务异常"),
 
     // ==================== 文件 ====================
@@ -26,14 +29,22 @@ public enum ErrorCode {
     FIRMWARE_EXIST(4100, "固件版本已存在"),
     FIRMWARE_NOT_FOUND(4101, "固件不存在"),
     FIRMWARE_DISABLED(4102, "固件已禁用"),
+    FIRMWARE_FILE_TOO_LARGE(4103, "固件文件超过大小限制"),
+    FIRMWARE_FILE_NOT_FOUND(4104, "固件文件不存在"),
+    FIRMWARE_VERSION_EMPTY(4105, "版本号不能为空"),
+    FIRMWARE_FORMAT_MUST_BIN(4106, "文件格式必须是 .bin"),
 
     // 设备
     DEVICE_NOT_FOUND(4200, "设备不存在"),
     DEVICE_OFFLINE(4201, "设备离线"),
+    DEVICE_ID_EMPTY(4202, "设备ID为空"),
+    DEVICE_ID_FORMAT_ERROR(4203, "设备ID格式错误"),
+    MAC_FORMAT_ERROR(4204, "MAC 格式错误"),
 
     // OTA
     OTA_START_FAILED(4300, "OTA 触发失败"),
     OTA_IN_PROGRESS(4301, "OTA 正在进行中"),
+    OTA_VERSION_INCOMPATIBLE(4302, "OTA 版本不兼容"),
 
     // ==================== 系统 ====================
     SYSTEM_ERROR(5000, "系统异常"),

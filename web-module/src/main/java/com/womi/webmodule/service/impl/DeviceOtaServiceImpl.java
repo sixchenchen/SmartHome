@@ -9,11 +9,13 @@ import com.womi.businessmodule.service.FirmwareService;
 import com.womi.commonmodule.constants.CommandConstants;
 import com.womi.commonmodule.constants.ErrorInfoConstants;
 import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.enums.CommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.webmodule.dto.ota.request.OtaStartRequest;
 import com.womi.webmodule.dto.ota.response.OtaProgressVO;
 import com.womi.webmodule.dto.ota.response.OtaStartResponse;
+import com.womi.webmodule.mqtt.core.MqttPublisher;
 import com.womi.webmodule.service.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,19 +27,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.womi.commonmodule.constants.CommandConstants.OTA_EXPIRE_SECONDS;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeviceOtaServiceImpl implements DeviceOtaService {
 
-    /**
-     * OTA 默认过期时间：10 分钟
-     */
-    private static final int DEFAULT_OTA_EXPIRE_SECONDS = 600;
-
     private final DeviceInfoService deviceInfoService;
     private final DeviceCommandService deviceCommandService;
     private final FirmwareService firmwareService;
+    private final MqttPublisher mqttPublisher;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -72,11 +72,11 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
 
         int expireSeconds = request.getExpireSeconds() != null && request.getExpireSeconds() > 0
                 ? request.getExpireSeconds()
-                : DEFAULT_OTA_EXPIRE_SECONDS;
+                : OTA_EXPIRE_SECONDS;
 
         for (String deviceId : deviceIds) {
             try {
-                DeviceCommand command = prepareOtaCommand(deviceId, firmware, request.getOperator(), expireSeconds);
+                DeviceCommand command = prepareAndSendOta(deviceId, firmware, request.getOperator(), expireSeconds);
                 response.getCommandIds().add(command.getCommandId());
                 response.setSuccess(response.getSuccess() + 1);
 
@@ -110,17 +110,15 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     // ==================== 私有方法 ====================
 
     /**
-     * 组装 OTA 指令（入库 + MQTT 下发）
+     * 组装 OTA 指令（入库 + 立即下发）
      */
-    private DeviceCommand prepareOtaCommand(String deviceId, Firmware firmware,
+    private DeviceCommand prepareAndSendOta(String deviceId, Firmware firmware,
                                             String operator, int expireSeconds) {
-        // 校验设备存在
         DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
         if (device == null) {
             throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, ErrorInfoConstants.DEVICE_NOT_FOUND);
         }
 
-        // 组装 params
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(MqttConstants.FIELD_OTA_URL, firmware.getUrl());
         params.put(MqttConstants.FIELD_OTA_VERSION, firmware.getVersion());
@@ -131,16 +129,33 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             params.put(MqttConstants.FIELD_OTA_SIZE, firmware.getSize());
         }
 
-        // 入库 + MQTT 下发
-        return deviceCommandService.prepareCommand(
+        // 1. 入库（PENDING）
+        DeviceCommand command = deviceCommandService.prepareCommand(
                 deviceId,
                 MqttConstants.ACTION_START,
                 MqttConstants.TARGET_OTA,
                 null,
                 params,
                 operator != null ? operator : CommandConstants.DEFAULT_OPERATOR,
-                CommandConstants.DEFAULT_SOURCE,
-                expireSeconds
-        );
+                CommandConstants.SOURCE_WEB,
+                expireSeconds);
+
+        // 2. 立即下发
+        try {
+            mqttPublisher.sendControlCommand(
+                    command.getDeviceId(),
+                    command.getCommandId(),
+                    command.getAction(),
+                    command.getTarget(),
+                    command.getChannel(),
+                    command.getParams()
+            );
+            deviceCommandService.updateStatus(command.getId(), CommandStatus.SENT.getCode(), null);
+            log.info("OTA 立即下发成功 - commandId: {}", command.getCommandId());
+        } catch (Exception e) {
+            log.error("OTA 立即下发失败，等待定时器兜底 - commandId: {}, error: {}", command.getCommandId(), e.getMessage(), e);
+        }
+
+        return command;
     }
 }

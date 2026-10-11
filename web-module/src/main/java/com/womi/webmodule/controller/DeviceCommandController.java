@@ -2,53 +2,84 @@ package com.womi.webmodule.controller;
 
 import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.businessmodule.vo.CommandStatsVO;
 import com.womi.commonmodule.constants.CommandConstants;
-import com.womi.webmodule.dto.mqtt.request.SendCommandRequest;
+import com.womi.commonmodule.response.ApiResponse;
+import com.womi.webmodule.dto.http.request.SendCommandRequest;
+import com.womi.webmodule.service.DeviceControlService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/device/command")
 @RequiredArgsConstructor
 public class DeviceCommandController {
 
     private final DeviceCommandService deviceCommandService;
+    private final DeviceControlService deviceControlService;
 
-    /** 下发指令 */
+    /**
+     * 下发指令
+     */
     @PostMapping("/send")
-    public String send(@RequestBody SendCommandRequest req) {
-       return null;
+    public ApiResponse<DeviceCommand> send(@RequestBody SendCommandRequest req) {
+        String operator = req.getOperator() != null ?
+                req.getOperator() : CommandConstants.WEB_DEFAULT_OPERATOR;
+
+        int expireSeconds = req.getExpireSeconds() != null
+                ? req.getExpireSeconds() : CommandConstants.DEFAULT_EXPIRE_SECONDS;
+
+        DeviceCommand command = deviceControlService.sendCommand(
+                req.getDeviceId(),
+                req.getAction(),
+                req.getTarget(),
+                req.getChannel(),
+                req.getParams(),
+                operator,
+                expireSeconds);
+
+        log.info("指令下发请求 - commandId: {}, deviceId: {}, action: {}, target: {}", command.getCommandId(), req.getDeviceId(), req.getAction(), req.getTarget());
+
+        return ApiResponse.success(command);
     }
 
-    /** 查询指令详情 */
+    /**
+     * 查询指令详情
+     */
     @GetMapping("/{commandId}")
-    public DeviceCommand detail(@PathVariable String commandId) {
-        return deviceCommandService.getByCommandId(commandId);
+    public ApiResponse<DeviceCommand> detail(@PathVariable String commandId) {
+        return ApiResponse.success(deviceCommandService.getByCommandId(commandId));
     }
 
-    /** 查询设备指令列表 */
+    /**
+     * 查询设备指令列表
+     */
     @GetMapping("/list")
-    public List<DeviceCommand> list(@RequestParam String deviceId,
-                                    @RequestParam(required = false) Integer status) {
-        return deviceCommandService.listByDeviceAndStatus(deviceId, status);
+    public ApiResponse<List<DeviceCommand>> list(@RequestParam String deviceId,
+                                                 @RequestParam(required = false) Integer status) {
+        return ApiResponse.success(deviceCommandService.listByDeviceAndStatus(deviceId, status));
     }
 
-    /** 取消指令 */
+    /**
+     * 取消指令
+     */
     @PostMapping("/cancel/{id}")
-    public boolean cancel(@PathVariable Long id,
-                          @RequestParam(required = false) String operator) {
-        return deviceCommandService.cancelCommand(id,
+    public ApiResponse<Boolean> cancel(@PathVariable Long id,
+                                       @RequestParam(required = false) String operator) {
+        boolean ok = deviceCommandService.cancelCommand(id,
                 operator != null ? operator : CommandConstants.WEB_DEFAULT_OPERATOR);
+        return ApiResponse.success(ok);
     }
 
-    /** 状态统计 */
+    /**
+     * 状态统计
+     */
     @GetMapping("/stats/{deviceId}")
-    public Map<Integer, Long> stats(@PathVariable String deviceId) {
-        return null;
+    public ApiResponse<CommandStatsVO> stats(@PathVariable String deviceId) {
+        return ApiResponse.success(deviceCommandService.statsByDevice(deviceId));
     }
-
-
 }

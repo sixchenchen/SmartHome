@@ -3,7 +3,7 @@ package com.womi.webmodule.schedule;
 import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.service.CommandSender;
 import com.womi.businessmodule.service.DeviceCommandService;
-import com.womi.webmodule.mqtt.core.MqttPublisher;
+import com.womi.commonmodule.enums.CommandStatus;
 import com.womi.webmodule.schedule.constants.ScheduleConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +11,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+
+import static com.womi.commonmodule.constants.CommandConstants.ERR_TIMEOUT_RETRY_EXCEEDED;
 
 @Slf4j
 @Component
@@ -21,53 +23,81 @@ public class CommandScheduler {
     private final CommandSender commandSender;
 
     /**
-     * 每 5 秒扫描待下发指令
+     * 兜底扫描：立即下发失败的命令PENDING，每 2 秒扫一次
      */
     @Scheduled(fixedDelay = ScheduleConstants.DISPATCH_FIXED_DELAY)
     public void dispatchPending() {
-        List<DeviceCommand> pending = deviceCommandService.listPending(ScheduleConstants.BATCH_SIZE);
-        if (pending.isEmpty()) return;
+        List<DeviceCommand> pending = deviceCommandService.listStalePending(
+                ScheduleConstants.DISPATCH_MIN_WAIT_SECONDS,
+                ScheduleConstants.BATCH_SIZE);
+        if (pending.isEmpty()) {
+            return;
+        }
+
+        log.info("兜底扫描到 {} 条待下发指令", pending.size());
 
         for (DeviceCommand command : pending) {
             try {
+                // 重试次数超上限 → 标记失败
+                if (command.getRetryCount() >= ScheduleConstants.MAX_RETRY) {
+                    deviceCommandService.updateStatus(
+                            command.getId(),
+                            CommandStatus.FAILED.getCode(),
+                            ERR_TIMEOUT_RETRY_EXCEEDED);
+                    log.warn("指令重试次数超限，标记失败 - commandId: {}", command.getCommandId());
+                    continue;
+                }
+
+                // 发送（只做一件事：要么成功更新为 SENT，要么失败保持 PENDING）
                 commandSender.send(command);
-                deviceCommandService.markAsSent(command.getId());
-                log.info("定时下发成功 - commandId: {}", command.getCommandId());
+                deviceCommandService.updateStatus(
+                        command.getId(),
+                        CommandStatus.SENT.getCode(),
+                        null);
+                deviceCommandService.incrementRetryCount(command.getId());
+
+                log.info("兜底下发成功 - commandId: {}, retry: {}", command.getCommandId(), command.getRetryCount() + 1);
             } catch (Exception e) {
-                log.error("定时下发失败 - commandId: {}", command.getCommandId(), e);
+                log.error("兜底下发失败 - commandId: {}, error: {}",
+                        command.getCommandId(), e.getMessage(), e);
             }
         }
     }
 
     /**
-     * 每 30 秒检查一次超时未 ACK 的指令并重试
+     * 超时重试：已 SENT 但 30 秒内没 ACK 的指令，每 5 秒扫一次
      */
     @Scheduled(fixedDelay = ScheduleConstants.RETRY_FIXED_DELAY)
     public void retryTimeout() {
         List<DeviceCommand> retryable = deviceCommandService.listRetryable(
                 ScheduleConstants.RETRY_TIMEOUT_SECONDS,
                 ScheduleConstants.BATCH_SIZE);
-        if (retryable.isEmpty()) return;
-
+        if (retryable.isEmpty()) {
+            return;
+        }
+        log.info("扫描到 {} 条超时未 ACK 指令", retryable.size());
         for (DeviceCommand command : retryable) {
             try {
                 commandSender.send(command);
                 deviceCommandService.incrementRetryCount(command.getId());
-                log.info("指令重试成功 - commandId: {}, 第 {} 次",
-                        command.getCommandId(), command.getRetryCount() + 1);
+                log.info("超时重试成功 - commandId: {}, 第 {}/{} 次", command.getCommandId(), command.getRetryCount() + 1, command.getMaxRetry());
+                log.info("超时重试参数 : {}", command.getParams());
             } catch (Exception e) {
-                log.error("指令重试失败 - commandId: {}", command.getCommandId(), e);
+                log.error("超时重试失败 - commandId: {}, error: {}",command.getCommandId(), e.getMessage(), e);
             }
         }
     }
 
     /**
-     * 每 60 秒标记一次过期指令
+     * 标记过期指令：PENDING/SENT 但已超过 expire_time，每 60 秒一次
      */
     @Scheduled(fixedDelay = ScheduleConstants.MARK_EXPIRED_FIXED_DELAY)
     public void markExpired() {
         try {
-            deviceCommandService.markExpiredCommands();
+            int count = deviceCommandService.markExpiredCommands();
+            if (count > 0) {
+                log.info("标记过期指令 - 共 {} 条", count);
+            }
         } catch (Exception e) {
             log.error("标记过期指令失败", e);
         }
@@ -79,7 +109,10 @@ public class CommandScheduler {
     @Scheduled(cron = ScheduleConstants.CLEAN_HISTORY_CRON)
     public void cleanHistory() {
         try {
-            deviceCommandService.cleanHistory(ScheduleConstants.CLEAN_RETENTION_DAYS);
+            int count = deviceCommandService.cleanHistory(ScheduleConstants.CLEAN_RETENTION_DAYS);
+            if (count > 0) {
+                log.info("清理历史指令 - 共 {} 条", count);
+            }
         } catch (Exception e) {
             log.error("清理历史指令失败", e);
         }

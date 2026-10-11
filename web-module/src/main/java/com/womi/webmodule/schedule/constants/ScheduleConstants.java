@@ -8,49 +8,26 @@ public final class ScheduleConstants {
 
     private ScheduleConstants() {
     } // 防止实例化
-
-    /**
-     * 心跳超时阈值（秒）：连续 3 个心跳周期未收到，判定离线
-     */
+    // 心跳超时阈值（秒）：连续 3 个心跳周期未收到，判定离线
     public static final int HEARTBEAT_TIMEOUT_SECONDS = 90;
-
-    /**
-     * 心跳超时扫描间隔（毫秒）：每 30 秒扫描一次
-     */
+    // 心跳超时扫描间隔（毫秒）：每 30 秒扫描一次
     public static final long HEARTBEAT_SCAN_FIXED_DELAY = 30_000L;
-
-    /**
-     * 待下发指令扫描间隔（毫秒）
-     */
-    public static final long DISPATCH_FIXED_DELAY = 5000L;
-
-    /**
-     * 超时未 ACK 指令重试间隔（毫秒）
-     */
-    public static final long RETRY_FIXED_DELAY = 30000L;
-
-    /**
-     * 过期指令标记间隔（毫秒）
-     */
+    // 待下发指令扫描间隔
+    public static final long DISPATCH_FIXED_DELAY = 2000L;
+    // 超时未 ACK 指令重试间隔（毫秒）
+    public static final long RETRY_FIXED_DELAY = 2000L;
+    // 最小等待时间
+    public static final int DISPATCH_MIN_WAIT_SECONDS = 2;
+    // 最大重试次数
+    public static final int MAX_RETRY = 3;
+    // 过期指令标记间隔
     public static final long MARK_EXPIRED_FIXED_DELAY = 60000L;
-
-    /**
-     * 单批处理条数
-     */
+    // 单批处理条数
     public static final int BATCH_SIZE = 50;
-
-    /**
-     * 重试超时阈值（秒）
-     */
-    public static final int RETRY_TIMEOUT_SECONDS = 30;
-
-    /**
-     * 历史指令清理保留天数
-     */
+    // 重试超时阈值（秒）
+    public static final int RETRY_TIMEOUT_SECONDS = 5;
+    // 历史指令清理保留天数
     public static final int CLEAN_RETENTION_DAYS = 30;
-
-    /**
-     * 每日清理历史指令 cron
-     */
+    // 每日清理历史指令
     public static final String CLEAN_HISTORY_CRON = "0 0 2 * * ?";
 }

@@ -2,12 +2,41 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.womi.businessmodule.mapper.DeviceCommandMapper">
+    <!-- 通用 resultMap：处理 JSON 类型字段 -->
+    <resultMap id="BaseResultMap" type="com.womi.businessmodule.model.DeviceCommand">
+        <id column="id" property="id"/>
+        <result column="command_id" property="commandId"/>
+        <result column="device_id" property="deviceId"/>
+        <result column="action" property="action"/>
+        <result column="target" property="target"/>
+        <result column="channel" property="channel"/>
+        <result column="params" property="params"
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result column="qos" property="qos"/>
+        <result column="retain" property="retain"/>
+        <result column="status" property="status"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="max_retry" property="maxRetry"/>
+        <result column="error_msg" property="errorMsg"/>
+        <result column="response_payload" property="responsePayload"
+                typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result column="operator" property="operator"/>
+        <result column="source" property="source"/>
+        <result column="expire_time" property="expireTime"/>
+        <result column="send_time" property="sendTime"/>
+        <result column="ack_time" property="ackTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
 
-    <select id="selectByCommandId" resultType="com.womi.businessmodule.model.DeviceCommand">
-        SELECT * FROM device_command WHERE command_id = #{commandId} LIMIT 1
+    <select id="selectByCommandId" resultMap="BaseResultMap">
+        SELECT *
+        FROM device_command
+        WHERE command_id = #{commandId}
+        LIMIT 1
     </select>
 
-    <select id="selectPendingCommands" resultType="com.womi.businessmodule.model.DeviceCommand">
+    <select id="selectPendingCommands" resultMap="BaseResultMap">
         SELECT *
         FROM device_command
         WHERE status = 0
@@ -15,7 +44,17 @@
         LIMIT #{limit}
     </select>
 
-    <select id="selectRetryableCommands" resultType="com.womi.businessmodule.model.DeviceCommand">
+    <select id="selectStalePendingCommands" resultMap="BaseResultMap">
+        SELECT *
+        FROM device_command
+        WHERE status = 0
+          AND create_time &lt; NOW(3) - INTERVAL #{minWaitSeconds} SECOND
+          AND expire_time &gt; NOW(3)
+        ORDER BY create_time ASC
+        LIMIT #{batchSize}
+    </select>
+
+    <select id="selectRetryableCommands" resultMap="BaseResultMap">
         SELECT *
         FROM device_command
         WHERE status = 1
@@ -26,7 +65,7 @@
         LIMIT #{limit}
     </select>
 
-    <select id="selectExpiredCommands" resultType="com.womi.businessmodule.model.DeviceCommand">
+    <select id="selectExpiredCommands" resultMap="BaseResultMap">
         SELECT *
         FROM device_command
         WHERE status IN (0, 1)
@@ -35,8 +74,8 @@
 
     <update id="markAsSent">
         UPDATE device_command
-        SET status = 1,
-            send_time = #{sendTime},
+        SET status      = 1,
+            send_time   = #{sendTime},
             update_time = NOW(3)
         WHERE id = #{id}
     </update>
@@ -44,26 +83,25 @@
     <update id="incrementRetryCount">
         UPDATE device_command
         SET retry_count = retry_count + 1,
-            status = 1,
-            send_time = #{sendTime},
+            send_time   = #{sendTime},
             update_time = NOW(3)
         WHERE id = #{id}
     </update>
 
     <update id="markAsSuccess">
         UPDATE device_command
-        SET status = 2,
-            ack_time = #{ackTime},
+        SET status           = 2,
+            ack_time         = #{ackTime},
             response_payload = #{responsePayload},
-            update_time = NOW(3)
+            update_time      = NOW(3)
         WHERE command_id = #{commandId}
     </update>
 
     <update id="markAsFailed">
         UPDATE device_command
-        SET status = 3,
-            ack_time = #{ackTime},
-            error_msg = #{errorMsg},
+        SET status      = 3,
+            ack_time    = #{ackTime},
+            error_msg   = #{errorMsg},
             update_time = NOW(3)
         WHERE command_id = #{commandId}
     </update>
@@ -78,6 +116,16 @@
         </foreach>
     </update>
 
+    <select id="selectStalePending" resultMap="BaseResultMap">
+        SELECT *
+        FROM device_command
+        WHERE status = 0
+          AND create_time &lt; DATE_SUB(NOW(), INTERVAL #{minWaitSeconds} SECOND)
+          AND (expire_time IS NULL OR expire_time &gt; NOW())
+        ORDER BY create_time ASC
+        LIMIT #{batchSize}
+    </select>
+
     <update id="batchUpdateStatus">
         UPDATE device_command
         SET status = #{status},
@@ -88,4 +136,12 @@
         </foreach>
     </update>
 
+    <update id="markExpiredCommands">
+        UPDATE device_command
+        SET status    = 4,
+            error_msg = '指令已过期',
+            ack_time  = NOW(3)
+        WHERE status IN (0, 1)
+          AND expire_time &lt; NOW(3)
+    </update>
 </mapper>

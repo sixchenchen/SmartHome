@@ -313,4 +313,10 @@ public final class MqttConstants {
      * 时间戳清零
      */
     public static final Long WILL_TIMESTAMP_DEFAULT = 0L;
+
+    /** LED 亮度 */
+    public static final String FIELD_BRIGHTNESS = "brightness";
+
+    /** 舵机角度 */
+    public static final String FIELD_ANGLE = "angle";
 }

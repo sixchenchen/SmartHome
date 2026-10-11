@@ -103,12 +103,12 @@ password_hash = SHA-256( salt + password )
 
 ### 4.2 ACL 规则列表（从上往下匹配，命中即止）
 
-| 序号 | 主体 | 匹配值 | 动作 | 主题 | 权限 |
-|------|------|--------|------|------|------|
-| 1 | 用户名 | `PROVISION_USER` | 发布和订阅 | `/provision/#` | ✅ 允许 |
-| 2 | 用户名 | `RUNTIME_USER` | 发布和订阅 | `#` | ✅ 允许 |
-| 3 | 用户名 | `dev_*` | 发布和订阅 | `device/#` | ✅ 允许 |
-| 4 | 所有用户 | （空） | 发布和订阅 | `#` | ❌ **拒绝** |
+| 序号 | 主体 | 匹配值 | 动作 | 主题 | 权限     |
+|------|------|--------|------|------|----------|
+| 1 | 用户名 | `PROVISION_USER` | 发布和订阅 | `/provision/#` |  允许    |
+| 2 | 用户名 | `RUNTIME_USER` | 发布和订阅 | `#` | 允许     |
+| 3 | 用户名 | `dev_*` | 发布和订阅 | `device/#` | 允许     |
+| 4 | 所有用户 | （空） | 发布和订阅 | `#` | **拒绝** |
 
 > **规则 4 是兜底拒绝，必须放在最后。**
 
@@ -235,29 +235,6 @@ openssl x509 -in cert.pem -noout -text | Select-String "192.168.1.15"
 | 没有证书则 SSL 失败 | `false`（当前阶段） |
 | SSL 版本 | `tlsv1.2`、`tlsv1.3` |
 
-### 7.5 客户端校验
-
-**Java 端（MQTT 客户端）**：
-
-```java
-SSLContext sslContext = SSLContext.getInstance("TLS");
-TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-ks.load(new FileInputStream("cert.pem"), null);
-tmf.init(ks);
-sslContext.init(null, tmf.getTrustManagers(), null);
-
-MqttConnectOptions options = new MqttConnectOptions();
-options.setSocketFactory(sslContext.getSocketFactory());
-```
-
-**ESP32 端（mbedTLS）**：
-
-```cpp
-WiFiClientSecure client;
-client.setCACert(ROOT_CA_CERT);  // cert.pem 内容转为 C 字符串
-client.connect("192.168.1.15", 8883);
-```
 
 ---
 
@@ -283,55 +260,6 @@ mqtt:
     keep-alive-interval: 60
 ```
 
-### 8.2 Java 配置类
-
-```java
-@Configuration
-public class MqttConfig {
-
-    @Bean("runtimeMqttClientFactory")
-    public MqttPahoClientFactory runtimeMqttClientFactory(MqttProperties props) throws Exception {
-        DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
-        MqttConnectOptions options = new MqttConnectOptions();
-        options.setServerURIs(new String[]{props.getRuntime().getHost() + ":" + props.getRuntime().getPort()});
-        options.setUserName(props.getRuntime().getUsername());
-        options.setPassword(props.getRuntime().getPassword().toCharArray());
-        options.setCleanSession(true);
-        options.setAutomaticReconnect(true);
-        options.setSocketFactory(sslSocketFactory(props.getRuntime().getCaCert()));
-        factory.setConnectionOptions(options);
-        return factory;
-    }
-
-    @Bean("provisionMqttClientFactory")
-    public MqttPahoClientFactory provisionMqttClientFactory(MqttProperties props) throws Exception {
-        DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
-        MqttConnectOptions options = new MqttConnectOptions();
-        options.setServerURIs(new String[]{props.getProvision().getHost() + ":" + props.getProvision().getPort()});
-        options.setUserName(props.getProvision().getUsername());
-        options.setPassword(props.getProvision().getPassword().toCharArray());
-        options.setCleanSession(true);
-        options.setAutomaticReconnect(true);
-        options.setSocketFactory(sslSocketFactory(props.getProvision().getCaCert()));
-        factory.setConnectionOptions(options);
-        return factory;
-    }
-
-    private SSLSocketFactory sslSocketFactory(String caCertPath) throws Exception {
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        InputStream is = new ClassPathResource(caCertPath).getInputStream();
-        Certificate ca = cf.generateCertificate(is);
-        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-        ks.load(null, null);
-        ks.setCertificateEntry("ca", ca);
-        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        tmf.init(ks);
-        SSLContext ctx = SSLContext.getInstance("TLS");
-        ctx.init(null, tmf.getTrustManagers(), null);
-        return ctx.getSocketFactory();
-    }
-}
-```
 
 ---
 
@@ -574,8 +502,6 @@ openssl x509 -in cert.pem -noout -text | Select-String "192.168.1.15"
 ---
 
 ## 四、运行态上行消息（设备 → 服务器）
-
-> 以下所有主题格式为 `device/{mac}/{type}`。除在线/离线/心跳/注册外，`state`/`ack`/`event`/`sensor` 四个主题**已被服务端订阅但处理器尚未接线**（后续版本接入）。已实现处理器见下。
 
 ### 4.1 上线 `device/{mac}/online`
 

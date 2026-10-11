@@ -43,6 +43,11 @@ public interface DeviceCommandMapper extends BaseMapper<DeviceCommand> {
     int incrementRetryCount(@Param("id") Long id, @Param("sendTime") LocalDateTime sendTime);
 
     /**
+     * 查询 PENDING
+     */
+    List<DeviceCommand> selectStalePendingCommands(@Param("minWaitSeconds") int minWaitSeconds, @Param("batchSize") int batchSize);
+
+    /**
      * 标记成功
      */
     int markAsSuccess(@Param("commandId") String commandId,

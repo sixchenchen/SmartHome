@@ -20,6 +20,7 @@
             <groupId>com.womi</groupId>
             <artifactId>business-module</artifactId>
         </dependency>
+
         <!-- Spring -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

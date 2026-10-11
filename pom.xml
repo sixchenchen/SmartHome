@@ -46,6 +46,8 @@
                 <artifactId>common-module</artifactId>
                 <version>${project.version}</version>
             </dependency>
+
+
             <dependency>
                 <groupId>com.womi</groupId>
                 <artifactId>business-module</artifactId>

@@ -5,10 +5,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.womi.businessmodule.mapper.DeviceCommandMapper;
 import com.womi.businessmodule.model.DeviceCommand;
-import com.womi.businessmodule.service.CommandSender;
 import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.businessmodule.vo.CommandStatsVO;
 import com.womi.commonmodule.constants.CommandConstants;
 import com.womi.commonmodule.enums.CommandStatus;
+import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,22 +22,16 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DeviceCommandServiceImpl
-        extends ServiceImpl<DeviceCommandMapper, DeviceCommand>
-        implements DeviceCommandService {
+public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, DeviceCommand> implements DeviceCommandService {
 
     private final ObjectMapper objectMapper;
-    private final CommandSender commandSender;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public DeviceCommand prepareCommand(String deviceId, String action, String target,
-                                        Integer channel, Map<String, Object> params,
-                                        String operator, String source, int expireSeconds) {
+    public DeviceCommand prepareCommand(String deviceId, String action, String target, Integer channel, Map<String, Object> params, String operator, String source, int expireSeconds) {
         if (deviceId == null || action == null || target == null) {
-            throw new BusinessException("deviceId/action/target 不能为空");
+            throw new BusinessException(ErrorCode.PARAM_EMPTY);
         }
-
         String commandId = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
 
@@ -47,35 +42,42 @@ public class DeviceCommandServiceImpl
         cmd.setTarget(target);
         cmd.setChannel(channel);
         cmd.setParams(params != null ? params : Collections.emptyMap());
-        cmd.setQos(1);
-        cmd.setRetain(0);
+        cmd.setQos(CommandConstants.DEFAULT_QOS);
+        cmd.setRetain(CommandConstants.DEFAULT_RETAIN);
         cmd.setStatus(CommandStatus.PENDING.getCode());
         cmd.setRetryCount(0);
-        cmd.setMaxRetry(3);
+        cmd.setMaxRetry(CommandConstants.DEFAULT_MAX_RETRY);
         cmd.setOperator(operator != null ? operator : CommandConstants.DEFAULT_OPERATOR);
-        cmd.setSource(source != null ? source : CommandConstants.DEFAULT_SOURCE);
-        cmd.setExpireTime(now.plusSeconds(expireSeconds > 0 ? expireSeconds : 30));
+        cmd.setSource(source != null ? source : CommandConstants.SOURCE_WEB);
+        cmd.setExpireTime(now.plusSeconds(expireSeconds > 0 ? expireSeconds : CommandConstants.DEFAULT_EXPIRE_SECONDS));
 
         save(cmd);
-
-        // 尝试立即下发
-        try {
-            commandSender.send(cmd);
-            markAsSent(cmd.getId());
-        } catch (Exception e) {
-            // 失败不管，留给定时器
-            log.warn("立即下发失败，等待定时器重试 - commandId: {}", cmd.getCommandId());
-        }
-
-        log.info("指令已入库 - commandId: {}, deviceId: {}, action: {}, target: {}", commandId, deviceId, action, target);
+        log.info("指令已入库 - commandId: {}, deviceId: {}, action: {}, target: {}, params: {}", commandId, deviceId, action, target, params);
         return cmd;
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void markAsSent(Long id) {
-        baseMapper.markAsSent(id, LocalDateTime.now());
+    public void updateStatus(Long id, Integer status, String errorMsg) {
+        DeviceCommand update = new DeviceCommand();
+        update.setId(id);
+        update.setStatus(status);
+
+        if (errorMsg != null) {
+            update.setErrorMsg(errorMsg);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (status == CommandStatus.SENT.getCode()) {
+            // 已发出：记录发送时间
+            update.setSendTime(now);
+        } else if (status == CommandStatus.SUCCESS.getCode() || status == CommandStatus.FAILED.getCode() || status == CommandStatus.TIMEOUT.getCode()) {
+            // 终态：记录响应时间
+            update.setAckTime(now);
+        }
+        updateById(update);
+        log.debug("指令状态更新 - id: {}, status: {}, errorMsg: {}", id, status, errorMsg);
     }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -84,40 +86,49 @@ public class DeviceCommandServiceImpl
     }
 
     @Override
+    public List<DeviceCommand> listStalePending(int minWaitSeconds, int batchSize) {
+        return baseMapper.selectStalePendingCommands(minWaitSeconds, batchSize);
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void handleAck(String commandId, boolean success, Map<String, Object> payload, String errorMsg) {
-        DeviceCommand cmd = baseMapper.selectByCommandId(commandId);
-        if (cmd == null) {
-            log.warn("收到未知指令的 ACK - commandId: {}", commandId);
-            return;
-        }
-        if (cmd.getStatus() != null
-                && (cmd.getStatus() == CommandStatus.SUCCESS.getCode()
-                || cmd.getStatus() == CommandStatus.FAILED.getCode()
-                || cmd.getStatus() == CommandStatus.TIMEOUT.getCode()
-                || cmd.getStatus() == CommandStatus.CANCELLED.getCode())) {
-            log.debug("指令已处于终态，忽略 ACK - commandId: {}, status: {}", commandId, cmd.getStatus());
+        // 1. 参数校验
+        if (commandId == null || commandId.isBlank()) {
+            log.warn("ACK commandId 为空");
             return;
         }
 
-        String responseJson = null;
-        if (payload != null) {
-            try {
-                responseJson = objectMapper.writeValueAsString(payload);
-            } catch (Exception e) {
-                log.error("序列化响应失败", e);
-            }
+        // 2. 查询指令
+        DeviceCommand command = getByCommandId(commandId);
+        if (command == null) {
+            log.warn("ACK 对应的指令不存在 - commandId: {}", commandId);
+            return;
         }
 
-        LocalDateTime now = LocalDateTime.now();
-        if (success) {
-            baseMapper.markAsSuccess(commandId, now, responseJson);
-            log.info("指令执行成功 - commandId: {}", commandId);
-        } else {
-            baseMapper.markAsFailed(commandId, now,
-                    errorMsg != null ? errorMsg : "UNKNOWN_ERROR");
-            log.warn("指令执行失败 - commandId: {}, error: {}", commandId, errorMsg);
+        // 3. 幂等：只处理 SENT 状态，其他状态全部忽略
+        if (command.getStatus() == null || !command.getStatus().equals(CommandStatus.SENT.getCode())) {
+            log.debug("ACK 状态非 SENT，忽略 - commandId: {}, status: {}", commandId, command.getStatus());
+            return;
         }
+
+        // 4. 计算新状态
+        Integer newStatus = success ? CommandStatus.SUCCESS.getCode() : CommandStatus.FAILED.getCode();
+
+        String finalErrorMsg = success ? null : (errorMsg != null && !errorMsg.isBlank() ? errorMsg : CommandConstants.DEFAULT_FAIL_MSG);
+
+        // 5. 更新状态（内部会更新 ack_time）
+        updateStatus(command.getId(), newStatus, finalErrorMsg);
+
+        // 6. 更新 response_payload（如果有）
+        if (payload != null && !payload.isEmpty()) {
+            DeviceCommand update = new DeviceCommand();
+            update.setId(command.getId());
+            update.setResponsePayload(payload);
+            updateById(update);
+        }
+
+        log.info("设备 ACK 处理完成 - commandId: {}, deviceId: {}, success: {}, newStatus: {}", commandId, command.getDeviceId(), success, newStatus);
     }
 
     @Override
@@ -142,10 +153,7 @@ public class DeviceCommandServiceImpl
 
     @Override
     public List<DeviceCommand> listByDeviceAndStatus(String deviceId, Integer status) {
-        LambdaQueryWrapper<DeviceCommand> wrapper = new LambdaQueryWrapper<DeviceCommand>()
-                .eq(DeviceCommand::getDeviceId, deviceId)
-                .eq(status != null, DeviceCommand::getStatus, status)
-                .orderByDesc(DeviceCommand::getCreateTime);
+        LambdaQueryWrapper<DeviceCommand> wrapper = new LambdaQueryWrapper<DeviceCommand>().eq(DeviceCommand::getDeviceId, deviceId).eq(status != null, DeviceCommand::getStatus, status).orderByDesc(DeviceCommand::getCreateTime);
         return list(wrapper);
     }
 
@@ -180,14 +188,43 @@ public class DeviceCommandServiceImpl
     @Transactional(rollbackFor = Exception.class)
     public int cleanHistory(int retentionDays) {
         LocalDateTime before = LocalDateTime.now().minusDays(retentionDays);
-        List<Integer> finalStatus = Arrays.asList(
-                CommandStatus.SUCCESS.getCode(), CommandStatus.FAILED.getCode(),
-                CommandStatus.TIMEOUT.getCode(), CommandStatus.CANCELLED.getCode());
-        LambdaQueryWrapper<DeviceCommand> wrapper = new LambdaQueryWrapper<DeviceCommand>()
-                .lt(DeviceCommand::getUpdateTime, before)
-                .in(DeviceCommand::getStatus, finalStatus);
+        List<Integer> finalStatus = Arrays.asList(CommandStatus.SUCCESS.getCode(), CommandStatus.FAILED.getCode(), CommandStatus.TIMEOUT.getCode(), CommandStatus.CANCELLED.getCode());
+        LambdaQueryWrapper<DeviceCommand> wrapper = new LambdaQueryWrapper<DeviceCommand>().lt(DeviceCommand::getUpdateTime, before).in(DeviceCommand::getStatus, finalStatus);
         int deleted = baseMapper.delete(wrapper);
         if (deleted > 0) log.info("清理历史指令 - 共 {} 条", deleted);
         return deleted;
+    }
+
+    @Override
+    public CommandStatsVO statsByDevice(String deviceId) {
+        // 一次性查出该设备的所有指令，在内存里分组统计
+        List<DeviceCommand> commands = list(new LambdaQueryWrapper<DeviceCommand>().eq(DeviceCommand::getDeviceId, deviceId).select(DeviceCommand::getStatus));
+
+        CommandStatsVO vo = new CommandStatsVO();
+        vo.setPending(0L);
+        vo.setSent(0L);
+        vo.setSuccess(0L);
+        vo.setFailed(0L);
+        vo.setTimeout(0L);
+        vo.setCancelled(0L);
+
+        for (DeviceCommand cmd : commands) {
+            CommandStatus status = CommandStatus.fromCode(cmd.getStatus());
+            if (status == null) {
+                continue;
+            }
+            switch (status) {
+                case PENDING -> vo.setPending(vo.getPending() + 1);
+                case SENT -> vo.setSent(vo.getSent() + 1);
+                case SUCCESS -> vo.setSuccess(vo.getSuccess() + 1);
+                case FAILED -> vo.setFailed(vo.getFailed() + 1);
+                case TIMEOUT -> vo.setTimeout(vo.getTimeout() + 1);
+                case CANCELLED -> vo.setCancelled(vo.getCancelled() + 1);
+            }
+        }
+
+        long total = commands.size();
+        vo.setTotal(total);
+        return vo;
     }
 }
