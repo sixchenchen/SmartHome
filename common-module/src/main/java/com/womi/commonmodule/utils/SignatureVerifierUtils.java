@@ -79,7 +79,7 @@ public final class SignatureVerifierUtils {
                 .replace("-----BEGIN PUBLIC KEY-----", "")
                 .replace("-----END PUBLIC KEY-----", "")
                 .replaceAll("\\s", "");
-        byte[] der = Base64.getMimeDecoder().decode(content);   // ★ MIME 解码器
+        byte[] der = Base64.getMimeDecoder().decode(content);
         X509EncodedKeySpec spec = new X509EncodedKeySpec(der);
         return KeyFactory.getInstance(KEY_ALGORITHM).generatePublic(spec);
     }

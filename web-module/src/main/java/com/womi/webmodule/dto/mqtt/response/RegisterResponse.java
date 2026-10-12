@@ -50,7 +50,7 @@ public class RegisterResponse {
         RegisterResponse response = new RegisterResponse();
         response.setSuccess(false);
         response.setError(errorCode.getCode());
-        response.setMessage(errorCode.getDefaultMessage());
+        response.setMessage(errorCode.getMessage());
         return response;
     }
 
@@ -61,7 +61,7 @@ public class RegisterResponse {
         RegisterResponse response = new RegisterResponse();
         response.setSuccess(false);
         response.setError(errorCode.getCode());
-        response.setMessage(customMessage != null ? customMessage : errorCode.getDefaultMessage());
+        response.setMessage(customMessage != null ? customMessage : errorCode.getMessage());
         return response;
     }
 }

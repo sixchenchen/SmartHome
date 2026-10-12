@@ -16,15 +16,15 @@ import org.springframework.stereotype.Component;
   设备离线处理器
   topic: device/{mac}/offline  device/{mac}/will
   payload:
-  {
-  "device": "B4BFE90CDBA0",
-  "product": "SmartHome-v1",
-  "type": "offline",
-  "timestamp": 1710000000000,
-  "data": {
-  "reason": "shutdown"
+   {
+    "device": "B4BFE90CDBA1",
+    "type": "offline",
+    "timestamp": 1710000000000,
+    "data": {
+      "product": "SmartHome-v1",
+      "reason": "shutdown"
+    }
   }
-}
  */
 @Slf4j
 @Component
@@ -35,7 +35,6 @@ public class OfflineMessageHandler implements MqttMessageHandler {
 
     private final JsonUtils jsonUtils;
     private final DeviceInfoService deviceInfoService;
-    private final DeviceSlaveDataService deviceSlaveDataService;
 
     @Override
     public boolean supports(String topic) {

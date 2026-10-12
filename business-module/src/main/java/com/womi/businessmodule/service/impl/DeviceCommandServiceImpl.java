@@ -8,6 +8,7 @@ import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.service.DeviceCommandService;
 import com.womi.businessmodule.vo.CommandStatsVO;
 import com.womi.commonmodule.constants.CommandConstants;
+import com.womi.commonmodule.constants.MqttConstants;
 import com.womi.commonmodule.enums.CommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
@@ -70,7 +71,9 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
         if (status == CommandStatus.SENT.getCode()) {
             // 已发出：记录发送时间
             update.setSendTime(now);
-        } else if (status == CommandStatus.SUCCESS.getCode() || status == CommandStatus.FAILED.getCode() || status == CommandStatus.TIMEOUT.getCode()) {
+        } else if (status == CommandStatus.SUCCESS.getCode()
+                || status == CommandStatus.FAILED.getCode()
+                || status == CommandStatus.TIMEOUT.getCode()) {
             // 终态：记录响应时间
             update.setAckTime(now);
         }
@@ -92,7 +95,8 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void handleAck(String commandId, boolean success, Map<String, Object> payload, String errorMsg) {
+    public void handleAck(String commandId, boolean success,
+                          Map<String, Object> payload, String errorMsg) {
         // 1. 参数校验
         if (commandId == null || commandId.isBlank()) {
             log.warn("ACK commandId 为空");
@@ -106,18 +110,50 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
             return;
         }
 
-        // 3. 幂等：只处理 SENT 状态，其他状态全部忽略
-        if (command.getStatus() == null || !command.getStatus().equals(CommandStatus.SENT.getCode())) {
-            log.debug("ACK 状态非 SENT，忽略 - commandId: {}, status: {}", commandId, command.getStatus());
+        Integer currentStatus = command.getStatus();
+        if (currentStatus == null) {
+            log.warn("ACK 指令状态为空 - commandId: {}", commandId);
             return;
         }
 
-        // 4. 计算新状态
-        Integer newStatus = success ? CommandStatus.SUCCESS.getCode() : CommandStatus.FAILED.getCode();
+        // 3. 判断指令类型 + 是否 OTA 接收确认 ACK
+        boolean isOta = MqttConstants.TARGET_OTA.equals(command.getTarget());
+        boolean isAcceptAck = isOta && isOtaAcceptAck(payload);
 
-        String finalErrorMsg = success ? null : (errorMsg != null && !errorMsg.isBlank() ? errorMsg : CommandConstants.DEFAULT_FAIL_MSG);
+        // 4. 状态流转
+        Integer newStatus;
+        String finalErrorMsg;
 
-        // 5. 更新状态（内部会更新 ack_time）
+        if (currentStatus == CommandStatus.SENT.getCode()) {
+            // ---------- 情况 A：SENT 状态收到 ACK ----------
+            if (isAcceptAck) {
+                // A-1：OTA 接收确认 → ACCEPTED
+                newStatus = CommandStatus.ACCEPTED.getCode();
+                finalErrorMsg = null;
+                log.info("OTA 接收确认 - commandId: {}, deviceId: {}", commandId, command.getDeviceId());
+            } else {
+                // A-2：普通指令 或 OTA 最终结果 → SUCCESS/FAILED
+                newStatus = success ? CommandStatus.SUCCESS.getCode() : CommandStatus.FAILED.getCode();
+                finalErrorMsg = success ? null : resolveErrorMsg(errorMsg);
+            }
+        } else if (currentStatus == CommandStatus.ACCEPTED.getCode()) {
+            // ---------- 情况 B：ACCEPTED 状态收到 ACK ----------
+            if (isAcceptAck) {
+                // B-1：重复的 OTA 接收确认 → 忽略
+                log.debug("重复的 OTA 接收确认 ACK，忽略 - commandId: {}", commandId);
+                return;
+            }
+            // B-2：OTA 最终结果 → SUCCESS/FAILED
+            newStatus = success ? CommandStatus.SUCCESS.getCode() : CommandStatus.FAILED.getCode();
+            finalErrorMsg = success ? null : resolveErrorMsg(errorMsg);
+            log.info("OTA 最终 ACK - commandId: {}, success: {}", commandId, success);
+        } else {
+            // ---------- 情况 C：终态 → 忽略 ----------
+            log.debug("ACK 状态非 SENT/ACCEPTED，忽略 - commandId: {}, status: {}", commandId, currentStatus);
+            return;
+        }
+
+        // 5. 更新状态
         updateStatus(command.getId(), newStatus, finalErrorMsg);
 
         // 6. 更新 response_payload（如果有）
@@ -128,7 +164,8 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
             updateById(update);
         }
 
-        log.info("设备 ACK 处理完成 - commandId: {}, deviceId: {}, success: {}, newStatus: {}", commandId, command.getDeviceId(), success, newStatus);
+        log.info("ACK 处理完成 - commandId: {}, 状态 {} → {}, success: {}",
+                commandId, currentStatus, newStatus, success);
     }
 
     @Override
@@ -226,5 +263,25 @@ public class DeviceCommandServiceImpl extends ServiceImpl<DeviceCommandMapper, D
         long total = commands.size();
         vo.setTotal(total);
         return vo;
+    }
+
+    /**
+     * 判断是否是 OTA 的"接收确认" ACK
+     */
+    private boolean isOtaAcceptAck(Map<String, Object> payload) {
+        if (payload == null) {
+            return false;
+        }
+        Object state = payload.get(MqttConstants.FIELD_STATE);
+        return MqttConstants.OTA_STATE_ACCEPTED.equals(state);
+    }
+
+    /**
+     * 解析失败原因（errorMsg 为空时用默认值）
+     */
+    private String resolveErrorMsg(String errorMsg) {
+        return (errorMsg != null && !errorMsg.isBlank())
+                ? errorMsg
+                : CommandConstants.DEFAULT_FAIL_MSG;
     }
 }

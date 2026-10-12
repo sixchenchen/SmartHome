@@ -21,7 +21,8 @@ public enum CommandStatus {
     SUCCESS(2, "成功"),
     FAILED(3, "失败"),
     TIMEOUT(4, "超时"),
-    CANCELLED(5, "取消");
+    CANCELLED(5, "取消"),
+    ACCEPTED(6, "已接收");
 
     private final int code;
     private final String message;

@@ -30,13 +30,13 @@ signature = private_key.sign(
 )
 signature_b64 = base64.b64encode(signature).decode('utf-8')
 
-# ===== 6. 组装 JSON =====
+# ===== 6. 组装 JSON（统一格式：顶层三剑客 + data 主体）=====
 payload = {
     "device": device,
-    "product": "SmartHome-v1",
     "type": "register",
     "timestamp": timestamp,
     "data": {
+        "product": "SmartHome-v1",           # ★ product 从顶层移到 data
         "firmware": "1.0.29",
         "chip": "ESP32",
         "hardware_version": "V1.0",

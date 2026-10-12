@@ -1,6 +1,7 @@
 package com.womi.webmodule.controller;
 
 import com.womi.commonmodule.response.ApiResponse;
+import com.womi.webmodule.dto.http.request.SendCommandRequest;
 import com.womi.webmodule.dto.ota.request.OtaStartRequest;
 import com.womi.webmodule.dto.ota.response.OtaProgressVO;
 import com.womi.webmodule.dto.ota.response.OtaStartResponse;
@@ -20,8 +21,8 @@ public class DeviceOtaController {
      * POST /api/ota/start
      */
     @PostMapping("/start")
-    public ApiResponse<OtaStartResponse> start(@RequestBody OtaStartRequest request) {
-        OtaStartResponse response = deviceOtaService.startOta(request);
+    public ApiResponse<OtaStartResponse> start(@RequestBody SendCommandRequest req) {
+        OtaStartResponse response = deviceOtaService.startOta(req);
         return ApiResponse.success(response);
     }
 

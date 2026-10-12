@@ -20,16 +20,15 @@ import java.util.Map;
 /*
   设备注册处理器:通过一下目录文件获取 resources/python/key_json.py -> python key_json.py
   topic: /provision/device/{mac}/register
-  payload:
+   payload:
   {
-    "device": "B4BFE90CDBA0",
-    "product": "SmartHome-v1",
+    "device": "B4BFE90CDBA1",
     "type": "register",
     "timestamp": 1710000000700,
     "data": {
+      "product": "SmartHome-v1",
       "firmware": "1.0.29",
       "chip": "ESP32",
-      "hardware_version": "V1.0",
       "nonce": "550e8400-...",
       "pubkey": "-----BEGIN PUBLIC KEY-----...",
       "signature": "MEUCIQDxYz..."
@@ -67,6 +66,13 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
                 sendResponse(deviceId, RegisterResponse.error(MqttErrorCode.INVALID_PAYLOAD));
                 return;
             }
+
+            String payloadDevice = jsonUtils.getString(json, MqttConstants.FIELD_DEVICE);
+            if (payloadDevice != null && !payloadDevice.equals(deviceId)) {
+                log.warn("注册 device 与 topic 不一致 - topic: {}, payload: {}", topic, payloadDevice);
+                sendResponse(deviceId, RegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID));
+                return;
+            }
             // 3. 提取字段 → 组装 RegisterRequest
             RegisterRequest request = buildRequest(deviceId, json);
             // 4. 调业务层（含验签、防重放、分配凭据）
@@ -86,13 +92,12 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
     private RegisterRequest buildRequest(String deviceId, JsonNode json) {
         RegisterRequest request = new RegisterRequest();
         request.setDeviceId(deviceId);
-        request.setProduct(jsonUtils.getString(json, MqttConstants.FIELD_PRODUCT));
         request.setTimestamp(jsonUtils.getLong(json, MqttConstants.FIELD_TIMESTAMP));
 
         JsonNode dataNode = json.path(MqttConstants.FIELD_DATA);
+        request.setProduct(jsonUtils.getString(dataNode, MqttConstants.FIELD_PRODUCT));
         request.setFirmware(jsonUtils.getString(dataNode, MqttConstants.FIELD_FIRMWARE));
         request.setChip(jsonUtils.getString(dataNode, MqttConstants.FIELD_CHIP));
-        request.setHardwareVersion(jsonUtils.getString(dataNode, MqttConstants.FIELD_HARDWARE_VERSION));
         request.setNonce(jsonUtils.getString(dataNode, MqttConstants.FIELD_NONCE));
         request.setPubkey(jsonUtils.getString(dataNode, MqttConstants.FIELD_PUBKEY));
         request.setSignature(jsonUtils.getString(dataNode, MqttConstants.FIELD_SIGNATURE));

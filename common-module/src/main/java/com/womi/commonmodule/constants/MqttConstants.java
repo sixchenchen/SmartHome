@@ -5,6 +5,7 @@ package com.womi.commonmodule.constants;
  */
 public final class MqttConstants {
 
+
     private MqttConstants() {
     }
     // ---------- 凭据前缀 ----------
@@ -121,6 +122,7 @@ public final class MqttConstants {
     public static final String ACK_TOPIC_PATTERN = "device/[^/]+/ack";
     public static final String EVENT_TOPIC_PATTERN = "device/[^/]+/event";
     public static final String SENSOR_TOPIC_PATTERN = "device/[^/]+/sensor";
+    public static final String OTA_PROGRESS_TOPIC_PATTERN = "device/[^/]+/ota_progress";
     public static final String PROVISION_REGISTER_TOPIC_PATTERN = "/provision/device/[^/]+/register";
 
     // ---------- payload 字段 key：通用 ----------
@@ -170,9 +172,11 @@ public final class MqttConstants {
     public static final String FIELD_OTA_URL = "url";
     public static final String FIELD_OTA_VERSION = "version";
     public static final String FIELD_OTA_MD5 = "md5";
+    public static final String FIELD_OTA_SH2566 = "sh256";
     public static final String FIELD_OTA_SIZE = "size";
     public static final String FIELD_OTA_PROGRESS = "progress";
     public static final String FIELD_OTA_FORCE = "force";
+    public static final String FIELD_FIRMWARE_ID = "firmwareId";
 
     // ---------- payload 字段 key：配置 ----------
     public static final String FIELD_CONFIG = "config";
@@ -181,7 +185,6 @@ public final class MqttConstants {
 
     // ---------- payload 字段 key：注册 ----------
     public static final String FIELD_CHIP = "chip";
-    public static final String FIELD_HARDWARE_VERSION = "hardware_version";
     public static final String FIELD_NONCE = "nonce";
     public static final String FIELD_MQTT = "mqtt";
     public static final String FIELD_WILL = "will";

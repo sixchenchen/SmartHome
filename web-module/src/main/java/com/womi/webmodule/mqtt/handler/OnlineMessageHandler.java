@@ -17,19 +17,19 @@ import java.util.Map;
   设备上线处理器
   topic: device/{mac}/online
   payload:
-  {
-  "device": "B4BFE90CDBA0",
-  "product": "SmartHome-v1",
-  "type": "online",
-  "timestamp": 1710000000000,
-  "data": {
-  "firmware": "1.0.29",
-  "capabilities": {
-  "mos": 8,
-  "led": 3,
-  "servo": 2
-  }
- }
+   {
+    "device": "B4BFE90CDBA1",
+    "type": "online",
+    "timestamp": 1710000000000,
+    "data": {
+      "product": "SmartHome-v1",
+      "firmware": "1.0.29",
+      "capabilities": {
+        "mos": 8,
+        "led": 3,
+        "servo": 2
+      }
+   }
 }
 */
 @Slf4j
@@ -63,13 +63,14 @@ public class OnlineMessageHandler implements MqttMessageHandler {
                 log.warn("payload 解析失败 - Topic: {}", topic);
                 return;
             }
-            String product = jsonUtils.getString(json, MqttConstants.FIELD_PRODUCT);
             JsonNode dataNode = json.path(MqttConstants.FIELD_DATA);
+            String product = jsonUtils.getString(dataNode, MqttConstants.FIELD_PRODUCT);
             String firmware = jsonUtils.getString(dataNode, MqttConstants.FIELD_FIRMWARE);
-            // 3. 解析 capabilities（JSON 对象）
             Map<String, Object> capabilities = jsonUtils.nodeToMap(dataNode.path(MqttConstants.FIELD_CAPABILITIES));
+
             // 4. 标记设备上线
             deviceInfoService.markOnline(deviceId, product, firmware, capabilities.isEmpty() ? null : capabilities);
+
             log.info("设备上线 - deviceId: {}, product: {}, firmware: {}, capabilities: {}", deviceId, product, firmware, capabilities);
         } catch (Exception e) {
             log.error("处理上线消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);

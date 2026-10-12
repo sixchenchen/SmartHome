@@ -1,34 +1,25 @@
 package com.womi.webmodule.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
-
-import java.time.Duration;
-
 /**
  * Nonce 防重放服务
+ *
+ * <p>用于注册接口的防重放校验，nonce 一旦被使用，短时间内不可重复。
  */
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class NonceService {
-
-    private static final String KEY_PREFIX = "register:nonce:";
-    private static final Duration TTL = Duration.ofMinutes(5);
-
-    private final StringRedisTemplate redisTemplate;
+public interface NonceService {
 
     /**
-     * 尝试占用 nonce（如果已被用过则返回 false）
+     * 检查 nonce 是否已被使用（不消耗）
+     *
+     * @param nonce 随机数
+     * @return true=已被使用；false=未被使用
      */
-    public boolean tryAcquire(String nonce) {
-        if (nonce == null || nonce.isBlank()) {
-            return false;
-        }
-        String key = KEY_PREFIX + nonce;
-        Boolean success = redisTemplate.opsForValue().setIfAbsent(key, "used", TTL);
-        return Boolean.TRUE.equals(success);
-    }
+    boolean exists(String nonce);
+
+    /**
+     * 尝试占用 nonce（消耗）
+     *
+     * @param nonce 随机数
+     * @return true=首次使用（获取成功）；false=已被使用（获取失败）
+     */
+    boolean tryAcquire(String nonce);
 }

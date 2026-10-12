@@ -17,11 +17,14 @@ import org.springframework.stereotype.Component;
  topic: device/{mac}/heartbeat
  payload:
   {
-  "device": "B4BFE90CDBA0",
-  "product": "SmartHome-v1",
-  "type": "heartbeat",
-  "timestamp": 1710000000000,
-  "data": { "uptime": 1234, "rssi": -65 }
+    "device": "B4BFE90CDBA1",
+    "type": "heartbeat",
+    "timestamp": 1710000000000,
+    "data": {
+      "product": "SmartHome-v1",
+      "uptime": 1234,
+      "rssi": -65
+    }
   }
 */
 @Slf4j
@@ -31,7 +34,6 @@ import org.springframework.stereotype.Component;
 public class HeartbeatMessageHandler implements MqttMessageHandler {
 
     private final JsonUtils jsonUtils;
-    private final ObjectMapper objectMapper;
     private final DeviceInfoService deviceInfoService;
     private final HeartbeatRecordService heartbeatRecordService;
 

@@ -28,6 +28,7 @@ mqtt:
       - device/+/ack
       - device/+/event
       - device/+/sensor
+      - device/+/ota_progress
     qos:
       - 1
       - 1
@@ -36,6 +37,7 @@ mqtt:
       - 1
       - 1
       - 1
+      - 0
       - 0
     default-qos: 1
     keep-alive-interval: 60

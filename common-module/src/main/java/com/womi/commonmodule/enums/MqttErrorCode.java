@@ -1,5 +1,7 @@
 package com.womi.commonmodule.enums;
 
+import lombok.Getter;
+
 /**
  * MQTT 错误码
  */
@@ -20,7 +22,7 @@ public enum MqttErrorCode {
     INVALID_TIMESTAMP("INVALID_TIMESTAMP", "时间戳无效或已过期"),
     REPLAY_ATTACK("REPLAY_ATTACK", "重放攻击"),
     INVALID_PUBKEY("INVALID_PUBKEY", "公钥格式错误"),
-
+    DEVICE_NOT_AUTHORIZED("DEVICE_NOT_AUTHORIZED","设备未授权"),
     // ==================== 指令相关 ====================
     UNKNOWN_ACTION("UNKNOWN_ACTION", "不支持的动作"),
     UNKNOWN_TARGET("UNKNOWN_TARGET", "不支持的目标"),
@@ -41,20 +43,17 @@ public enum MqttErrorCode {
     FLASH_FAILED("FLASH_FAILED", "刷写失败"),
     OTA_TIMEOUT("OTA_TIMEOUT", "OTA 超时");
 
+    @Getter
     private final String code;
-    private final String defaultMessage;
+    private final String message;
 
-    MqttErrorCode(String code, String defaultMessage) {
+    MqttErrorCode(String code, String message) {
         this.code = code;
-        this.defaultMessage = defaultMessage;
+        this.message = message;
     }
 
-    public String getCode() {
-        return code;
-    }
-
-    public String getDefaultMessage() {
-        return defaultMessage;
+    public String getMessage() {
+        return message;
     }
 
     /**

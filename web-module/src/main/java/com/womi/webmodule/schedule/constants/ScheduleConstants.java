@@ -13,15 +13,15 @@ public final class ScheduleConstants {
     // 心跳超时扫描间隔（毫秒）：每 30 秒扫描一次
     public static final long HEARTBEAT_SCAN_FIXED_DELAY = 30_000L;
     // 待下发指令扫描间隔
-    public static final long DISPATCH_FIXED_DELAY = 2000L;
+    public static final long DISPATCH_FIXED_DELAY = 1000L;
     // 超时未 ACK 指令重试间隔（毫秒）
-    public static final long RETRY_FIXED_DELAY = 2000L;
+    public static final long RETRY_FIXED_DELAY = 3000L;
     // 最小等待时间
     public static final int DISPATCH_MIN_WAIT_SECONDS = 2;
     // 最大重试次数
     public static final int MAX_RETRY = 3;
     // 过期指令标记间隔
-    public static final long MARK_EXPIRED_FIXED_DELAY = 60000L;
+    public static final long MARK_EXPIRED_FIXED_DELAY = 30000L;
     // 单批处理条数
     public static final int BATCH_SIZE = 50;
     // 重试超时阈值（秒）
