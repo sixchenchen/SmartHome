@@ -10,6 +10,7 @@ import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.businessmodule.vo.CommandStatsVO;
 import com.womi.commonmodule.constants.CommandConstants;
 import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.OtaStateConstants;
 import com.womi.commonmodule.enums.CommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
@@ -192,46 +193,23 @@ public class DeviceCommandServiceImpl
     }
 
     /**
-     * OTA 最终 ACK 成功时，从 payload.toVersion 兜底更新 device_info.firmware
-     * <p>双保险：即使设备重启后没发 online，也能通过最终 ACK 更新版本号
+     * OTA 最终 ACK 成功时，从 payload.toVersion 同步 device_info.firmware（双保险之一）
+     * <p>另一处触发点是 ota_progress 上报 success，两者共用 {@code syncFirmwareIfTarget}，
+     * 即使设备重启后没发 online，也能通过最终 ACK 收敛版本号。</p>
      */
     private void updateFirmwareFromAck(String deviceId, Map<String, Object> payload) {
         if (payload == null || payload.isEmpty()) {
             return;
         }
-
         Object toVersionObj = payload.get(MqttConstants.FIELD_TO_VERSION);
         if (toVersionObj == null) {
             return;
         }
-        String toVersion = toVersionObj.toString().trim();
-        if (toVersion.isEmpty()) {
-            return;
-        }
-
         try {
-            DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
-            if (device == null) {
-                log.warn("OTA 更新 firmware 失败，设备不存在 - deviceId: {}", deviceId);
-                return;
-            }
-            if (toVersion.equals(device.getFirmware())) {
-                log.debug("固件版本已是目标版本，无需更新 - deviceId: {}, version: {}",
-                        deviceId, toVersion);
-                return;
-            }
-
-            String oldVersion = device.getFirmware();
-            device.setFirmware(toVersion);
-            device.setUpdateTime(LocalDateTime.now());
-            deviceInfoService.updateById(device);
-
-            log.info("OTA 最终 ACK 更新固件版本 - deviceId: {}, from: {} → to: {}",
-                    deviceId, oldVersion, toVersion);
+            deviceInfoService.syncFirmwareIfTarget(deviceId, toVersionObj.toString());
         } catch (Exception e) {
             // 兜底失败不影响主流程（online 消息还会再更新一次）
-            log.error("OTA 最终 ACK 更新固件版本失败 - deviceId: {}, toVersion: {}",
-                    deviceId, toVersion, e);
+            log.error("OTA 最终 ACK 同步固件版本失败 - deviceId: {}, toVersion: {}", deviceId, toVersionObj, e);
         }
     }
     @Override
@@ -254,18 +232,16 @@ public class DeviceCommandServiceImpl
         return count;
     }
 
-    /** 清理 device_info 的 OTA 状态（只在进行中时才清） */
+    /** 清理 device_info 的 OTA 状态（只在进行中时才清，定向更新避免整行覆盖） */
     private void clearOtaState(String deviceId) {
         DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
         if (device == null) return;
 
         String otaState = device.getOtaState();
         if (otaState == null || otaState.isBlank()) return;
-        if ("success".equals(otaState) || "failed".equals(otaState)) return;
+        if (OtaStateConstants.FINAL_STATES.contains(otaState)) return;
 
-        device.setOtaState(null);
-        device.setOtaProgress(null);
-        deviceInfoService.updateById(device);
+        deviceInfoService.clearOtaState(deviceId);
         log.info("清理卡住的 OTA 状态 - deviceId: {}, 原 otaState: {}", deviceId, otaState);
     }
 
@@ -276,7 +252,7 @@ public class DeviceCommandServiceImpl
         if (payload == null) {
             return false;
         }
-        return MqttConstants.OTA_STATE_ACCEPTED.equals(payload.get(MqttConstants.FIELD_STATE));
+        return MqttConstants.OTA_STATE_ACCEPTED.equals(payload.get(MqttConstants.FIELD_OTA_STATE));
     }
 
     /**

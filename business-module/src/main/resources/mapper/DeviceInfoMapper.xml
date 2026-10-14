@@ -42,4 +42,31 @@
         WHERE device_id = #{deviceId}
           AND online = 1
     </update>
+
+    <update id="updateOtaStateByDeviceId">
+        UPDATE device_info
+        SET ota_state       = #{state},
+            ota_update_time = NOW(3),
+            update_time     = NOW(3)
+        <if test="progress != null">, ota_progress = #{progress}</if>
+        <if test="version != null">, ota_version = #{version}</if>
+        WHERE device_id = #{deviceId}
+    </update>
+
+    <update id="updateFirmwareByDeviceId">
+        UPDATE device_info
+        SET firmware    = #{firmware},
+            update_time = NOW(3)
+        WHERE device_id = #{deviceId}
+          AND (firmware &lt;&gt; #{firmware} OR firmware IS NULL)
+    </update>
+
+    <update id="clearOtaStateByDeviceId">
+        UPDATE device_info
+        SET ota_state       = NULL,
+            ota_progress    = NULL,
+            ota_update_time = NOW(3),
+            update_time     = NOW(3)
+        WHERE device_id = #{deviceId}
+    </update>
 </mapper>

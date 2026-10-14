@@ -69,6 +69,8 @@ public class OnlineMessageHandler implements MqttMessageHandler {
 
             // 4. 标记设备上线
             deviceInfoService.markOnline(deviceId, product, firmware, capabilities.isEmpty() ? null : capabilities);
+            // 5. OTA 结果校验兜底：设备上报成功但重启后版本没变 → 判定回滚失败
+            deviceInfoService.reconcileOtaOnOnline(deviceId, firmware);
 
             log.info("设备上线 - deviceId: {}, product: {}, firmware: {}, capabilities: {}", deviceId, product, firmware, capabilities);
         } catch (Exception e) {

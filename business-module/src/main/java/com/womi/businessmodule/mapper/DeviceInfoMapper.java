@@ -31,4 +31,23 @@ public interface DeviceInfoMapper extends BaseMapper<DeviceInfo> {
 
     int markOfflineByDeviceId(@Param("deviceId") String deviceId,
                               @Param("reason") String reason);
+
+    /**
+     * 定向更新 OTA 状态（只改 ota_* 字段，避免整行覆盖导致并发字段丢失）
+     */
+    int updateOtaStateByDeviceId(@Param("deviceId") String deviceId,
+                                 @Param("state") String state,
+                                 @Param("progress") Integer progress,
+                                 @Param("version") String version);
+
+    /**
+     * 定向同步固件版本（仅当与目标版本不一致时才更新，幂等）
+     */
+    int updateFirmwareByDeviceId(@Param("deviceId") String deviceId,
+                                 @Param("firmware") String firmware);
+
+    /**
+     * 定向清理 OTA 状态（只清 ota_state/ota_progress）
+     */
+    int clearOtaStateByDeviceId(@Param("deviceId") String deviceId);
 }

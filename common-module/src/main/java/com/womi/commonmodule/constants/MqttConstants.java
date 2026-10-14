@@ -141,6 +141,7 @@ public final class MqttConstants {
     public static final String FIELD_CHANNEL = "channel";
     public static final String FIELD_PARAMS = "params";
     public static final String FIELD_STATE = "state";
+    public static final String FIELD_OTA_STATE = "otaState";
     public static final String FIELD_SUCCESS = "success";
     public static final String FIELD_ERROR = "error";
     public static final String FIELD_MESSAGE = "message";

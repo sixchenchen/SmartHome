@@ -32,3 +32,4 @@ build/
 ### VS Code ###
 .vscode/
 web-module/src/main/resources/python/firmware_1.0.34.bin
+*.bin

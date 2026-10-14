@@ -6,6 +6,7 @@ import com.womi.businessmodule.mapper.DeviceInfoMapper;
 import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceConstants;
+import com.womi.commonmodule.constants.OtaStateConstants;
 import com.womi.commonmodule.enums.OfflineReason;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -122,26 +123,72 @@ public class DeviceInfoServiceImpl
 
     /**
      * 更新设备OTA状态
+     * <p>改为定向字段更新，避免 read-modify-write 整行覆盖导致并发丢失其他字段。</p>
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateOtaState(String deviceId, String state, Integer progress, String version) {
-        DeviceInfo info = getByDeviceId(deviceId);
-        if (info == null) {
-            log.warn("设备不存在 - deviceId: {}", deviceId);
+        int rows = baseMapper.updateOtaStateByDeviceId(deviceId, state, progress, version);
+        if (rows == 0) {
+            log.warn("设备不存在，OTA 状态未更新 - deviceId: {}", deviceId);
             return;
         }
-
-        info.setOtaState(state);
-        if (progress != null) {
-            info.setOtaProgress(progress);
-        }
-        if (version != null) {
-            info.setOtaVersion(version);
-        }
-        info.setOtaUpdateTime(LocalDateTime.now());
-        updateById(info);
-
         log.info("设备 OTA 状态更新 - deviceId: {}, state: {}, progress: {}", deviceId, state, progress);
+    }
+
+    /**
+     * 同步设备固件版本为目标版本（幂等，双保险收口）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean syncFirmwareIfTarget(String deviceId, String targetVersion) {
+        if (targetVersion == null || targetVersion.isBlank()) {
+            return false;
+        }
+        String version = targetVersion.trim();
+        // 定向 + 带前置条件：仅当 firmware 与目标版本不一致时才更新
+        int rows = baseMapper.updateFirmwareByDeviceId(deviceId, version);
+        if (rows > 0) {
+            log.info("OTA 固件版本同步 - deviceId: {}, firmware → {}", deviceId, version);
+            return true;
+        }
+        log.debug("固件版本已是目标版本或设备不存在，无需更新 - deviceId: {}, version: {}", deviceId, version);
+        return false;
+    }
+
+    /**
+     * 设备上线后的 OTA 结果校验兜底
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void reconcileOtaOnOnline(String deviceId, String reportedFirmware) {
+        if (reportedFirmware == null || reportedFirmware.isBlank()) {
+            return;
+        }
+        DeviceInfo device = getByDeviceId(deviceId);
+        if (device == null) {
+            return;
+        }
+        String otaState = device.getOtaState();
+        String otaVersion = device.getOtaVersion();
+        if (otaVersion == null || otaVersion.isBlank()) {
+            return;
+        }
+        // 设备已上报成功，但重启后运行版本与目标版本不一致 → 升级回滚，判定失败
+        String version = reportedFirmware.trim();
+        if (OtaStateConstants.SUCCESS.equals(otaState) && !version.equals(otaVersion.trim())) {
+            baseMapper.updateOtaStateByDeviceId(deviceId, OtaStateConstants.FAILED, null, null);
+            log.warn("OTA 版本校验不通过，判定升级回滚 - deviceId: {}, running: {}, target: {}",
+                    deviceId, version, otaVersion);
+        }
+    }
+
+    /**
+     * 清理设备 OTA 状态（定向更新）
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void clearOtaState(String deviceId) {
+        baseMapper.clearOtaStateByDeviceId(deviceId);
     }
 }

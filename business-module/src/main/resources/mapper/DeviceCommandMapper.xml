@@ -50,6 +50,7 @@
         WHERE status = 0
           AND create_time &lt; NOW(3) - INTERVAL #{minWaitSeconds} SECOND
           AND expire_time &gt; NOW(3)
+          AND target != 'ota'
         ORDER BY create_time ASC
         LIMIT #{batchSize}
     </select>

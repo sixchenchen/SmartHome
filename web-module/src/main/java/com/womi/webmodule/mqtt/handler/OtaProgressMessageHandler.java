@@ -3,6 +3,7 @@ package com.womi.webmodule.mqtt.handler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.OtaStateConstants;
 import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Component;
     "commandId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "timestamp": 1710000000000,
     "data": {
-      "state": "downloading",
+      "otaState": "downloading",
       "progress": 45,
       "version": "1.0.30"
     }
@@ -61,8 +62,8 @@ public class OtaProgressMessageHandler implements MqttMessageHandler {
                 log.warn("OTA 进度缺少 data 节点 - deviceId: {}", deviceId);
                 return;
             }
-            // 4. 从 data 里读 state / progress / version
-            String state = jsonUtils.getString(dataNode, MqttConstants.FIELD_STATE);
+            // 4. 从 data 里读 otaState / progress / version
+            String state = jsonUtils.getString(dataNode, MqttConstants.FIELD_OTA_STATE);
             if (state == null || state.isBlank()) {
                 log.warn("OTA 进度缺少 state - deviceId: {}", deviceId);
                 return;
@@ -75,6 +76,10 @@ public class OtaProgressMessageHandler implements MqttMessageHandler {
             String version = jsonUtils.getString(dataNode, MqttConstants.FIELD_OTA_VERSION);
             // 5. 更新设备 OTA 状态
             deviceInfoService.updateOtaState(deviceId, state, progress, version);
+            // 6. OTA 成功 → 兜底同步固件版本（双保险：即使最终 ACK 丢失也能收敛）
+            if (OtaStateConstants.SUCCESS.equals(state)) {
+                deviceInfoService.syncFirmwareIfTarget(deviceId, version);
+            }
             log.info("OTA 进度上报 - deviceId: {}, state: {}, progress: {}, version: {}",deviceId, state, progress, version);
         } catch (Exception e) {
             log.error("处理 OTA 进度失败 - topic: {}, error: {}", topic, e.getMessage(), e);
