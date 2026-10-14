@@ -20,9 +20,7 @@ mqtt:
     password: 123456
     ca-cert: certs/cert.pem
     topics:
-      - device/+/online
-      - device/+/offline
-      - device/+/will
+      - device/+/presence
       - device/+/heartbeat
       - device/+/state
       - device/+/ack
@@ -30,8 +28,6 @@ mqtt:
       - device/+/sensor
       - device/+/ota_progress
     qos:
-      - 1
-      - 1
       - 1
       - 0
       - 1

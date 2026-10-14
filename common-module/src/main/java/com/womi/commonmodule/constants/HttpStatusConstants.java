@@ -1,7 +1,6 @@
 package com.womi.commonmodule.constants;
 
 public final class HttpStatusConstants {
-    private HttpStatusConstants() {} // 防止实例化
 
     public static final int SUCCESS_CODE = 200;
     public static final String SUCCESS_MESSAGE = "success";

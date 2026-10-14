@@ -1,6 +1,10 @@
 package com.womi.webmodule.dto.ota.request;
 
 import com.womi.commonmodule.constants.MqttConstants;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -8,6 +12,8 @@ import java.util.Map;
 /**
  * OTA 参数
  */
+
+@Builder
 public record OtaParam(
         String url,
         String version,

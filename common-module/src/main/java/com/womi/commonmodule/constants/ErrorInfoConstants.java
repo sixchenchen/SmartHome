@@ -1,14 +1,9 @@
 package com.womi.commonmodule.constants;
 
 /**
- * 错误信息常量
- *
- * <p>统一管理业务错误提示文案，避免散落各处。
+ * 错误信息常量:统一管理业务错误提示
  */
 public final class ErrorInfoConstants {
-
-    private ErrorInfoConstants() {}
-
     // ==================== 通用 ====================
     /** 参数错误 */
     public static final String PARAM_ERROR = "参数错误";
@@ -73,9 +68,7 @@ public final class ErrorInfoConstants {
 
     /**
      * 格式化：拼接自定义信息
-     *
-     * <p>例：{@code format(FIRMWARE_EXIST, "version=1.0.1")}
-     * → {@code "固件已存在: version=1.0.1"}
+     * 例： format(FIRMWARE_EXIST, "version=1.0.1") →  "固件已存在: version=1.0.1"
      */
     public static String format(String message, String detail) {
         if (detail == null || detail.isBlank()) {

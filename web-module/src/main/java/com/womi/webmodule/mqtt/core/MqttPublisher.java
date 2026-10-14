@@ -96,18 +96,6 @@ public class MqttPublisher {
         log.info("MQTT 控制指令下发 - Topic: {}, commandId: {}, action: {}, target: {}, channel: {}", topic, commandId, action, target, channel);
     }
 
-    public void sendOtaCommand(String deviceId, String commandId,
-                               String url, String version, String md5, Long size) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put(MqttConstants.FIELD_OTA_URL, url);
-        params.put(MqttConstants.FIELD_OTA_VERSION, version);
-        if (md5 != null) params.put(MqttConstants.FIELD_OTA_MD5, md5);
-        if (size != null) params.put(MqttConstants.FIELD_OTA_SIZE, size);
-
-        sendControlCommand(deviceId, commandId,
-                MqttConstants.ACTION_START, MqttConstants.TARGET_OTA, null, params);
-    }
-
     public void sendConfigCommand(String deviceId, String commandId,
                                   Map<String, Object> config, Integer configVersion) {
         Map<String, Object> params = new LinkedHashMap<>();

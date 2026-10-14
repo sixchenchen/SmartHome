@@ -8,10 +8,6 @@ import java.util.List;
  * 指令领域常量
  */
 public final class CommandConstants {
-
-    private CommandConstants() {
-    }
-
     // ==================== 状态集合 ====================
 
     /** 终态：不再变化，无需重试 */
@@ -36,8 +32,8 @@ public final class CommandConstants {
     /** 长流程指令过期秒数：5 分钟（配置下发等） */
     public static final int LONG_EXPIRE_SECONDS = 5 * 60;
 
-    /** OTA 指令过期秒数：10 分钟 */
-    public static final int OTA_EXPIRE_SECONDS = 10 * 60;
+    /** OTA 指令过期秒数：5 分钟 */
+    public static final int OTA_EXPIRE_SECONDS = 5 * 60;
 
     /** 默认最大重试次数 */
     public static final int DEFAULT_MAX_RETRY = 3;

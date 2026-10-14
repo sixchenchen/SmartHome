@@ -6,10 +6,6 @@ import java.util.Set;
  * OTA 状态常量
  */
 public final class OtaStateConstants {
-
-    private OtaStateConstants() {
-    }
-
     // ==================== 设备 OTA 阶段状态 ====================
 
     public static final String ACCEPTED    = "accepted";

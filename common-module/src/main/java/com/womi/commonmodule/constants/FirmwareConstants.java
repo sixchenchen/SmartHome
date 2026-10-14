@@ -5,8 +5,6 @@ package com.womi.commonmodule.constants;
  */
 public final class FirmwareConstants {
 
-    private FirmwareConstants() {}
-
     /** 默认文件名格式：firmware_{version}_{timestamp}.bin */
     public static final String DEFAULT_FILE_NAME_PATTERN = "firmware_%s_%s.bin";
 

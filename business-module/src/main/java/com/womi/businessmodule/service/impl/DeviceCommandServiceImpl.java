@@ -252,7 +252,7 @@ public class DeviceCommandServiceImpl
         if (payload == null) {
             return false;
         }
-        return MqttConstants.OTA_STATE_ACCEPTED.equals(payload.get(MqttConstants.FIELD_OTA_STATE));
+        return OtaStateConstants.ACCEPTED.equals(payload.get(MqttConstants.FIELD_OTA_STATE));
     }
 
     /**

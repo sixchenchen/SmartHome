@@ -27,8 +27,7 @@ public final class OtaStateUtils {
     }
 
     /**
-     * 判断 OTA 状态是否"僵死"
-     * <p>规则：状态为进行中，但 ota_update_time 超过 {@link OtaStateConstants#STALE_OTA_MINUTES} 分钟未更新
+     * 判断 OTA 状态是否"僵死"：状态为进行中，但 ota_update_time 超过 {@link OtaStateConstants#STALE_OTA_MINUTES} 分钟未更新
      *
      * @param otaState      OTA 状态
      * @param otaUpdateTime OTA 状态最后更新时间（可为 null，视为僵死）
@@ -44,7 +43,6 @@ public final class OtaStateUtils {
             return true;
         }
         // 超过阈值 → 僵死
-        return otaUpdateTime.isBefore(
-                LocalDateTime.now().minusMinutes(OtaStateConstants.STALE_OTA_MINUTES));
+        return otaUpdateTime.isBefore(LocalDateTime.now().minusMinutes(OtaStateConstants.STALE_OTA_MINUTES));
     }
 }

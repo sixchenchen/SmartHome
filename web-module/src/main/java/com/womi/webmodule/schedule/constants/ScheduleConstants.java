@@ -9,7 +9,7 @@ public final class ScheduleConstants {
     private ScheduleConstants() {
     } // 防止实例化
     // 心跳超时阈值（秒）：连续 3 个心跳周期未收到，判定离线
-    public static final int HEARTBEAT_TIMEOUT_SECONDS = 90;
+    public static final int HEARTBEAT_TIMEOUT_SECONDS = 60;
     // 心跳超时扫描间隔（毫秒）：每 30 秒扫描一次
     public static final long HEARTBEAT_SCAN_FIXED_DELAY = 30_000L;
     // 待下发指令扫描间隔

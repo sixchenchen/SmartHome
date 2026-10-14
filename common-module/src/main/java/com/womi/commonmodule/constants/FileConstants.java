@@ -4,10 +4,6 @@ package com.womi.commonmodule.constants;
  * 文件相关常量
  */
 public final class FileConstants {
-
-    private FileConstants() {}
-
-
     /** 固件文件扩展名 */
     public static final String FIRMWARE_EXTENSION = ".bin";
 

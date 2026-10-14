@@ -3,11 +3,17 @@
 
 功能：
 1. 直接用凭据连 8883
-2. 发送 online
+2. 发送 online（presence topic，retain=true）
 3. 周期性发送 heartbeat
 4. 接收普通指令 → 回 ACK
 5. 接收 OTA 指令 → 完整 OTA 流程（accepted → 下载 → SHA256 校验 → 进度 → 最终 ACK）
 6. 支持 Ctrl+C 优雅退出 / 强杀触发 LWT
+
+presence 统一说明：
+- online / offline / will 三者合并到 device/{mac}/presence
+- 三者都 retain=true，Broker 上只保留最后一条状态
+- payload 用 type 字段区分 online / offline
+- data.reason 区分离线原因：shutdown / mqtt_lwt
 
 打印说明：
 - OTA 接收确认、最终 ACK：JSON 多行美化打印
@@ -32,7 +38,7 @@ MQTT_HOST = "192.168.1.15"
 MQTT_PORT = 8883
 CLIENT_ID = "device-B4BFE90CDBA1"
 USERNAME = "dev_B4BFE90CDBA1"
-PASSWORD = "W6nf9SaZh2KCGYPc"    
+PASSWORD = "W6nf9SaZh2KCGYPc"
 KEEP_ALIVE = 60
 
 DEVICE_ID = "B4BFE90CDBA1"
@@ -41,16 +47,19 @@ FIRMWARE = "1.0.29"                     # 会被 OTA 更新
 
 CA_CERT = r"d:\software\emqx-5.3.0-windows-amd64\etc\certs\cert.pem"
 
-# 遗嘱配置
-WILL_TOPIC = f"device/{DEVICE_ID}/will"
-WILL_QOS = 1
-WILL_RETAIN = True
+# ==================== presence 统一配置 ====================
+# online / offline / will 三者共用一个 topic，retain=true
+PRESENCE_TOPIC = f"device/{DEVICE_ID}/presence"
+PRESENCE_QOS = 1
+PRESENCE_RETAIN = True
+
+# 遗嘱（LWT）：设备异常断开时由 Broker 代发
 WILL_PAYLOAD = {
     "device": DEVICE_ID,
-    "product": PRODUCT,
     "type": "offline",
     "timestamp": 0,
     "data": {
+        "product": PRODUCT,
         "reason": "mqtt_lwt"
     }
 }
@@ -74,7 +83,7 @@ ota_in_progress = False              # 防止 OTA 期间处理新指令
 ota_command_id = None                # 模拟 NVS：保存 OTA 的 commandId
 
 
-# ==================== 发送上线消息 ====================
+# ==================== 发送上线消息（presence）====================
 def send_online():
     online_payload = {
         "device": DEVICE_ID,
@@ -90,9 +99,10 @@ def send_online():
             }
         }
     }
-    topic = f"device/{DEVICE_ID}/online"
-    client.publish(topic, json.dumps(online_payload), qos=1)
-    print(f"[OUT] 已发送上线 - firmware: {FIRMWARE}")
+    # ★ 关键：发到 presence topic，retain=True 覆盖旧 will
+    client.publish(PRESENCE_TOPIC, json.dumps(online_payload),
+                   qos=PRESENCE_QOS, retain=PRESENCE_RETAIN)
+    print(f"[OUT] 已发送上线（presence） - firmware: {FIRMWARE}")
 
 
 # ==================== 心跳线程 ====================
@@ -338,7 +348,7 @@ def ota_flow(command_id, target_version, url, sha256, size=None):
         FIRMWARE = target_version
         print(f"[OTA] 重启完成，当前版本：{FIRMWARE}")
 
-        # ★ 关键：重启后必须重发 online
+        # ★ 关键：重启后必须重发 online（presence topic，retain=true 覆盖旧 will）
         send_online()
 
         # 上报最终进度
@@ -417,7 +427,7 @@ def on_connect(c, userdata, flags, rc):
         c.subscribe(f"device/{DEVICE_ID}/command", qos=1)
         print(f"[OK] 已订阅 device/{DEVICE_ID}/command")
 
-        # 发上线
+        # 发上线（presence topic，retain=true）
         send_online()
 
         # 启动心跳
@@ -463,7 +473,7 @@ def graceful_shutdown(signum=None, frame=None):
     stop_flag.set()
 
     if client:
-        # 发主动离线消息
+        # 发主动离线消息（presence topic，retain=true）
         offline_payload = {
             "device": DEVICE_ID,
             "type": "offline",
@@ -473,11 +483,11 @@ def graceful_shutdown(signum=None, frame=None):
                 "reason": "shutdown"
             }
         }
-        topic = f"device/{DEVICE_ID}/offline"
         try:
-            client.publish(topic, json.dumps(offline_payload), qos=1)
-            print(f"[OUT] 已发送离线 - Topic: {topic}")
-            time.sleep(0.5)
+            client.publish(PRESENCE_TOPIC, json.dumps(offline_payload),
+                           qos=PRESENCE_QOS, retain=PRESENCE_RETAIN)
+            print(f"[OUT] 已发送离线（presence） - reason: shutdown")
+            time.sleep(0.5)   # 等 publish 出网，再 disconnect
         except Exception as e:
             print(f"[ERR] 发送离线失败: {e}")
 
@@ -504,15 +514,17 @@ def main():
     print(f"模拟设备: {DEVICE_ID}")
     print(f"连接: {MQTT_HOST}:{MQTT_PORT}")
     print(f"固件版本: {FIRMWARE}")
+    print(f"presence topic: {PRESENCE_TOPIC} (retain={PRESENCE_RETAIN})")
     print("=" * 60)
 
     # 创建客户端
     client = mqtt.Client(client_id=CLIENT_ID)
 
-    # 设置遗嘱
+    # 设置遗嘱（发到 presence topic，retain=true）
     will_payload_str = json.dumps(WILL_PAYLOAD)
-    client.will_set(WILL_TOPIC, will_payload_str, qos=WILL_QOS, retain=WILL_RETAIN)
-    print(f"[LWT] 遗嘱已设置: {WILL_TOPIC}")
+    client.will_set(PRESENCE_TOPIC, will_payload_str,
+                    qos=PRESENCE_QOS, retain=PRESENCE_RETAIN)
+    print(f"[LWT] 遗嘱已设置: {PRESENCE_TOPIC}")
 
     # TLS
     client.tls_set(ca_certs=CA_CERT, cert_reqs=ssl.CERT_REQUIRED)

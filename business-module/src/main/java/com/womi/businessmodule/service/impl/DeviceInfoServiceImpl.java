@@ -137,7 +137,7 @@ public class DeviceInfoServiceImpl
     }
 
     /**
-     * 同步设备固件版本为目标版本（幂等，双保险收口）
+     * 同步设备固件版本为目标版本
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -152,7 +152,7 @@ public class DeviceInfoServiceImpl
             log.info("OTA 固件版本同步 - deviceId: {}, firmware → {}", deviceId, version);
             return true;
         }
-        log.debug("固件版本已是目标版本或设备不存在，无需更新 - deviceId: {}, version: {}", deviceId, version);
+        log.debug("固件版本同步更新完成 - deviceId: {}, version: {}", deviceId, version);
         return false;
     }
 

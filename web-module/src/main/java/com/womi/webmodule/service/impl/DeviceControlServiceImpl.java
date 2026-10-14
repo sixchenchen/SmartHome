@@ -1,10 +1,15 @@
 package com.womi.webmodule.service.impl;
 
 import com.womi.businessmodule.model.DeviceCommand;
+import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.commonmodule.constants.CommandConstants;
+import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.MqttConstants;
 import com.womi.commonmodule.enums.CommandStatus;
+import com.womi.commonmodule.enums.ErrorCode;
+import com.womi.commonmodule.exception.BusinessException;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import com.womi.webmodule.service.DeviceControlService;
 import lombok.RequiredArgsConstructor;
@@ -12,11 +17,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static com.womi.commonmodule.constants.CommandConstants.*;
+import static com.womi.commonmodule.constants.CommandConstants.DEFAULT_EXPIRE_SECONDS;
 
 @Slf4j
 @Service
@@ -25,6 +32,7 @@ public class DeviceControlServiceImpl implements DeviceControlService {
 
     private final DeviceCommandService deviceCommandService;
     private final MqttPublisher mqttPublisher;
+    private final DeviceInfoService deviceInfoService;
 
     // ==================== 通用入口 ====================
 
@@ -33,6 +41,8 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     public DeviceCommand sendCommand(String deviceId, String action, String target,
                                      Integer channel, Map<String, Object> params,
                                      String operator, int expireSeconds) {
+        checkDeviceOnline(deviceId);
+
         // 1. 入库（PENDING）
         DeviceCommand command = deviceCommandService.prepareCommand(
                 deviceId, action, target, channel, params,
@@ -120,33 +130,6 @@ public class DeviceControlServiceImpl implements DeviceControlService {
                 channel, params, operator, DEFAULT_EXPIRE_SECONDS);
     }
 
-    // ==================== OTA ====================
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public DeviceCommand startOta(String deviceId, String url, String version,
-                                  String md5, Long size, String operator) {
-        Map<String, Object> params = new LinkedHashMap<>();
-        params.put(MqttConstants.FIELD_OTA_URL, url);
-        params.put(MqttConstants.FIELD_OTA_VERSION, version);
-        if (md5 != null) {
-            params.put(MqttConstants.FIELD_OTA_MD5, md5);
-        }
-        if (size != null) {
-            params.put(MqttConstants.FIELD_OTA_SIZE, size);
-        }
-
-        DeviceCommand command = deviceCommandService.prepareCommand(
-                deviceId,
-                MqttConstants.ACTION_START,
-                MqttConstants.TARGET_OTA,
-                null, params,
-                operator, SOURCE_WEB,
-                OTA_EXPIRE_SECONDS);
-
-        trySendImmediately(command);
-        return command;
-    }
 
     // ==================== 配置 ====================
 
@@ -154,6 +137,7 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     @Transactional(rollbackFor = Exception.class)
     public DeviceCommand sendConfig(String deviceId, Map<String, Object> config,
                                     Integer configVersion, String operator) {
+
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(MqttConstants.FIELD_CONFIG, config);
         if (configVersion != null) {
@@ -165,5 +149,39 @@ public class DeviceControlServiceImpl implements DeviceControlService {
                 MqttConstants.ACTION_SET,
                 MqttConstants.TARGET_CONFIG,
                 null, params, operator, DEFAULT_EXPIRE_SECONDS);
+    }
+
+    /**
+     * 校验设备在线：
+     * 1) 设备必须存在
+     * 2) online 字段必须为 1
+     * 3) 心跳未超时（防止 LWT 延迟导致误判在线）
+     */
+    private void checkDeviceOnline(String deviceId) {
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR);
+        }
+
+        DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
+        if (device == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
+        }
+
+        // 在线标志
+        if (device.getOnline() == null
+                || device.getOnline() != DeviceConstants.DEVICE_STATUS_ONLINE) {
+            log.warn("指令拒绝：设备不在线 - deviceId: {}, online: {}", deviceId, device.getOnline());
+            throw new BusinessException(ErrorCode.DEVICE_OFFLINE);
+        }
+
+        // 心跳兜底：防止 LWT 还没触发，online=1 但实际已断
+        LocalDateTime last = device.getLastHeartbeatTime();
+        if (last != null) {
+            long gap = Duration.between(last, LocalDateTime.now()).getSeconds();
+            if (gap > DeviceConstants.HEARTBEAT_OFFLINE_SECONDS) {
+                log.warn("指令拒绝：心跳超时 - deviceId: {}, gap: {}s", deviceId, gap);
+                throw new BusinessException(ErrorCode.DEVICE_OFFLINE, "设备心跳超时 " + gap + "s，视为离线");
+            }
+        }
     }
 }

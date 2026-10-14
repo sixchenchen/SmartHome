@@ -35,9 +35,6 @@ public interface DeviceControlService {
     // ==================== 舵机 ====================
     DeviceCommand controlServo(String deviceId, int channel, int angle, String operator);
 
-    // ==================== OTA ====================
-    DeviceCommand startOta(String deviceId, String url, String version, String md5, Long size, String operator);
-
     // ==================== 配置 ====================
     DeviceCommand sendConfig(String deviceId, Map<String, Object> config, Integer configVersion, String operator);
 }

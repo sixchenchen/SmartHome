@@ -267,7 +267,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         willPayload.put(MqttConstants.FIELD_DATA, willData);
 
         Map<String, Object> will = new LinkedHashMap<>();
-        will.put(MqttConstants.FIELD_WILL_TOPIC, String.format(MqttConstants.WILL_TOPIC_FORMAT, deviceId));
+        will.put(MqttConstants.FIELD_WILL_TOPIC, String.format(MqttConstants.PRESENCE_TOPIC_FORMAT, deviceId));
         will.put(MqttConstants.FIELD_WILL_QOS, MqttConstants.DEFAULT_QOS);
         will.put(MqttConstants.FIELD_WILL_RETAIN, MqttConstants.PRESENCE_RETAINED);
         will.put(MqttConstants.FIELD_WILL_PAYLOAD, willPayload);

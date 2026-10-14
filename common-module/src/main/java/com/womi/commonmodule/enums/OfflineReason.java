@@ -1,9 +1,7 @@
 package com.womi.commonmodule.enums;
 
 /**
- * 离线原因
- *
- * <p>对应数据库 device_info.offline_reason (varchar)
+ * 离线原因:对应数据库 device_info.offline_reason (varchar)
  */
 public enum OfflineReason {
 

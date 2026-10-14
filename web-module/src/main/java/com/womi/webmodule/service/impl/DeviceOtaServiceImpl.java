@@ -55,9 +55,11 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     @Transactional(rollbackFor = Exception.class)
     public OtaStartResponse startOta(SendCommandRequest request) {
         String deviceId = request.getDeviceId();
-        validateDeviceId(deviceId);
-
-        // 1. 查设备 + 校验 OTA 状态（含僵死自愈）
+        // 校验deviceId是否合法
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_MISSING);
+        }
+        // 1. 查设备 + 校验 OTA 状态
         DeviceInfo device = getAndCheckDevice(deviceId);
 
         // 2. 校验无未完成的 OTA 指令
@@ -73,8 +75,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         // 5. 组装下发参数 + 下发
         DeviceCommand command = dispatchOta(deviceId, firmware, request);
 
-        log.info("OTA 触发成功 - deviceId: {}, firmwareId: {}, version: {}, commandId: {}",
-                deviceId, firmwareId, firmware.getVersion(), command.getCommandId());
+        log.info("OTA 触发成功 - deviceId: {}, firmwareId: {}, version: {}, commandId: {}", deviceId, firmwareId, firmware.getVersion(), command.getCommandId());
 
         // 6. 组装响应
         OtaStartResponse response = new OtaStartResponse(1);
@@ -100,16 +101,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     // ==================== 私有方法：校验 ====================
 
     /**
-     * 校验 deviceId
-     */
-    private void validateDeviceId(String deviceId) {
-        if (deviceId == null || deviceId.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_MISSING);
-        }
-    }
-
-    /**
-     * 查设备 + 校验 OTA 状态（含僵死自愈）:返回最新设备信息
+     * 查设备 + 校验 OTA 状态:返回最新设备信息
      */
     private DeviceInfo getAndCheckDevice(String deviceId) {
         DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
@@ -159,8 +151,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
                                 CommandStatus.ACCEPTED.getCode()));
         if (exists) {
             log.warn("OTA 拒绝：存在未完成的 OTA 指令 - deviceId: {}", deviceId);
-            throw new BusinessException(ErrorCode.OTA_IN_PROGRESS,
-                    "已有未完成的 OTA 指令，请等待完成或超时");
+            throw new BusinessException(ErrorCode.OTA_IN_PROGRESS, "已有未完成的 OTA 指令，请等待完成或超时");
         }
     }
 
@@ -185,10 +176,8 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     private void checkVersionDiff(DeviceInfo device, Firmware firmware) {
         String current = device.getFirmware();
         if (current != null && !current.isBlank() && current.equals(firmware.getVersion())) {
-            log.warn("OTA 拒绝：设备已是该版本 - deviceId: {}, version: {}",
-                    device.getDeviceId(), current);
-            throw new BusinessException(ErrorCode.OTA_VERSION_INCOMPATIBLE,
-                    "设备已是版本 " + current + "，无需重复升级");
+            log.warn("OTA 拒绝：设备已是该版本 - deviceId: {}, version: {}", device.getDeviceId(), current);
+            throw new BusinessException(ErrorCode.OTA_VERSION_INCOMPATIBLE, "设备已是版本 " + current + "，无需重复升级");
         }
     }
 
@@ -196,20 +185,18 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
      * 组装参数 + 下发 OTA 指令
      */
     private DeviceCommand dispatchOta(String deviceId, Firmware firmware, SendCommandRequest request) {
-        OtaParam otaParam = new OtaParam(
-                firmware.getUrl(),
-                firmware.getVersion(),
-                firmware.getSha256(),
-                firmware.getSize());
-
+        OtaParam otaParam = OtaParam.builder()
+                .url(firmware.getUrl())
+                .version(firmware.getVersion())
+                .sha256(firmware.getSha256())
+                .size(firmware.getSize())
+                .build();
         String operator = (request.getOperator() != null && !request.getOperator().isBlank())
-                ? request.getOperator()
-                : CommandConstants.DEFAULT_OPERATOR;
+                ? request.getOperator() : CommandConstants.DEFAULT_OPERATOR;
 
         Integer reqExpire = request.getExpireSeconds();
         int expireSeconds = (reqExpire != null && reqExpire > 0)
-                ? reqExpire
-                : CommandConstants.OTA_EXPIRE_SECONDS;
+                ? reqExpire : CommandConstants.OTA_EXPIRE_SECONDS;
 
         return deviceControlService.sendCommand(
                 deviceId,

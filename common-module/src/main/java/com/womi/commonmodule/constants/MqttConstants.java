@@ -5,10 +5,6 @@ package com.womi.commonmodule.constants;
  */
 public final class MqttConstants {
 
-
-    private MqttConstants() {
-    }
-
     // ---------- 凭据前缀 ----------
     /**
      * MQTT 客户端 ID 前缀
@@ -37,7 +33,7 @@ public final class MqttConstants {
     public static final String FIELD_HEARTBEAT_INTERVAL = "heartbeat_interval";
     public static final String FIELD_SENSOR_BATCH_SIZE = "sensor_batch_size";
 
-// ---------- 默认配置值 ----------
+    // ---------- 默认配置值 ----------
     /**
      * 默认传感器批量上报大小
      */
@@ -83,6 +79,11 @@ public final class MqttConstants {
      * LWT 遗嘱：device/{mac}/will
      */
     public static final String WILL_TOPIC_FORMAT = "device/%s/will";
+
+    /**
+     * 设备状态
+     */
+    public static final String PRESENCE_TOPIC_FORMAT  = "device/%s/presence";
     /**
      * 心跳：device/{mac}/heartbeat
      */
@@ -125,6 +126,7 @@ public final class MqttConstants {
     public static final String SENSOR_TOPIC_PATTERN = "device/[^/]+/sensor";
     public static final String OTA_PROGRESS_TOPIC_PATTERN = "device/[^/]+/ota_progress";
     public static final String PROVISION_REGISTER_TOPIC_PATTERN = "/provision/device/[^/]+/register";
+    public static final String PRESENCE_TOPIC_PATTERN = "device/[0-9A-Fa-f]{12}/presence";
 
     // ---------- payload 字段 key：通用 ----------
     public static final String FIELD_DEVICE = "device";
@@ -218,15 +220,6 @@ public final class MqttConstants {
      * 通道 - 全部
      */
     public static final int CHANNEL_ALL = 0;
-
-    // ---------- OTA 状态 ----------
-    public static final String OTA_STATE_ACCEPTED = "accepted";
-    public static final String OTA_STATE_DOWNLOADING = "downloading";
-    public static final String OTA_STATE_VERIFYING = "verifying";
-    public static final String OTA_STATE_FLASHING = "flashing";
-    public static final String OTA_STATE_SUCCESS = "success";
-    public static final String OTA_STATE_FAIL = "fail";
-    public static final String OTA_STATE_CANCELED = "canceled";
 
     // ---------- MQTT Header Key ----------
     public static final String MQTT_HEADER_TOPIC = "mqtt_topic";

@@ -4,7 +4,6 @@ package com.womi.commonmodule.constants;
  * 正则表达式常量
  */
 public final class RegexConstants {
-    private RegexConstants() {}
 
     /** MAC 地址：12 位大写十六进制（无冒号） */
     public static final String MAC = "^[0-9A-F]{12}$";

@@ -1,6 +1,9 @@
 package com.womi.webmodule.dto.ota.response;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,6 +12,9 @@ import java.util.List;
  * OTA 启动响应（兼容单/多设备）
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 public class OtaStartResponse {
 
     /** 请求总数 */
@@ -22,9 +28,6 @@ public class OtaStartResponse {
 
     /** 每个设备的处理结果 */
     private List<Item> results = new ArrayList<>();
-
-    public OtaStartResponse() {
-    }
 
     public OtaStartResponse(int total) {
         this.total = total;
