@@ -155,7 +155,7 @@ def send_ota_accept_ack(command_id):
         "success": True,
         "timestamp": int(time.time() * 1000),
         "data": {
-            "state": "accepted"
+            "otaState": "accepted"
         }
     }
     topic = f"device/{DEVICE_ID}/ack"
@@ -174,7 +174,7 @@ def send_ota_progress(command_id, state, progress, version=None):
         "commandId": command_id,
         "timestamp": int(time.time() * 1000),
         "data": {
-            "state": state,
+            "otaState": state,
             "progress": progress
         }
     }
@@ -197,7 +197,7 @@ def send_ota_final_ack(command_id, version, success=True, error=None):
         "success": success,
         "timestamp": int(time.time() * 1000),
         "data": {
-            "state": "success" if success else "failed",
+            "otaState": "success" if success else "failed",
             "toVersion": version
         }
     }
