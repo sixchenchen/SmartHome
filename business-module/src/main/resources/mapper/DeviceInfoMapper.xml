@@ -10,4 +10,36 @@
           AND last_heartbeat_time &lt; #{threshold}
     </select>
 
+    <update id="markOfflineIfTimeout">
+        UPDATE device_info
+        SET online            = 0,
+            offline_reason    = #{reason},
+            last_offline_time = NOW(3),
+            update_time       = NOW(3)
+        WHERE device_id = #{deviceId}
+          AND online = 1
+          AND (last_heartbeat_time = #{lastHeartbeatTime}
+            OR (last_heartbeat_time IS NULL AND #{lastHeartbeatTime} IS NULL))
+    </update>
+
+    <update id="updateHeartbeatByDeviceId">
+        UPDATE device_info
+        SET uptime              = #{uptime},
+            last_heartbeat_time = NOW(3),
+            last_payload        = #{payload},
+            online              = 1,
+            offline_reason      = NULL,
+            update_time         = NOW(3)
+        WHERE device_id = #{deviceId}
+    </update>
+
+    <update id="markOfflineByDeviceId">
+        UPDATE device_info
+        SET online            = 0,
+            offline_reason    = #{reason},
+            last_offline_time = NOW(3),
+            update_time       = NOW(3)
+        WHERE device_id = #{deviceId}
+          AND online = 1
+    </update>
 </mapper>

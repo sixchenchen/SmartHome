@@ -42,5 +42,6 @@ public interface DeviceCommandService extends IService<DeviceCommand> {
     int cleanHistory(int retentionDays);
     // 获取设备指令状态
     CommandStatsVO statsByDevice(String deviceId);
+    int markOtaExpiredCommands();
 
 }

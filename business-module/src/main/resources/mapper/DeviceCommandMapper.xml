@@ -69,8 +69,8 @@
     <select id="selectExpiredCommands" resultMap="BaseResultMap">
         SELECT *
         FROM device_command
-        WHERE status IN (0, 1)
-          AND expire_time &lt; #{now}
+        WHERE status IN (0, 1, 6)
+        AND expire_time &lt; #{now}
     </select>
 
     <update id="markAsSent">
@@ -142,7 +142,28 @@
         SET status    = 4,
             error_msg = '指令已过期',
             ack_time  = NOW(3)
-        WHERE status IN (0, 1)
+        WHERE status IN (0, 1, 6)
+          AND expire_time &lt; NOW(3)
+          AND target != 'ota'
+    </update>
+    <!-- 查询已过期的 OTA 指令（SENT 或 ACCEPTED，且 expire_time 已过） -->
+    <select id="selectExpiredOtaCommands" resultMap="BaseResultMap">
+        SELECT *
+        FROM device_command
+        WHERE status IN (1, 6)
+          AND target = 'ota'
+          AND expire_time &lt; NOW(3)
+    </select>
+
+    <!-- 批量标记 OTA 指令过期 -->
+    <update id="markOtaExpiredCommands">
+        UPDATE device_command
+        SET status      = 4,
+            error_msg   = 'OTA 指令超时',
+            ack_time    = NOW(3),
+            update_time = NOW(3)
+        WHERE status IN (1, 6)
+          AND target = 'ota'
           AND expire_time &lt; NOW(3)
     </update>
 </mapper>

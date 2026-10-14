@@ -64,26 +64,21 @@ public class DeviceInfoServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void markOffline(String deviceId, OfflineReason reason) {
-        DeviceInfo info = getOrCreateDevice(deviceId);
-        LocalDateTime now = LocalDateTime.now();
-        info.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
-        info.setOfflineReason(reason.getCode());
-        info.setLastOfflineTime(now);
-        updateById(info);
-        log.info("设备离线 - deviceId: {}, reason: {}", deviceId, reason);
+        int rows = baseMapper.markOfflineByDeviceId(deviceId, reason.getCode());
+        if (rows == 0) {
+            log.debug("设备已离线或不存在，跳过 - deviceId: {}", deviceId);
+        } else {
+            log.info("设备离线 - deviceId: {}, reason: {}", deviceId, reason.getCode());
+        }
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateHeartbeat(String deviceId, Long uptime, String payload) {
-        DeviceInfo info = getOrCreateDevice(deviceId);
-        LocalDateTime now = LocalDateTime.now();
-        info.setUptime(uptime);
-        info.setLastHeartbeatTime(now);
-        info.setLastPayload(payload);
-        info.setOnline(DeviceConstants.DEVICE_STATUS_ONLINE);
-        info.setOfflineReason(null);
-        updateById(info);
+        int rows = baseMapper.updateHeartbeatByDeviceId(deviceId, uptime, payload);
+        if (rows == 0) {
+            log.warn("心跳更新失败，设备不存在 - deviceId: {}", deviceId);
+        }
     }
 
     @Override
@@ -100,24 +95,29 @@ public class DeviceInfoServiceImpl
             return 0;
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        int count = 0;
         for (DeviceInfo device : devices) {
-            markAsTimeoutOffline(device, now);
+            try {
+                // 仅当 online=1 且 last_heartbeat_time 未变时才标记
+                int rows = baseMapper.markOfflineIfTimeout(
+                        device.getDeviceId(),
+                        OfflineReason.HEARTBEAT_TIMEOUT.getCode(),
+                        device.getLastHeartbeatTime());
+
+                if (rows > 0) {
+                    count++;
+                    log.warn("设备心跳超时标记离线 - deviceId: {}, lastHeartbeat: {}", device.getDeviceId(), device.getLastHeartbeatTime());
+                } else {
+                    log.debug("设备已被心跳抢占，跳过离线标记 - deviceId: {}", device.getDeviceId());
+                }
+            } catch (Exception e) {
+                log.error("标记离线失败 - deviceId: {}", device.getDeviceId(), e);
+            }
         }
-        updateBatchById(devices);
-
-        log.warn("心跳超时标记离线 - 共 {} 台", devices.size());
-        return devices.size();
-    }
-
-
-    /**
-     * 把设备标记为"心跳超时离线"
-     */
-    private void markAsTimeoutOffline(DeviceInfo device, LocalDateTime now) {
-        device.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
-        device.setOfflineReason(OfflineReason.HEARTBEAT_TIMEOUT.getCode());
-        device.setLastOfflineTime(now);
+        if (count > 0) {
+            log.warn("心跳超时标记离线 - 共 {} 台", count);
+        }
+        return count;
     }
 
     /**
@@ -139,6 +139,7 @@ public class DeviceInfoServiceImpl
         if (version != null) {
             info.setOtaVersion(version);
         }
+        info.setOtaUpdateTime(LocalDateTime.now());
         updateById(info);
 
         log.info("设备 OTA 状态更新 - deviceId: {}, state: {}, progress: {}", deviceId, state, progress);

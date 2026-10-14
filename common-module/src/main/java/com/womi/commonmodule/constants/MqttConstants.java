@@ -8,6 +8,7 @@ public final class MqttConstants {
 
     private MqttConstants() {
     }
+
     // ---------- 凭据前缀 ----------
     /**
      * MQTT 客户端 ID 前缀
@@ -133,8 +134,7 @@ public final class MqttConstants {
     public static final String FIELD_TYPE = "type";
     public static final String FIELD_TIMESTAMP = "timestamp";
     public static final String FIELD_DATA = "data";
-
-    // ---------- payload 字段 key：指令相关 ----------
+    public static final String FIELD_TO_VERSION = "toVersion";
     public static final String FIELD_COMMAND_ID = "commandId";
     public static final String FIELD_ACTION = "action";
     public static final String FIELD_TARGET = "target";
@@ -146,44 +146,30 @@ public final class MqttConstants {
     public static final String FIELD_MESSAGE = "message";
     public static final String FIELD_CONTEXT = "context";
     public static final String FIELD_RESULT = "result";
-
-    // ---------- payload 字段 key：状态相关 ----------
     public static final String FIELD_FULL = "full";
     public static final String FIELD_TARGETS = "targets";
     public static final String FIELD_CHANNELS = "channels";
-
-    // ---------- payload 字段 key：事件相关 ----------
     public static final String FIELD_EVENT = "event";
     public static final String FIELD_TRIGGER = "trigger";
-
-    // ---------- payload 字段 key：心跳 / 离线 ----------
     public static final String FIELD_UPTIME = "uptime";
     public static final String FIELD_RSSI = "rssi";
     public static final String FIELD_REASON = "reason";
-
-    // ---------- payload 字段 key：传感器 ----------
     public static final String FIELD_SENSOR_ID = "sensor_id";
     public static final String FIELD_SENSOR_TYPE = "sensor_type";
     public static final String FIELD_VALUE = "value";
     public static final String FIELD_UNIT = "unit";
     public static final String FIELD_COUNT = "count";
-
-    // ---------- payload 字段 key：OTA ----------
     public static final String FIELD_OTA_URL = "url";
     public static final String FIELD_OTA_VERSION = "version";
     public static final String FIELD_OTA_MD5 = "md5";
-    public static final String FIELD_OTA_SH2566 = "sh256";
+    public static final String FIELD_OTA_SHA256 = "sha256";
     public static final String FIELD_OTA_SIZE = "size";
     public static final String FIELD_OTA_PROGRESS = "progress";
     public static final String FIELD_OTA_FORCE = "force";
     public static final String FIELD_FIRMWARE_ID = "firmwareId";
-
-    // ---------- payload 字段 key：配置 ----------
     public static final String FIELD_CONFIG = "config";
     public static final String FIELD_CONFIG_VERSION = "configVersion";
     public static final String FIELD_PERSIST = "persist";
-
-    // ---------- payload 字段 key：注册 ----------
     public static final String FIELD_CHIP = "chip";
     public static final String FIELD_NONCE = "nonce";
     public static final String FIELD_MQTT = "mqtt";
@@ -279,28 +265,44 @@ public final class MqttConstants {
     public static final boolean PRESENCE_RETAINED = true;
 
     // ---------- MQTT 客户端参数 ----------
-    /** 运行时入站客户端后缀 */
+    /**
+     * 运行时入站客户端后缀
+     */
     public static final String RUNTIME_INBOUND_SUFFIX = "-runtime-in";
 
-    /** 运行时出站客户端后缀 */
+    /**
+     * 运行时出站客户端后缀
+     */
     public static final String RUNTIME_OUTBOUND_SUFFIX = "-runtime-out";
 
-    /** 注册入站客户端后缀 */
+    /**
+     * 注册入站客户端后缀
+     */
     public static final String PROVISION_INBOUND_SUFFIX = "-provision-in";
 
-    /** 注册出站客户端后缀 */
+    /**
+     * 注册出站客户端后缀
+     */
     public static final String PROVISION_OUTBOUND_SUFFIX = "-provision-out";
 
-    /** 运行时输入通道 Bean 名 */
+    /**
+     * 运行时输入通道 Bean 名
+     */
     public static final String RUNTIME_INPUT_CHANNEL = "runtimeInputChannel";
 
-    /** 运行时输出通道 Bean 名 */
+    /**
+     * 运行时输出通道 Bean 名
+     */
     public static final String RUNTIME_OUTPUT_CHANNEL = "runtimeOutputChannel";
 
-    /** 注册输入通道 Bean 名 */
+    /**
+     * 注册输入通道 Bean 名
+     */
     public static final String PROVISION_INPUT_CHANNEL = "provisionInputChannel";
 
-    /** 注册输出通道 Bean 名 */
+    /**
+     * 注册输出通道 Bean 名
+     */
     public static final String PROVISION_OUTPUT_CHANNEL = "provisionOutputChannel";
 
     // ---------- 硬件参数 ----------
@@ -317,9 +319,13 @@ public final class MqttConstants {
      */
     public static final Long WILL_TIMESTAMP_DEFAULT = 0L;
 
-    /** LED 亮度 */
+    /**
+     * LED 亮度
+     */
     public static final String FIELD_BRIGHTNESS = "brightness";
 
-    /** 舵机角度 */
+    /**
+     * 舵机角度
+     */
     public static final String FIELD_ANGLE = "angle";
 }

@@ -70,4 +70,10 @@ public interface DeviceCommandMapper extends BaseMapper<DeviceCommand> {
      * 批量更新状态
      */
     int batchUpdateStatus(@Param("ids") List<Long> ids, @Param("status") int status);
+
+    /** 查询已过期的 OTA 指令 */
+    List<DeviceCommand> selectExpiredOtaCommands(@Param("now") LocalDateTime now);
+
+    /** 批量标记 OTA 指令过期 */
+    int markOtaExpiredCommands();
 }

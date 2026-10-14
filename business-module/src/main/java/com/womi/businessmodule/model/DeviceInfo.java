@@ -57,6 +57,9 @@ public class DeviceInfo {
     @TableField("ota_state")
     private String otaState;
 
+    @TableField("ota_update_time")
+    private LocalDateTime otaUpdateTime;
+
     @TableField("ota_progress")
     private Integer otaProgress;
 

@@ -40,7 +40,6 @@ public class OnlineMessageHandler implements MqttMessageHandler {
 
 
     private final JsonUtils jsonUtils;
-    private final ObjectMapper objectMapper;
     private final DeviceInfoService deviceInfoService;
 
     @Override

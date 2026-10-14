@@ -21,7 +21,8 @@ import org.springframework.stereotype.Component;
     "timestamp": 1710000000000,
     "data": {
       "state": "downloading",
-      "progress": 45
+      "progress": 45,
+      "version": "1.0.30"
     }
   }
 */
@@ -48,33 +49,33 @@ public class OtaProgressMessageHandler implements MqttMessageHandler {
                 log.warn("无法提取设备ID - Topic: {}", topic);
                 return;
             }
-
             // 2. 解析 payload
             JsonNode json = jsonUtils.parse(payload);
             if (json == null) {
                 log.warn("OTA 进度 payload 解析失败 - Topic: {}", topic);
                 return;
             }
-
-            // 3. 提取 state / progress
-            String state = jsonUtils.getString(json, MqttConstants.FIELD_STATE);
+            // 3. 进入 data 节点
+            JsonNode dataNode = json.path(MqttConstants.FIELD_DATA);
+            if (dataNode.isMissingNode() || !dataNode.isObject()) {
+                log.warn("OTA 进度缺少 data 节点 - deviceId: {}", deviceId);
+                return;
+            }
+            // 4. 从 data 里读 state / progress / version
+            String state = jsonUtils.getString(dataNode, MqttConstants.FIELD_STATE);
             if (state == null || state.isBlank()) {
                 log.warn("OTA 进度缺少 state - deviceId: {}", deviceId);
                 return;
             }
-
-            Integer progress = jsonUtils.getInt(json, MqttConstants.FIELD_OTA_PROGRESS);
+            Integer progress = jsonUtils.getInt(dataNode, MqttConstants.FIELD_OTA_PROGRESS);
             if (progress == null) {
                 progress = 0;
             }
-            // 夹紧到 0~100
             progress = Math.max(0, Math.min(100, progress));
-
-            // 4. 更新设备ota状态
-            deviceInfoService.updateOtaState(deviceId, state, progress, null);
-
-            log.info("OTA 进度上报 - deviceId: {}, state: {}, progress: {}", deviceId, state, progress);
-
+            String version = jsonUtils.getString(dataNode, MqttConstants.FIELD_OTA_VERSION);
+            // 5. 更新设备 OTA 状态
+            deviceInfoService.updateOtaState(deviceId, state, progress, version);
+            log.info("OTA 进度上报 - deviceId: {}, state: {}, progress: {}, version: {}",deviceId, state, progress, version);
         } catch (Exception e) {
             log.error("处理 OTA 进度失败 - topic: {}, error: {}", topic, e.getMessage(), e);
         }

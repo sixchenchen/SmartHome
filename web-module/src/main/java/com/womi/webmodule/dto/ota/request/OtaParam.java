@@ -11,14 +11,14 @@ import java.util.Map;
 public record OtaParam(
         String url,
         String version,
-        String sh256,
+        String sha256,
         Long size
 ) {
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>(4);
         map.put(MqttConstants.FIELD_OTA_URL, url);
         map.put(MqttConstants.FIELD_OTA_VERSION, version);
-        map.put(MqttConstants.FIELD_OTA_SH2566, sh256);
+        map.put(MqttConstants.FIELD_OTA_SHA256, sha256);
         map.put(MqttConstants.FIELD_OTA_SIZE, size);
         return map;
     }

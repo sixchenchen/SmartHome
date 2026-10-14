@@ -8,10 +8,12 @@ import com.womi.businessmodule.service.DeviceCommandService;
 import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.businessmodule.service.FirmwareService;
 import com.womi.commonmodule.constants.CommandConstants;
+import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.MqttConstants;
 import com.womi.commonmodule.enums.CommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
+import com.womi.commonmodule.utils.OtaStateUtils;
 import com.womi.webmodule.dto.http.request.SendCommandRequest;
 import com.womi.webmodule.dto.ota.request.OtaParam;
 import com.womi.webmodule.dto.ota.response.OtaProgressVO;
@@ -21,22 +23,20 @@ import com.womi.webmodule.service.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
-import java.util.Set;
 
 /**
- * OTA 升级服务
- *
- * 前端请求示例：
+ * OTA 升级服务：前端请求示例
  * POST /device/ota/start
  * {
- *   "deviceId": "B4BFE90CDBA1",
- *   "action": "start",
- *   "target": "ota",
- *   "params": { "firmwareId": 5 },
- *   "operator": "admin",
- *   "expireSeconds": 900
+ * "deviceId": "B4BFE90CDBA1",
+ * "action": "start",
+ * "target": "ota",
+ * "params": { "firmwareId": 5 },
+ * "operator": "admin",
+ * "expireSeconds": 900
  * }
  */
 @Slf4j
@@ -49,102 +49,36 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     private final DeviceCommandService deviceCommandService;
     private final DeviceControlService deviceControlService;
 
-    /**
-     * OTA 进行中的状态集合
-     * <p>落在这几个状态的设备，拒绝再次发起 OTA
-     */
-    private static final Set<String> OTA_RUNNING_STATES = Set.of(
-            "accepted", "downloading", "verifying", "flashing", "rebooting"
-    );
-
     // ==================== 主入口 ====================
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public OtaStartResponse startOta(SendCommandRequest request) {
-        // ========== 1. 校验 deviceId ==========
         String deviceId = request.getDeviceId();
-        if (deviceId == null || deviceId.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_MISSING, "deviceId 不能为空");
-        }
+        validateDeviceId(deviceId);
 
-        // ========== 2. 校验设备存在 ==========
-        DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
-        if (device == null) {
-            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
-        }
+        // 1. 查设备 + 校验 OTA 状态（含僵死自愈）
+        DeviceInfo device = getAndCheckDevice(deviceId);
 
-        // ========== 3. 校验设备当前未在 OTA 中 ==========
-        if (isOtaInProgress(device.getOtaState())) {
-            log.warn("OTA 拒绝：设备正在升级中 - deviceId: {}, otaState: {}", deviceId, device.getOtaState());
-            throw new BusinessException(ErrorCode.OTA_IN_PROGRESS, "设备正在升级中，当前状态：" + device.getOtaState());
-        }
+        // 2. 校验无未完成的 OTA 指令
+        checkNoRunningOtaCommand(deviceId);
 
-        // ========== 4. 校验 DB 中无未完成的 OTA 指令 ==========
-        if (hasRunningOtaCommand(deviceId)) {
-            log.warn("OTA 拒绝：存在未完成的 OTA 指令 - deviceId: {}", deviceId);
-            throw new BusinessException(ErrorCode.OTA_IN_PROGRESS, "已有未完成的 OTA 指令，请等待完成或超时");
-        }
+        // 3. 查固件 + 校验
+        Long firmwareId = parseFirmwareId(request.getParams());
+        Firmware firmware = getAndCheckFirmware(firmwareId);
 
-        // ========== 5. 提取 firmwareId ==========
-        Long firmwareId = extractFirmwareId(request.getParams());
+        // 4. 校验版本
+        checkVersionDiff(device, firmware);
 
-        // ========== 6. 查固件 + 校验状态 ==========
-        Firmware firmware = firmwareService.getById(firmwareId);
-        if (firmware == null) {
-            throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND);
-        }
-        if (firmware.getStatus() == null || firmware.getStatus() != 1) {
-            throw new BusinessException(ErrorCode.FIRMWARE_DISABLED);
-        }
-
-        // ========== 7. 校验版本：设备已是该版本则拒绝 ==========
-        String currentFirmware = device.getFirmware();
-        if (currentFirmware != null
-                && !currentFirmware.isBlank()
-                && currentFirmware.equals(firmware.getVersion())) {
-            log.warn("OTA 拒绝：设备已是该版本 - deviceId: {}, version: {}", deviceId, currentFirmware);
-            throw new BusinessException(ErrorCode.OTA_VERSION_INCOMPATIBLE, "设备已是版本 " + currentFirmware + "，无需重复升级");
-        }
-
-        // ========== 8. 组装下发参数 ==========
-        OtaParam otaParam = new OtaParam(
-                firmware.getUrl(),
-                firmware.getVersion(),
-                firmware.getSha256(),
-                firmware.getSize());
-
-        // ========== 9. 解析 operator / expireSeconds ==========
-        String operator = (request.getOperator() != null && !request.getOperator().isBlank())
-                ? request.getOperator()
-                : CommandConstants.DEFAULT_OPERATOR;
-
-        Integer reqExpire = request.getExpireSeconds();
-        int expireSeconds = (reqExpire != null && reqExpire > 0)
-                ? reqExpire
-                : CommandConstants.OTA_EXPIRE_SECONDS;
-
-        // ========== 10. 入库 + 下发 ==========
-        DeviceCommand command = deviceControlService.sendCommand(
-                deviceId,
-                MqttConstants.ACTION_START,
-                MqttConstants.TARGET_OTA,
-                null,
-                otaParam.toMap(),
-                operator,
-                expireSeconds);
+        // 5. 组装下发参数 + 下发
+        DeviceCommand command = dispatchOta(deviceId, firmware, request);
 
         log.info("OTA 触发成功 - deviceId: {}, firmwareId: {}, version: {}, commandId: {}",
                 deviceId, firmwareId, firmware.getVersion(), command.getCommandId());
 
-        // ========== 11. 组装响应 ==========
+        // 6. 组装响应
         OtaStartResponse response = new OtaStartResponse(1);
-        response.addResult(
-                deviceId,
-                true,
-                command.getCommandId(),
-                firmware.getVersion(),
-                null
-        );
+        response.addResult(deviceId, true, command.getCommandId(), firmware.getVersion(), null);
         return response;
     }
 
@@ -163,33 +97,134 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         return vo;
     }
 
-    // ==================== 拦截工具方法 ====================
+    // ==================== 私有方法：校验 ====================
 
     /**
-     * 判断设备是否在 OTA 进行中
+     * 校验 deviceId
      */
-    private boolean isOtaInProgress(String otaState) {
-        return otaState != null && OTA_RUNNING_STATES.contains(otaState);
+    private void validateDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new BusinessException(ErrorCode.PARAM_MISSING);
+        }
     }
 
     /**
-     * 判断 DB 中是否存在未完成的 OTA 指令
-     * <p>只查 PENDING / SENT，终态（SUCCESS/FAILED/TIMEOUT/CANCELLED）不算
+     * 查设备 + 校验 OTA 状态（含僵死自愈）:返回最新设备信息
      */
-    private boolean hasRunningOtaCommand(String deviceId) {
-        return deviceCommandService.exists(
+    private DeviceInfo getAndCheckDevice(String deviceId) {
+        DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
+        if (device == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
+        }
+
+        // 不在 OTA 中 → 直接返回
+        if (!OtaStateUtils.isRunning(device.getOtaState())) {
+            return device;
+        }
+
+        // 僵死 → 自动清理
+        if (OtaStateUtils.isStale(device.getOtaState(), device.getOtaUpdateTime())) {
+            log.warn("检测到僵死 OTA 状态，自动清理 - deviceId: {}, otaState: {}, lastUpdate: {}", deviceId, device.getOtaState(), device.getOtaUpdateTime());
+            cleanStaleOtaState(device);
+            return deviceInfoService.getByDeviceId(deviceId);
+        }
+
+        // 真的在升级中 → 拒绝
+        log.warn("OTA 拒绝：设备正在升级中 - deviceId: {}, otaState: {}", deviceId, device.getOtaState());
+        throw new BusinessException(ErrorCode.OTA_IN_PROGRESS, "设备正在升级中，当前状态：" + device.getOtaState());
+    }
+
+    /**
+     * 清理僵死 OTA 状态
+     */
+    private void cleanStaleOtaState(DeviceInfo device) {
+        device.setOtaState(null);
+        device.setOtaProgress(null);
+        device.setOtaUpdateTime(null);
+        deviceInfoService.updateById(device);
+        log.info("已清理僵死 OTA 状态 - deviceId: {}", device.getDeviceId());
+    }
+
+    /**
+     * 校验无未完成的 OTA 指令
+     */
+    private void checkNoRunningOtaCommand(String deviceId) {
+        boolean exists = deviceCommandService.exists(
                 new LambdaQueryWrapper<DeviceCommand>()
                         .eq(DeviceCommand::getDeviceId, deviceId)
                         .eq(DeviceCommand::getTarget, MqttConstants.TARGET_OTA)
                         .in(DeviceCommand::getStatus,
                                 CommandStatus.PENDING.getCode(),
-                                CommandStatus.SENT.getCode()));
+                                CommandStatus.SENT.getCode(),
+                                CommandStatus.ACCEPTED.getCode()));
+        if (exists) {
+            log.warn("OTA 拒绝：存在未完成的 OTA 指令 - deviceId: {}", deviceId);
+            throw new BusinessException(ErrorCode.OTA_IN_PROGRESS,
+                    "已有未完成的 OTA 指令，请等待完成或超时");
+        }
+    }
+
+    /**
+     * 查固件 + 校验状态
+     */
+    private Firmware getAndCheckFirmware(Long firmwareId) {
+        Firmware firmware = firmwareService.getById(firmwareId);
+        if (firmware == null) {
+            throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND);
+        }
+        if (firmware.getStatus() == null
+                || firmware.getStatus() != DeviceConstants.FIRMWARE_STATUS_ENABLE) {
+            throw new BusinessException(ErrorCode.FIRMWARE_DISABLED);
+        }
+        return firmware;
+    }
+
+    /**
+     * 校验设备当前版本 ≠ 目标版本
+     */
+    private void checkVersionDiff(DeviceInfo device, Firmware firmware) {
+        String current = device.getFirmware();
+        if (current != null && !current.isBlank() && current.equals(firmware.getVersion())) {
+            log.warn("OTA 拒绝：设备已是该版本 - deviceId: {}, version: {}",
+                    device.getDeviceId(), current);
+            throw new BusinessException(ErrorCode.OTA_VERSION_INCOMPATIBLE,
+                    "设备已是版本 " + current + "，无需重复升级");
+        }
+    }
+
+    /**
+     * 组装参数 + 下发 OTA 指令
+     */
+    private DeviceCommand dispatchOta(String deviceId, Firmware firmware, SendCommandRequest request) {
+        OtaParam otaParam = new OtaParam(
+                firmware.getUrl(),
+                firmware.getVersion(),
+                firmware.getSha256(),
+                firmware.getSize());
+
+        String operator = (request.getOperator() != null && !request.getOperator().isBlank())
+                ? request.getOperator()
+                : CommandConstants.DEFAULT_OPERATOR;
+
+        Integer reqExpire = request.getExpireSeconds();
+        int expireSeconds = (reqExpire != null && reqExpire > 0)
+                ? reqExpire
+                : CommandConstants.OTA_EXPIRE_SECONDS;
+
+        return deviceControlService.sendCommand(
+                deviceId,
+                MqttConstants.ACTION_START,
+                MqttConstants.TARGET_OTA,
+                null,
+                otaParam.toMap(),
+                operator,
+                expireSeconds);
     }
 
     /**
      * 从 params 提取 firmwareId
      */
-    private Long extractFirmwareId(Map<String, Object> params) {
+    private Long parseFirmwareId(Map<String, Object> params) {
         if (params == null || params.isEmpty()) {
             throw new BusinessException(ErrorCode.PARAM_MISSING, "OTA params 不能为空");
         }

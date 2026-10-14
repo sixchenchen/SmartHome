@@ -36,7 +36,7 @@ payload = {
     "type": "register",
     "timestamp": timestamp,
     "data": {
-        "product": "SmartHome-v1",           # ★ product 从顶层移到 data
+        "product": "SmartHome-v1",      
         "firmware": "1.0.29",
         "chip": "ESP32",
         "hardware_version": "V1.0",

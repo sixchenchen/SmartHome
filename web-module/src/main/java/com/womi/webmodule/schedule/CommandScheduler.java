@@ -103,6 +103,18 @@ public class CommandScheduler {
         }
     }
 
+    @Scheduled(fixedDelay = ScheduleConstants.OTA_EXPIRED_FIXED_DELAY)
+    public void markOtaExpired() {
+        try {
+            int count = deviceCommandService.markOtaExpiredCommands();
+            if (count > 0) {
+                log.info("标记过期 OTA 指令 - 共 {} 条", count);
+            }
+        } catch (Exception e) {
+            log.error("标记过期 OTA 指令失败", e);
+        }
+    }
+
     /**
      * 每天凌晨 2 点清理 30 天前的历史指令
      */

@@ -2,7 +2,10 @@ package com.womi.businessmodule.model;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -12,6 +15,9 @@ import java.util.Map;
  */
 @Data
 @TableName(value = "device_command", autoResultMap = true)
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class DeviceCommand {
 
     @TableId(type = IdType.AUTO)

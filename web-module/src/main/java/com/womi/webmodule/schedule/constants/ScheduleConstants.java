@@ -22,6 +22,8 @@ public final class ScheduleConstants {
     public static final int MAX_RETRY = 3;
     // 过期指令标记间隔
     public static final long MARK_EXPIRED_FIXED_DELAY = 30000L;
+    // OTA过期间隔
+    public static final long OTA_EXPIRED_FIXED_DELAY = 5000L;
     // 单批处理条数
     public static final int BATCH_SIZE = 50;
     // 重试超时阈值（秒）

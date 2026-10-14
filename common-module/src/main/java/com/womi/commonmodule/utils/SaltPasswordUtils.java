@@ -11,7 +11,6 @@ import java.security.SecureRandom;
 
 /**
  * 密码工具（加盐哈希）
- * <p>
  * 存储格式：
  * salt：16 字节 → 32 位十六进制字符串
  * hash：SHA-256(salt + password) → 64 位十六进制字符串

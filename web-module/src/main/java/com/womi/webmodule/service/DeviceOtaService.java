@@ -17,4 +17,5 @@ public interface DeviceOtaService {
      * 查询 OTA 进度
      */
     OtaProgressVO getOtaProgress(String deviceId);
+
 }
