@@ -10,7 +10,7 @@ import ssl
 import paho.mqtt.client as mqtt
 
 # ==================== 配置 ====================
-MQTT_HOST = "192.168.1.15"
+MQTT_HOST = "localhost"
 MQTT_PORT = 8883
 DEVICE_MAC = "B4BFE90CDBA1"
 USERNAME = "dev_B4BFE90CDBA1"

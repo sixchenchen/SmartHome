@@ -1,6 +1,6 @@
 package com.womi.webmodule.mqtt.core;
 
-import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -87,7 +87,7 @@ public class MqttConfig {
 
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
-                        broker.getClientId() + MqttConstants.RUNTIME_INBOUND_SUFFIX,
+                        broker.getClientId() + DeviceMqttConstants.RUNTIME_INBOUND_SUFFIX,
                         runtimeClientFactory(),
                         topics
                 );
@@ -112,7 +112,7 @@ public class MqttConfig {
 
         MqttPahoMessageHandler handler =
                 new MqttPahoMessageHandler(
-                        broker.getClientId() + MqttConstants.RUNTIME_OUTBOUND_SUFFIX,
+                        broker.getClientId() + DeviceMqttConstants.RUNTIME_OUTBOUND_SUFFIX,
                         runtimeClientFactory()
                 );
         handler.setAsync(true);
@@ -140,7 +140,7 @@ public class MqttConfig {
 
         MqttPahoMessageDrivenChannelAdapter adapter =
                 new MqttPahoMessageDrivenChannelAdapter(
-                        broker.getClientId() + MqttConstants.PROVISION_INBOUND_SUFFIX,
+                        broker.getClientId() + DeviceMqttConstants.PROVISION_INBOUND_SUFFIX,
                         provisionClientFactory(),
                         topics
                 );
@@ -165,7 +165,7 @@ public class MqttConfig {
 
         MqttPahoMessageHandler handler =
                 new MqttPahoMessageHandler(
-                        broker.getClientId() + MqttConstants.PROVISION_OUTBOUND_SUFFIX,
+                        broker.getClientId() + DeviceMqttConstants.PROVISION_OUTBOUND_SUFFIX,
                         provisionClientFactory()
                 );
         handler.setAsync(true);

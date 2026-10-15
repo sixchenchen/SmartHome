@@ -2,7 +2,7 @@ package com.womi.webmodule.mqtt.core;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.integration.support.MessageBuilder;
@@ -33,7 +33,7 @@ public class MqttPublisher {
     // ==================== 运行时：发布 ====================
 
     public void publish(String topic, Object payload) {
-        publish(topic, payload, MqttConstants.DEFAULT_QOS, MqttConstants.DEFAULT_RETAINED);
+        publish(topic, payload, DeviceMqttConstants.DEFAULT_QOS, DeviceMqttConstants.DEFAULT_RETAINED);
     }
 
     public void publish(String topic, Object payload, int qos) {
@@ -63,9 +63,9 @@ public class MqttPublisher {
                     : objectMapper.writeValueAsString(payload);
 
             Map<String, Object> headers = new HashMap<>();
-            headers.put(MqttConstants.MQTT_HEADER_TOPIC, topic);
-            headers.put(MqttConstants.MQTT_HEADER_QOS, qos);
-            headers.put(MqttConstants.MQTT_HEADER_RETAINED, retained);
+            headers.put(DeviceMqttConstants.MQTT_HEADER_TOPIC, topic);
+            headers.put(DeviceMqttConstants.MQTT_HEADER_QOS, qos);
+            headers.put(DeviceMqttConstants.MQTT_HEADER_RETAINED, retained);
 
             channel.send(MessageBuilder.withPayload(message).copyHeaders(headers).build());
 
@@ -79,32 +79,32 @@ public class MqttPublisher {
     public void sendControlCommand(String deviceId, String commandId,
                                    String action, String target,
                                    Integer channel, Map<String, Object> params) {
-        String topic = String.format(MqttConstants.COMMAND_TOPIC_FORMAT, deviceId);
+        String topic = String.format(DeviceMqttConstants.COMMAND_TOPIC_FORMAT, deviceId);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put(MqttConstants.FIELD_COMMAND_ID, commandId);
-        payload.put(MqttConstants.FIELD_ACTION, action);
-        payload.put(MqttConstants.FIELD_TARGET, target);
+        payload.put(DeviceMqttConstants.FIELD_COMMAND_ID, commandId);
+        payload.put(DeviceMqttConstants.FIELD_ACTION, action);
+        payload.put(DeviceMqttConstants.FIELD_TARGET, target);
         if (channel != null) {
-            payload.put(MqttConstants.FIELD_CHANNEL, channel);
+            payload.put(DeviceMqttConstants.FIELD_CHANNEL, channel);
         }
         if (params != null && !params.isEmpty()) {
-            payload.put(MqttConstants.FIELD_PARAMS, params);
+            payload.put(DeviceMqttConstants.FIELD_PARAMS, params);
         }
-        payload.put(MqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
-        publish(topic, payload, MqttConstants.DEFAULT_QOS, false);
+        payload.put(DeviceMqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
+        publish(topic, payload, DeviceMqttConstants.DEFAULT_QOS, false);
         log.info("MQTT 控制指令下发 - Topic: {}, commandId: {}, action: {}, target: {}, channel: {}", topic, commandId, action, target, channel);
     }
 
     public void sendConfigCommand(String deviceId, String commandId,
                                   Map<String, Object> config, Integer configVersion) {
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put(MqttConstants.FIELD_CONFIG, config);
+        params.put(DeviceMqttConstants.FIELD_CONFIG, config);
         if (configVersion != null) {
-            params.put(MqttConstants.FIELD_CONFIG_VERSION, configVersion);
+            params.put(DeviceMqttConstants.FIELD_CONFIG_VERSION, configVersion);
         }
-        params.put(MqttConstants.FIELD_PERSIST, true);
+        params.put(DeviceMqttConstants.FIELD_PERSIST, true);
 
-        sendControlCommand(deviceId, commandId, MqttConstants.ACTION_SET, MqttConstants.TARGET_CONFIG, null, params);
+        sendControlCommand(deviceId, commandId, DeviceMqttConstants.ACTION_SET, DeviceMqttConstants.TARGET_CONFIG, null, params);
     }
 }

@@ -8,10 +8,10 @@ import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceCommandService;
 import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.businessmodule.vo.CommandStatsVO;
-import com.womi.commonmodule.constants.CommandConstants;
-import com.womi.commonmodule.constants.MqttConstants;
-import com.womi.commonmodule.constants.OtaStateConstants;
-import com.womi.commonmodule.enums.CommandStatus;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.constants.DeviceOtaStateConstants;
+import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -34,10 +34,10 @@ public class DeviceCommandServiceImpl
 
     /** 终态集合：进入后不再变化 */
     private static final List<Integer> FINAL_STATUSES = List.of(
-            CommandStatus.SUCCESS.getCode(),
-            CommandStatus.FAILED.getCode(),
-            CommandStatus.TIMEOUT.getCode(),
-            CommandStatus.CANCELLED.getCode());
+            DeviceCommandStatus.SUCCESS.getCode(),
+            DeviceCommandStatus.FAILED.getCode(),
+            DeviceCommandStatus.TIMEOUT.getCode(),
+            DeviceCommandStatus.CANCELLED.getCode());
 
     private final DeviceInfoService deviceInfoService;
 
@@ -55,7 +55,7 @@ public class DeviceCommandServiceImpl
         String commandId = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
         int actualExpire = expireSeconds > 0
-                ? expireSeconds : CommandConstants.DEFAULT_EXPIRE_SECONDS;
+                ? expireSeconds : DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS;
 
         DeviceCommand cmd = DeviceCommand.builder()
                 .commandId(commandId)
@@ -64,13 +64,13 @@ public class DeviceCommandServiceImpl
                 .target(target)
                 .channel(channel)
                 .params(params != null ? params : Collections.emptyMap())
-                .qos(CommandConstants.DEFAULT_QOS)
-                .retain(CommandConstants.DEFAULT_RETAIN)
-                .status(CommandStatus.PENDING.getCode())
+                .qos(DeviceCommandConstants.DEFAULT_QOS)
+                .retain(DeviceCommandConstants.DEFAULT_RETAIN)
+                .status(DeviceCommandStatus.PENDING.getCode())
                 .retryCount(0)
-                .maxRetry(CommandConstants.DEFAULT_MAX_RETRY)
-                .operator(operator != null ? operator : CommandConstants.DEFAULT_OPERATOR)
-                .source(source != null ? source : CommandConstants.SOURCE_WEB)
+                .maxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY)
+                .operator(operator != null ? operator : DeviceCommandConstants.DEFAULT_OPERATOR)
+                .source(source != null ? source : DeviceCommandConstants.SOURCE_WEB)
                 .expireTime(now.plusSeconds(actualExpire))
                 .build();
 
@@ -90,7 +90,7 @@ public class DeviceCommandServiceImpl
                 .id(id)
                 .status(status)
                 .errorMsg(errorMsg)
-                .sendTime(status == CommandStatus.SENT.getCode() ? now : null)
+                .sendTime(status == DeviceCommandStatus.SENT.getCode() ? now : null)
                 .ackTime(FINAL_STATUSES.contains(status) ? now : null)
                 .build();
 
@@ -132,7 +132,7 @@ public class DeviceCommandServiceImpl
         }
 
         // 5. OTA 最终成功 → 兜底更新 firmware
-        if (decision.isOtaFinalAck() && decision.newStatus() == CommandStatus.SUCCESS.getCode()) {
+        if (decision.isOtaFinalAck() && decision.newStatus() == DeviceCommandStatus.SUCCESS.getCode()) {
             updateFirmwareFromAck(command.getDeviceId(), payload);
         }
 
@@ -153,27 +153,27 @@ public class DeviceCommandServiceImpl
             return null;
         }
 
-        boolean isOta = MqttConstants.TARGET_OTA.equals(command.getTarget());
+        boolean isOta = DeviceMqttConstants.TARGET_OTA.equals(command.getTarget());
         boolean isAcceptAck = isOta && isOtaAcceptAck(payload);
 
         // ---------- 情况 1：SENT + OTA 接收确认 → ACCEPTED ----------
-        if (current == CommandStatus.SENT.getCode() && isAcceptAck) {
+        if (current == DeviceCommandStatus.SENT.getCode() && isAcceptAck) {
             log.info("OTA 接收确认 - commandId: {}, deviceId: {}",
                     command.getCommandId(), command.getDeviceId());
-            return new AckDecision(CommandStatus.ACCEPTED.getCode(), null, false);
+            return new AckDecision(DeviceCommandStatus.ACCEPTED.getCode(), null, false);
         }
 
         // ---------- 情况 2：SENT 或 ACCEPTED + 最终结果 → SUCCESS/FAILED ----------
-        if (current == CommandStatus.SENT.getCode()
-                || current == CommandStatus.ACCEPTED.getCode()) {
+        if (current == DeviceCommandStatus.SENT.getCode()
+                || current == DeviceCommandStatus.ACCEPTED.getCode()) {
             // 排除"ACCEPTED + 重复接收确认"的干扰
-            if (current == CommandStatus.ACCEPTED.getCode() && isAcceptAck) {
+            if (current == DeviceCommandStatus.ACCEPTED.getCode() && isAcceptAck) {
                 log.debug("重复的 OTA 接收确认 ACK，忽略 - commandId: {}", command.getCommandId());
                 return null;
             }
 
             Integer newStatus = success
-                    ? CommandStatus.SUCCESS.getCode() : CommandStatus.FAILED.getCode();
+                    ? DeviceCommandStatus.SUCCESS.getCode() : DeviceCommandStatus.FAILED.getCode();
             String finalMsg = success ? null : resolveErrorMsg(errorMsg);
             boolean isFinalAck = isOta;
             return new AckDecision(newStatus, finalMsg, isFinalAck);
@@ -201,7 +201,7 @@ public class DeviceCommandServiceImpl
         if (payload == null || payload.isEmpty()) {
             return;
         }
-        Object toVersionObj = payload.get(MqttConstants.FIELD_TO_VERSION);
+        Object toVersionObj = payload.get(DeviceMqttConstants.FIELD_TO_VERSION);
         if (toVersionObj == null) {
             return;
         }
@@ -223,7 +223,7 @@ public class DeviceCommandServiceImpl
         int count = 0;
         for (DeviceCommand command : expired) {
             // 1. 标记指令为 TIMEOUT
-            updateStatus(command.getId(), CommandStatus.TIMEOUT.getCode(), "OTA 指令超时");
+            updateStatus(command.getId(), DeviceCommandStatus.TIMEOUT.getCode(), "OTA 指令超时");
             // 2. 联动清理 device_info.ota_state
             clearOtaState(command.getDeviceId());
             count++;
@@ -239,7 +239,7 @@ public class DeviceCommandServiceImpl
 
         String otaState = device.getOtaState();
         if (otaState == null || otaState.isBlank()) return;
-        if (OtaStateConstants.FINAL_STATES.contains(otaState)) return;
+        if (DeviceOtaStateConstants.FINAL_STATES.contains(otaState)) return;
 
         deviceInfoService.clearOtaState(deviceId);
         log.info("清理卡住的 OTA 状态 - deviceId: {}, 原 otaState: {}", deviceId, otaState);
@@ -252,7 +252,7 @@ public class DeviceCommandServiceImpl
         if (payload == null) {
             return false;
         }
-        return OtaStateConstants.ACCEPTED.equals(payload.get(MqttConstants.FIELD_OTA_STATE));
+        return DeviceOtaStateConstants.ACCEPTED.equals(payload.get(DeviceMqttConstants.FIELD_OTA_STATE));
     }
 
     /**
@@ -261,7 +261,7 @@ public class DeviceCommandServiceImpl
     private String resolveErrorMsg(String errorMsg) {
         return (errorMsg != null && !errorMsg.isBlank())
                 ? errorMsg
-                : CommandConstants.DEFAULT_FAIL_MSG;
+                : DeviceCommandConstants.DEFAULT_FAIL_MSG;
     }
 
     /**
@@ -319,14 +319,14 @@ public class DeviceCommandServiceImpl
             return false;
         }
         // 只有中间态才能取消
-        CommandStatus status = CommandStatus.fromCode(cmd.getStatus());
+        DeviceCommandStatus status = DeviceCommandStatus.fromCode(cmd.getStatus());
         if (status == null || status.isFinished()) {
             log.warn("指令已进入终态，无法取消 - id: {}, status: {}", id, cmd.getStatus());
             return false;
         }
 
-        cmd.setStatus(CommandStatus.CANCELLED.getCode());
-        cmd.setErrorMsg(CommandConstants.ERR_CANCELLED_BY_USER);
+        cmd.setStatus(DeviceCommandStatus.CANCELLED.getCode());
+        cmd.setErrorMsg(DeviceCommandConstants.ERR_CANCELLED_BY_USER);
         cmd.setOperator(operator);
         return updateById(cmd);
     }
@@ -339,7 +339,7 @@ public class DeviceCommandServiceImpl
             return 0;
         }
         List<Long> ids = expired.stream().map(DeviceCommand::getId).toList();
-        int updated = baseMapper.batchUpdateStatus(ids, CommandStatus.TIMEOUT.getCode());
+        int updated = baseMapper.batchUpdateStatus(ids, DeviceCommandStatus.TIMEOUT.getCode());
         log.warn("标记超时指令 - 共 {} 条", updated);
         return updated;
     }
@@ -374,7 +374,7 @@ public class DeviceCommandServiceImpl
         vo.setCancelled(0L);
 
         for (DeviceCommand cmd : commands) {
-            CommandStatus status = CommandStatus.fromCode(cmd.getStatus());
+            DeviceCommandStatus status = DeviceCommandStatus.fromCode(cmd.getStatus());
             if (status == null) continue;
             switch (status) {
                 case PENDING   -> vo.setPending(vo.getPending() + 1);

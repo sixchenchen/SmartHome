@@ -1,6 +1,6 @@
 package com.womi.webmodule.mqtt.core;
 
-import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -35,8 +35,8 @@ public class MqttMessageReceiver {
     private void route(Message<?> message) {
         try {
             String payload = message.getPayload().toString();
-            String topic = (String) message.getHeaders().get(MqttConstants.MQTT_RECEIVED_TOPIC);
-            Integer qos = (Integer) message.getHeaders().get(MqttConstants.MQTT_RECEIVED_QOS);
+            String topic = (String) message.getHeaders().get(DeviceMqttConstants.MQTT_RECEIVED_TOPIC);
+            Integer qos = (Integer) message.getHeaders().get(DeviceMqttConstants.MQTT_RECEIVED_QOS);
 
             log.debug("收到 MQTT 消息 - Topic: {}, QoS: {}", topic, qos);
             messageRouter.route(topic, payload, qos);

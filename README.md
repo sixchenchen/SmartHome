@@ -32,7 +32,7 @@
 
 ### 2. 设备在线状态管理
 - 统一 **`presence`** 主题承载上线/下线：`type=online` 走 `markOnline`，`type=offline` 走 `markOffline`。
-- 离线原因枚举 `OfflineReason`：`shutdown`（正常关机）、`factory_reset`、`mqtt_lwt`（遗嘱/异常断线）、`heartbeat_timeout`（心跳超时）、`manual`。
+- 离线原因枚举 `DeviceOfflineReason`：`shutdown`（正常关机）、`factory_reset`、`mqtt_lwt`（遗嘱/异常断线）、`heartbeat_timeout`（心跳超时）、`manual`。
 - **心跳保活**：`heartbeat` 更新 `uptime`/`last_heartbeat_time` 并写 `heartbeat_record`；超过 `60s` 未收到心跳由定时任务判离线（阈值 = 3 个心跳周期）。
 - **遗嘱（LWT）**：由注册响应下发 `will` 配置，设备异常断线由 Broker 代发离线。
 
@@ -110,11 +110,11 @@ WM_LAOHUA
 | web-module | Spring Web、Spring Integration MQTT（Paho）、Redis、Druid |
 
 **通用常量收敛于 `common-module/.../constants/`**：
-`MqttConstants`（主题/字段/header）、`CommandConstants`、`DeviceConstants`、`FirmwareConstants`、`FileConstants`、`HttpStatusConstants`、`RegexConstants`、`ErrorInfoConstants`、`OtaStateConstants`。
+`DeviceMqttConstants`（主题/字段/header）、`DeviceCommandConstants`、`DeviceConstants`、`DeviceFirmwareConstants`、`FileConstants`、`HttpStatusConstants`、`RegexConstants`、`ErrorInfoConstants`、`DeviceOtaStateConstants`。
 
-**枚举**：`CommandStatus`、`OfflineReason`、`MqttErrorCode`、`ErrorCode`。
+**枚举**：`DeviceCommandStatus`、`DeviceOfflineReason`、`MqttErrorCode`、`ErrorCode`。
 
-**工具**：`JsonUtils`、`SignatureVerifierUtils`、`TimestampValidatorUtils`、`DateTimeUtils`、`SaltPasswordUtils`、`OtaStateUtils`。
+**工具**：`JsonUtils`、`SignatureVerifierUtils`、`TimestampValidatorUtils`、`DateTimeUtils`、`SaltPasswordUtils`、`DeviceOtaStateUtils`。
 
 ---
 
@@ -327,7 +327,7 @@ MqttPahoMessageDrivenChannelAdapter
 }
 ```
 
-- `otaState` ∈ `accepted / downloading / verifying / flashing / rebooting / success / failed`（`OtaStateConstants`）。
+- `otaState` ∈ `accepted / downloading / verifying / flashing / rebooting / success / failed`（`DeviceOtaStateConstants`）。
 - 落库 `ota_state / ota_progress / ota_version`；当 `otaState=success` 时同步 `firmware`。
 
 #### ⑤ 待接入主题
@@ -408,7 +408,7 @@ MqttPahoMessageDrivenChannelAdapter
 | POST | `/api/ota/start` | body `SendCommandRequest`（`params.firmwareId` 指定固件） | `ApiResponse<OtaStartResponse>` |
 | GET | `/api/ota/{deviceId}/progress` | path | `ApiResponse<OtaProgressVO>` |
 
-### 5.3 固件 `FirmwareController`（`/firmware`）
+### 5.3 固件 `DeviceFirmwareController`（`/firmware`）
 
 | 方法 | 路径 | 参数 | 返回 |
 | :--- | :--- | :--- | :--- |

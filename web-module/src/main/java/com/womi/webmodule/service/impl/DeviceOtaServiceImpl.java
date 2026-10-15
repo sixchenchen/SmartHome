@@ -2,22 +2,22 @@ package com.womi.webmodule.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.womi.businessmodule.model.DeviceCommand;
+import com.womi.businessmodule.model.DeviceFirmware;
 import com.womi.businessmodule.model.DeviceInfo;
-import com.womi.businessmodule.model.Firmware;
 import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.businessmodule.service.DeviceFirmwareService;
 import com.womi.businessmodule.service.DeviceInfoService;
-import com.womi.businessmodule.service.FirmwareService;
-import com.womi.commonmodule.constants.CommandConstants;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.DeviceConstants;
-import com.womi.commonmodule.constants.MqttConstants;
-import com.womi.commonmodule.enums.CommandStatus;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
-import com.womi.commonmodule.utils.OtaStateUtils;
+import com.womi.commonmodule.utils.DeviceOtaStateUtils;
 import com.womi.webmodule.dto.http.request.SendCommandRequest;
-import com.womi.webmodule.dto.ota.request.OtaParam;
-import com.womi.webmodule.dto.ota.response.OtaProgressVO;
-import com.womi.webmodule.dto.ota.response.OtaStartResponse;
+import com.womi.webmodule.dto.ota.request.DeviceOtaParam;
+import com.womi.webmodule.dto.ota.response.DeviceOtaProgressVO;
+import com.womi.webmodule.dto.ota.response.DeviceOtaStartResponse;
 import com.womi.webmodule.service.DeviceControlService;
 import com.womi.webmodule.service.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,7 @@ import java.util.Map;
 public class DeviceOtaServiceImpl implements DeviceOtaService {
 
     private final DeviceInfoService deviceInfoService;
-    private final FirmwareService firmwareService;
+    private final DeviceFirmwareService firmwareService;
     private final DeviceCommandService deviceCommandService;
     private final DeviceControlService deviceControlService;
 
@@ -53,7 +53,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public OtaStartResponse startOta(SendCommandRequest request) {
+    public DeviceOtaStartResponse startOta(SendCommandRequest request) {
         String deviceId = request.getDeviceId();
         // 校验deviceId是否合法
         if (deviceId == null || deviceId.isBlank()) {
@@ -67,7 +67,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
 
         // 3. 查固件 + 校验
         Long firmwareId = parseFirmwareId(request.getParams());
-        Firmware firmware = getAndCheckFirmware(firmwareId);
+        DeviceFirmware firmware = getAndCheckFirmware(firmwareId);
 
         // 4. 校验版本
         checkVersionDiff(device, firmware);
@@ -78,18 +78,18 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         log.info("OTA 触发成功 - deviceId: {}, firmwareId: {}, version: {}, commandId: {}", deviceId, firmwareId, firmware.getVersion(), command.getCommandId());
 
         // 6. 组装响应
-        OtaStartResponse response = new OtaStartResponse(1);
+        DeviceOtaStartResponse response = new DeviceOtaStartResponse(1);
         response.addResult(deviceId, true, command.getCommandId(), firmware.getVersion(), null);
         return response;
     }
 
     @Override
-    public OtaProgressVO getOtaProgress(String deviceId) {
+    public DeviceOtaProgressVO getOtaProgress(String deviceId) {
         DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
         if (device == null) {
             return null;
         }
-        OtaProgressVO vo = new OtaProgressVO();
+        DeviceOtaProgressVO vo = new DeviceOtaProgressVO();
         vo.setDeviceId(device.getDeviceId());
         vo.setOtaState(device.getOtaState());
         vo.setOtaProgress(device.getOtaProgress());
@@ -110,12 +110,12 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         }
 
         // 不在 OTA 中 → 直接返回
-        if (!OtaStateUtils.isRunning(device.getOtaState())) {
+        if (!DeviceOtaStateUtils.isRunning(device.getOtaState())) {
             return device;
         }
 
         // 僵死 → 自动清理
-        if (OtaStateUtils.isStale(device.getOtaState(), device.getOtaUpdateTime())) {
+        if (DeviceOtaStateUtils.isStale(device.getOtaState(), device.getOtaUpdateTime())) {
             log.warn("检测到僵死 OTA 状态，自动清理 - deviceId: {}, otaState: {}, lastUpdate: {}", deviceId, device.getOtaState(), device.getOtaUpdateTime());
             cleanStaleOtaState(device);
             return deviceInfoService.getByDeviceId(deviceId);
@@ -144,11 +144,11 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         boolean exists = deviceCommandService.exists(
                 new LambdaQueryWrapper<DeviceCommand>()
                         .eq(DeviceCommand::getDeviceId, deviceId)
-                        .eq(DeviceCommand::getTarget, MqttConstants.TARGET_OTA)
+                        .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
                         .in(DeviceCommand::getStatus,
-                                CommandStatus.PENDING.getCode(),
-                                CommandStatus.SENT.getCode(),
-                                CommandStatus.ACCEPTED.getCode()));
+                                DeviceCommandStatus.PENDING.getCode(),
+                                DeviceCommandStatus.SENT.getCode(),
+                                DeviceCommandStatus.ACCEPTED.getCode()));
         if (exists) {
             log.warn("OTA 拒绝：存在未完成的 OTA 指令 - deviceId: {}", deviceId);
             throw new BusinessException(ErrorCode.OTA_IN_PROGRESS, "已有未完成的 OTA 指令，请等待完成或超时");
@@ -158,8 +158,8 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     /**
      * 查固件 + 校验状态
      */
-    private Firmware getAndCheckFirmware(Long firmwareId) {
-        Firmware firmware = firmwareService.getById(firmwareId);
+    private DeviceFirmware getAndCheckFirmware(Long firmwareId) {
+        DeviceFirmware firmware = firmwareService.getById(firmwareId);
         if (firmware == null) {
             throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND);
         }
@@ -173,7 +173,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     /**
      * 校验设备当前版本 ≠ 目标版本
      */
-    private void checkVersionDiff(DeviceInfo device, Firmware firmware) {
+    private void checkVersionDiff(DeviceInfo device, DeviceFirmware firmware) {
         String current = device.getFirmware();
         if (current != null && !current.isBlank() && current.equals(firmware.getVersion())) {
             log.warn("OTA 拒绝：设备已是该版本 - deviceId: {}, version: {}", device.getDeviceId(), current);
@@ -184,26 +184,26 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     /**
      * 组装参数 + 下发 OTA 指令
      */
-    private DeviceCommand dispatchOta(String deviceId, Firmware firmware, SendCommandRequest request) {
-        OtaParam otaParam = OtaParam.builder()
+    private DeviceCommand dispatchOta(String deviceId, DeviceFirmware firmware, SendCommandRequest request) {
+        DeviceOtaParam deviceOtaParam = DeviceOtaParam.builder()
                 .url(firmware.getUrl())
                 .version(firmware.getVersion())
                 .sha256(firmware.getSha256())
                 .size(firmware.getSize())
                 .build();
         String operator = (request.getOperator() != null && !request.getOperator().isBlank())
-                ? request.getOperator() : CommandConstants.DEFAULT_OPERATOR;
+                ? request.getOperator() : DeviceCommandConstants.DEFAULT_OPERATOR;
 
         Integer reqExpire = request.getExpireSeconds();
         int expireSeconds = (reqExpire != null && reqExpire > 0)
-                ? reqExpire : CommandConstants.OTA_EXPIRE_SECONDS;
+                ? reqExpire : DeviceCommandConstants.OTA_EXPIRE_SECONDS;
 
         return deviceControlService.sendCommand(
                 deviceId,
-                MqttConstants.ACTION_START,
-                MqttConstants.TARGET_OTA,
+                DeviceMqttConstants.ACTION_START,
+                DeviceMqttConstants.TARGET_OTA,
                 null,
-                otaParam.toMap(),
+                deviceOtaParam.toMap(),
                 operator,
                 expireSeconds);
     }
@@ -216,7 +216,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             throw new BusinessException(ErrorCode.PARAM_MISSING, "OTA params 不能为空");
         }
 
-        Object value = params.get(MqttConstants.FIELD_FIRMWARE_ID);
+        Object value = params.get(DeviceMqttConstants.FIELD_FIRMWARE_ID);
         if (value == null) {
             throw new BusinessException(ErrorCode.PARAM_MISSING, "OTA 缺少 firmwareId");
         }

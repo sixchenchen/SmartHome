@@ -3,7 +3,7 @@ package com.womi.webmodule.schedule;
 import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.businessmodule.service.DeviceSlaveDataService;
-import com.womi.commonmodule.enums.OfflineReason;
+import com.womi.commonmodule.enums.DeviceOfflineReason;
 import com.womi.webmodule.schedule.constants.ScheduleConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,7 +64,7 @@ public class DeviceOfflineScheduler {
                 deviceId, lastHeartbeat, ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS);
 
         // 1. 标记设备离线
-        deviceInfoService.markOffline(deviceId, OfflineReason.HEARTBEAT_TIMEOUT);
+        deviceInfoService.markOffline(deviceId, DeviceOfflineReason.HEARTBEAT_TIMEOUT);
 
         // 2. 清空该设备所有从机数据（主机离线，从机也视为离线）
         int cleared = deviceSlaveDataService.clearByDeviceId(deviceId);

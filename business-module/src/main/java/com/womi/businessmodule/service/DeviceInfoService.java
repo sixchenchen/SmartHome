@@ -2,9 +2,8 @@ package com.womi.businessmodule.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.womi.businessmodule.model.DeviceInfo;
-import com.womi.commonmodule.enums.OfflineReason;
+import com.womi.commonmodule.enums.DeviceOfflineReason;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -28,7 +27,7 @@ public interface DeviceInfoService extends IService<DeviceInfo> {
     /**
      * 标记设备离线
      */
-    void markOffline(String deviceId, OfflineReason reason);
+    void markOffline(String deviceId, DeviceOfflineReason reason);
 
     /**
      * 更新心跳

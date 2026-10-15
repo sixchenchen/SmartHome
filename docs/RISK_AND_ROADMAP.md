@@ -31,7 +31,7 @@
 | P2-1 | **统计分项之和 ≠ total** | `DeviceCommandServiceImpl.statsByDevice()` 第 386 行 `case ACCEPTED -> { /* ACCEPTED 暂不计入统计 */ }`，而第 390 行 `vo.setTotal((long) commands.size())` | `ACCEPTED(6)` 指令既不计入任何分项、又被算进 total → 前端分项相加对不上总数 | ACCEPTED 归入某分项（如 sent），或为统计对象单列一列；或 total 改为分项累加 |
 | P2-2 | **取消 OTA（ACCEPTED）后设备仍可能继续升级** | `cancelCommand()` 用 `status.isFinished()` 判定，而 `CommandStatus.isFinished()` 只含 SUCCESS/FAILED/TIMEOUT/CANCELLED，**ACCEPTED 非终态 → 可被取消**；但 `handleAck` 遇到 `CANCELLED` 终态会忽略（第 183 行） | 服务端把指令标记为"已取消"，设备端实际仍在下载/升级并可能成功 → `device_command.status` 与 `device_info.ota_state` 不一致 | 明确 ACCEPTED 语义：若不允许取消，则把它纳入 `isFinished()`；若允许，则取消时需同步通知设备或让后续 ACK/进度可覆盖 |
 | P2-3 | **markOnline 整行 updateById（read-modify-write 并发覆盖）** | `DeviceInfoServiceImpl.markOnline()` 第 61 行 `updateById(info)`（先 `getOrCreateDevice` 读整行，改字段后整行回写） | 心跳/上线高频并发时，`capabilities`、`config_version`、`last_payload` 等字段可能被旧快照覆盖，丢失其它写入 | 参照已改造的 OTA 写法，改为**带前置条件的定向 UPDATE**（只更新本次变更字段） |
-| P2-4 | **死常量** | `MqttConstants` 第 73/77/81 行 `ONLINE_TOPIC_FORMAT`、`OFFLINE_TOPIC_FORMAT`、`WILL_TOPIC_FORMAT`；全项目仅此定义处出现，无其它引用 | 已被 `device/+/presence`（含 `type=online/offline`）取代，残留常量易误导后续开发误用 | 确认无引用后删除 |
+| P2-4 | **死常量** | `DeviceMqttConstants` 第 73/77/81 行 `ONLINE_TOPIC_FORMAT`、`OFFLINE_TOPIC_FORMAT`、`WILL_TOPIC_FORMAT`；全项目仅此定义处出现，无其它引用 | 已被 `device/+/presence`（含 `type=online/offline`）取代，残留常量易误导后续开发误用 | 确认无引用后删除 |
 | P2-5 | **核心逻辑零单元测试** | 全项目仅 2 个 `*ApplicationTests`（contextLoads）；`src/main` 下验签、ACK 状态机、OTA 决策、非重放（nonce）等无测试 | 后续改动无回归保障，安全相关逻辑无法验证 | 补关键路径单测：`SignatureVerifierUtils`、`handleAck` 状态迁移、`syncFirmwareIfTarget`、`reconcileOtaOnOnline` |
 
 ### P3 · 低危 / 工程化
@@ -41,7 +41,7 @@
 | P3-1 | 固件路径/地址硬编码 | `application-dev.yml`：`firmware.upload-dir: D:/data/firmware/`、`firmware.base-url: http://192.168.1.15:8000/firmware/` | 换环境需改代码/配置、Windows 路径不通用 | 环境变量化；`base-url` 与部署域名对齐 |
 | P3-2 | SQL 注释未同步新状态 | `sql/smart_device.sql` 第 34 行 `status` 注释为 `0-PENDING 1-SENT 2-SUCCESS 3-FAILED 4-TIMEOUT 5-CANCELLED`，遗漏 `6-ACCEPTED` | 文档与代码枚举不一致，易误读 | 注释补 `6-ACCEPTED`（仅注释，不动表结构） |
 | P3-3 | 日志级别过宽 | `application-dev.yml`：`com.womi: debug`、`com.womi.business.mapper: debug` | 生产若沿用会产生大量 SQL/调试日志，影响性能与排查 | 生产用 `info`，mapper 用 `warn` 或按需开启 |
-| P3-4 | `DeviceOtaController.start` 入参名不直观 | `DeviceOtaController.start(@RequestBody SendCommandRequest req)`，而 DTO 目录另有 `dto/ota/request/OtaStartRequest` | OTA 启动复用了通用指令请求体，另有专用 DTO 未使用，易混淆 | 统一为专用 `OtaStartRequest`（属可读性改动，见第三章） |
+| P3-4 | `DeviceOtaController.start` 入参名不直观 | `DeviceOtaController.start(@RequestBody SendCommandRequest req)`，而 DTO 目录另有 `dto/ota/request/OtaStartRequest` | OTA 启动复用了通用指令请求体，另有专用 DTO 未使用，易混淆 | 统一为专用 `DeviceOtaStartRequest`（属可读性改动，见第三章） |
 
 ---
 
@@ -89,7 +89,7 @@
 > 原则：**只动"怎么写得更好看/更好维护"，不动"做什么"**。以下均不改变输入输出与业务语义。
 
 1. **统一常量注解风格**
-   - `MqttConstants` 等常量类注释存在中英混排与空行不齐（如 `ScheduleConstants` 第 9-10 行 `private ScheduleConstants() {}` 与 `// 防止实例化` 换行错位）。
+   - `DeviceMqttConstants` 等常量类注释存在中英混排与空行不齐（如 `ScheduleConstants` 第 9-10 行 `private ScheduleConstants() {}` 与 `// 防止实例化` 换行错位）。
    - 建议：统一为"字段上方单行中文注释 + 私有构造私有化"，参照 `ResponseConstants` 风格。
 
 2. **消除魔法值与裸数字**
@@ -97,7 +97,7 @@
    - 注意：仅抽**文案与展示**，不改判断条件。
 
 3. **DTO 命名与用途对齐**
-   - `DeviceOtaController` 用 `SendCommandRequest` 承接 OTA 请求，而同目录已有 `OtaStartRequest`（见 P3-4）。
+   - `DeviceOtaController` 用 `SendCommandRequest` 承接 OTA 请求，而同目录已有 `DeviceOtaStartRequest`（见 P3-4）。
    - 建议：统一到一个专用 DTO，命名自解释；不改字段含义与校验规则。
 
 4. **方法抽取与职责单一**
@@ -176,7 +176,7 @@
 ### C. 清理与可读性（不影响业务逻辑）
 - [ ] `[P2]` 删除 `ONLINE/OFFLINE/WILL_TOPIC_FORMAT` 死常量
 - [ ] `[P3]` 补 SQL `status` 注释 `6-ACCEPTED`
-- [ ] `[P3]` OTA 启动统一使用 `OtaStartRequest`
+- [ ] `[P3]` OTA 启动统一使用 `DeviceOtaStartRequest`
 - [ ] `[P3]` 统一常量/日志/注释风格
 - [ ] `[P3]` `handleAck` 决策逻辑抽私有方法
 
@@ -196,5 +196,5 @@
 - `DeviceCommandMapper.xml` 扫描语句已含 `target != 'ota'`（第 53、65、148 行共 3 处），**"兜底扫描未排除 OTA"已修复**。
 - `MqttPublisher` 仅有 `sendControlCommand` / `sendConfigCommand`，**不存在 `sendOtaCommand`**；`DeviceControlServiceImpl.startOta` 亦不存在 → 早期死代码已清理。
 - `device_info`（`uk_device_id`/`idx_online`/`idx_last_heartbeat`/`idx_ota_state`）与 `device_command`（多组合索引）**索引齐全** → "索引缺失"风险**不成立**。
-- `MqttConstants` 中已无 `OTA_STATE_*` 常量（已统一到 `OtaStateConstants`）→ "两套 OTA 常量并存"风险**已消除**。
+- `DeviceMqttConstants` 中已无 `OTA_STATE_*` 常量（已统一到 `DeviceOtaStateConstants`）→ "两套 OTA 常量并存"风险**已消除**。
 - `AckMessageHandler` 已有 `payload.device` 与 topic 一致性校验，但**仅告警不拦截**，且**未校验 commandId 归属** → P1-1 成立。

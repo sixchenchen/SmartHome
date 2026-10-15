@@ -1,7 +1,7 @@
 package com.womi.webmodule.mqtt.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.enums.MqttErrorCode;
 import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.dto.mqtt.request.RegisterRequest;
@@ -47,7 +47,7 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
 
     @Override
     public boolean supports(String topic) {
-        return topic != null && topic.matches(MqttConstants.PROVISION_REGISTER_TOPIC_PATTERN);
+        return topic != null && topic.matches(DeviceMqttConstants.PROVISION_REGISTER_TOPIC_PATTERN);
     }
 
     @Override
@@ -67,7 +67,7 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
                 return;
             }
 
-            String payloadDevice = jsonUtils.getString(json, MqttConstants.FIELD_DEVICE);
+            String payloadDevice = jsonUtils.getString(json, DeviceMqttConstants.FIELD_DEVICE);
             if (payloadDevice != null && !payloadDevice.equals(deviceId)) {
                 log.warn("注册 device 与 topic 不一致 - topic: {}, payload: {}", topic, payloadDevice);
                 sendResponse(deviceId, RegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID));
@@ -92,15 +92,15 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
     private RegisterRequest buildRequest(String deviceId, JsonNode json) {
         RegisterRequest request = new RegisterRequest();
         request.setDeviceId(deviceId);
-        request.setTimestamp(jsonUtils.getLong(json, MqttConstants.FIELD_TIMESTAMP));
+        request.setTimestamp(jsonUtils.getLong(json, DeviceMqttConstants.FIELD_TIMESTAMP));
 
-        JsonNode dataNode = json.path(MqttConstants.FIELD_DATA);
-        request.setProduct(jsonUtils.getString(dataNode, MqttConstants.FIELD_PRODUCT));
-        request.setFirmware(jsonUtils.getString(dataNode, MqttConstants.FIELD_FIRMWARE));
-        request.setChip(jsonUtils.getString(dataNode, MqttConstants.FIELD_CHIP));
-        request.setNonce(jsonUtils.getString(dataNode, MqttConstants.FIELD_NONCE));
-        request.setPubkey(jsonUtils.getString(dataNode, MqttConstants.FIELD_PUBKEY));
-        request.setSignature(jsonUtils.getString(dataNode, MqttConstants.FIELD_SIGNATURE));
+        JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
+        request.setProduct(jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_PRODUCT));
+        request.setFirmware(jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_FIRMWARE));
+        request.setChip(jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_CHIP));
+        request.setNonce(jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_NONCE));
+        request.setPubkey(jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_PUBKEY));
+        request.setSignature(jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_SIGNATURE));
 
         return request;
     }
@@ -109,23 +109,23 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
      * 发送注册响应到 /provision/device/{mac}/config
      */
     private void sendResponse(String deviceId, RegisterResponse response) {
-        String responseTopic = String.format(MqttConstants.PROVISION_CONFIG_TOPIC_FORMAT, deviceId);
+        String responseTopic = String.format(DeviceMqttConstants.PROVISION_CONFIG_TOPIC_FORMAT, deviceId);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put(MqttConstants.FIELD_DEVICE, deviceId);
-        payload.put(MqttConstants.FIELD_SUCCESS, response.isSuccess());
+        payload.put(DeviceMqttConstants.FIELD_DEVICE, deviceId);
+        payload.put(DeviceMqttConstants.FIELD_SUCCESS, response.isSuccess());
 
         if (response.isSuccess()) {
-            payload.put(MqttConstants.FIELD_MQTT, response.getMqtt());
-            payload.put(MqttConstants.FIELD_WILL, response.getWill());
-            payload.put(MqttConstants.FIELD_CONFIG, response.getConfig());
+            payload.put(DeviceMqttConstants.FIELD_MQTT, response.getMqtt());
+            payload.put(DeviceMqttConstants.FIELD_WILL, response.getWill());
+            payload.put(DeviceMqttConstants.FIELD_CONFIG, response.getConfig());
         } else {
-            payload.put(MqttConstants.FIELD_ERROR, response.getError());
-            payload.put(MqttConstants.FIELD_MESSAGE, response.getMessage());
+            payload.put(DeviceMqttConstants.FIELD_ERROR, response.getError());
+            payload.put(DeviceMqttConstants.FIELD_MESSAGE, response.getMessage());
         }
-        payload.put(MqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
+        payload.put(DeviceMqttConstants.FIELD_TIMESTAMP, System.currentTimeMillis());
 
-        mqttPublisher.publishProvision(responseTopic, payload, MqttConstants.DEFAULT_QOS, false);
+        mqttPublisher.publishProvision(responseTopic, payload, DeviceMqttConstants.DEFAULT_QOS, false);
 
         log.info("注册响应已发送 - deviceId: {}, topic: {}", deviceId, responseTopic);
     }

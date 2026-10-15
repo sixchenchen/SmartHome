@@ -2,20 +2,19 @@ package com.womi.webmodule.service;
 
 
 import com.womi.webmodule.dto.http.request.SendCommandRequest;
-import com.womi.webmodule.dto.ota.request.OtaStartRequest;
-import com.womi.webmodule.dto.ota.response.OtaProgressVO;
-import com.womi.webmodule.dto.ota.response.OtaStartResponse;
+import com.womi.webmodule.dto.ota.response.DeviceOtaProgressVO;
+import com.womi.webmodule.dto.ota.response.DeviceOtaStartResponse;
 
 public interface DeviceOtaService {
 
     /**
      * 触发 OTA
      */
-    OtaStartResponse startOta(SendCommandRequest request);
+    DeviceOtaStartResponse startOta(SendCommandRequest request);
 
     /**
      * 查询 OTA 进度
      */
-    OtaProgressVO getOtaProgress(String deviceId);
+    DeviceOtaProgressVO getOtaProgress(String deviceId);
 
 }

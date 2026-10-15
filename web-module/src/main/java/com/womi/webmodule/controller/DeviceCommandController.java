@@ -3,7 +3,7 @@ package com.womi.webmodule.controller;
 import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.service.DeviceCommandService;
 import com.womi.businessmodule.vo.CommandStatsVO;
-import com.womi.commonmodule.constants.CommandConstants;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.dto.http.request.SendCommandRequest;
 import com.womi.webmodule.service.DeviceControlService;
@@ -28,10 +28,10 @@ public class DeviceCommandController {
     @PostMapping("/send")
     public ApiResponse<DeviceCommand> send(@RequestBody SendCommandRequest req) {
         String operator = req.getOperator() != null ?
-                req.getOperator() : CommandConstants.WEB_DEFAULT_OPERATOR;
+                req.getOperator() : DeviceCommandConstants.WEB_DEFAULT_OPERATOR;
 
         int expireSeconds = req.getExpireSeconds() != null
-                ? req.getExpireSeconds() : CommandConstants.DEFAULT_EXPIRE_SECONDS;
+                ? req.getExpireSeconds() : DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS;
 
         DeviceCommand command = deviceControlService.sendCommand(
                 req.getDeviceId(),
@@ -71,7 +71,7 @@ public class DeviceCommandController {
     public ApiResponse<Boolean> cancel(@PathVariable Long id,
                                        @RequestParam(required = false) String operator) {
         boolean ok = deviceCommandService.cancelCommand(id,
-                operator != null ? operator : CommandConstants.WEB_DEFAULT_OPERATOR);
+                operator != null ? operator : DeviceCommandConstants.WEB_DEFAULT_OPERATOR);
         return ApiResponse.success(ok);
     }
 

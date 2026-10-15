@@ -1,6 +1,6 @@
 package com.womi.webmodule.mqtt.core;
 
-import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.utils.SaltPasswordUtils;
 import com.womi.webmodule.dto.mqtt.MqttCredential;
 import org.springframework.stereotype.Component;
@@ -23,8 +23,8 @@ public class MqttCredentialGenerator {
      * 生成完整的 MQTT 凭据
      */
     public MqttCredential generate(String deviceId) {
-        String clientId = MqttConstants.MQTT_CLIENT_ID_PREFIX + deviceId;
-        String username = MqttConstants.MQTT_USERNAME_PREFIX + deviceId;
+        String clientId = DeviceMqttConstants.MQTT_CLIENT_ID_PREFIX + deviceId;
+        String username = DeviceMqttConstants.MQTT_USERNAME_PREFIX + deviceId;
 
         String plainPassword = SaltPasswordUtils.generatePassword(SaltPasswordUtils.DEFAULT_PASSWORD_LENGTH);
         String salt = SaltPasswordUtils.generateSalt();
@@ -37,7 +37,7 @@ public class MqttCredentialGenerator {
      * 生成用户名：dev_{mac}
      */
     public String generateUsername(String deviceId) {
-        return MqttConstants.MQTT_USERNAME_PREFIX + deviceId;
+        return DeviceMqttConstants.MQTT_USERNAME_PREFIX + deviceId;
     }
 
     /**

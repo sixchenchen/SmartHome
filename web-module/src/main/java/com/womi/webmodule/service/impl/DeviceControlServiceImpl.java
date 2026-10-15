@@ -4,10 +4,10 @@ import com.womi.businessmodule.model.DeviceCommand;
 import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceCommandService;
 import com.womi.businessmodule.service.DeviceInfoService;
-import com.womi.commonmodule.constants.CommandConstants;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.DeviceConstants;
-import com.womi.commonmodule.constants.MqttConstants;
-import com.womi.commonmodule.enums.CommandStatus;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static com.womi.commonmodule.constants.CommandConstants.DEFAULT_EXPIRE_SECONDS;
+import static com.womi.commonmodule.constants.DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS;
 
 @Slf4j
 @Service
@@ -46,7 +46,7 @@ public class DeviceControlServiceImpl implements DeviceControlService {
         // 1. 入库（PENDING）
         DeviceCommand command = deviceCommandService.prepareCommand(
                 deviceId, action, target, channel, params,
-                operator, CommandConstants.SOURCE_WEB,
+                operator, DeviceCommandConstants.SOURCE_WEB,
                 expireSeconds > 0 ? expireSeconds : DEFAULT_EXPIRE_SECONDS);
 
         // 2. 立即下发
@@ -69,7 +69,7 @@ public class DeviceControlServiceImpl implements DeviceControlService {
             );
             deviceCommandService.updateStatus(
                     command.getId(),
-                    CommandStatus.SENT.getCode(),
+                    DeviceCommandStatus.SENT.getCode(),
                     null);
             log.info("指令立即下发成功 - commandId: {}, deviceId: {}, target: {}", command.getCommandId(), command.getDeviceId(), command.getTarget());
         } catch (Exception e) {
@@ -83,23 +83,23 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     @Override
     public DeviceCommand controlMos(String deviceId, int channel, int state, String operator) {
         Map<String, Object> params = new HashMap<>();
-        params.put(MqttConstants.FIELD_STATE, state);
+        params.put(DeviceMqttConstants.FIELD_STATE, state);
         return sendCommand(deviceId,
-                MqttConstants.ACTION_SET,
-                MqttConstants.TARGET_MOS,
+                DeviceMqttConstants.ACTION_SET,
+                DeviceMqttConstants.TARGET_MOS,
                 channel, params, operator, DEFAULT_EXPIRE_SECONDS);
     }
 
     @Override
     public DeviceCommand controlMosAll(String deviceId, int state, String operator) {
-        return controlMos(deviceId, MqttConstants.CHANNEL_ALL, state, operator);
+        return controlMos(deviceId, DeviceMqttConstants.CHANNEL_ALL, state, operator);
     }
 
     @Override
     public DeviceCommand queryMos(String deviceId, int channel, String operator) {
         return sendCommand(deviceId,
-                MqttConstants.ACTION_GET,
-                MqttConstants.TARGET_MOS,
+                DeviceMqttConstants.ACTION_GET,
+                DeviceMqttConstants.TARGET_MOS,
                 channel, null, operator, DEFAULT_EXPIRE_SECONDS);
     }
 
@@ -109,13 +109,13 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     public DeviceCommand controlLed(String deviceId, int channel, int state,
                                     Integer brightness, String operator) {
         Map<String, Object> params = new HashMap<>();
-        params.put(MqttConstants.FIELD_STATE, state);
+        params.put(DeviceMqttConstants.FIELD_STATE, state);
         if (brightness != null) {
-            params.put(MqttConstants.FIELD_BRIGHTNESS, brightness);
+            params.put(DeviceMqttConstants.FIELD_BRIGHTNESS, brightness);
         }
         return sendCommand(deviceId,
-                MqttConstants.ACTION_SET,
-                MqttConstants.TARGET_LED,
+                DeviceMqttConstants.ACTION_SET,
+                DeviceMqttConstants.TARGET_LED,
                 channel, params, operator, DEFAULT_EXPIRE_SECONDS);
     }
 
@@ -123,10 +123,10 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     @Override
     public DeviceCommand controlServo(String deviceId, int channel, int angle, String operator) {
         Map<String, Object> params = new HashMap<>();
-        params.put(MqttConstants.FIELD_ANGLE, angle);
+        params.put(DeviceMqttConstants.FIELD_ANGLE, angle);
         return sendCommand(deviceId,
-                MqttConstants.ACTION_SET,
-                MqttConstants.TARGET_SERVO,
+                DeviceMqttConstants.ACTION_SET,
+                DeviceMqttConstants.TARGET_SERVO,
                 channel, params, operator, DEFAULT_EXPIRE_SECONDS);
     }
 
@@ -139,15 +139,15 @@ public class DeviceControlServiceImpl implements DeviceControlService {
                                     Integer configVersion, String operator) {
 
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put(MqttConstants.FIELD_CONFIG, config);
+        params.put(DeviceMqttConstants.FIELD_CONFIG, config);
         if (configVersion != null) {
-            params.put(MqttConstants.FIELD_CONFIG_VERSION, configVersion);
+            params.put(DeviceMqttConstants.FIELD_CONFIG_VERSION, configVersion);
         }
-        params.put(MqttConstants.FIELD_PERSIST, true);
+        params.put(DeviceMqttConstants.FIELD_PERSIST, true);
 
         return sendCommand(deviceId,
-                MqttConstants.ACTION_SET,
-                MqttConstants.TARGET_CONFIG,
+                DeviceMqttConstants.ACTION_SET,
+                DeviceMqttConstants.TARGET_CONFIG,
                 null, params, operator, DEFAULT_EXPIRE_SECONDS);
     }
 

@@ -2,7 +2,7 @@
 
 ## Context（背景）
 
-项目当前在各业务类中散落着大量领域常量：魔法数字（超时秒数、重试次数、调度间隔）、指令状态值（0~6）、设备状态值（0~2）、MQTT 主题/正则/字段名、默认操作人与来源、payload 字段 key 等。这些常量在不同文件（如 `DeviceCommandServiceImpl`、`CommandScheduler`、各 MQTT Handler、`MqttPublisher`）中重复出现，缺少统一出处，后期改值容易遗漏。
+项目当前在各业务类中散落着大量领域常量：魔法数字（超时秒数、重试次数、调度间隔）、指令状态值（0~6）、设备状态值（0~2）、MQTT 主题/正则/字段名、默认操作人与来源、payload 字段 key 等。这些常量在不同文件（如 `DeviceCommandServiceImpl`、`DeviceCommandScheduler`、各 MQTT Handler、`MqttPublisher`）中重复出现，缺少统一出处，后期改值容易遗漏。
 
 目标：**不改任何业务逻辑**，仅把这些领域常量抽取到 `common-module` 中，按功能分包成常量类，沿用现有 `ResponseConstants` 的编码风格（`public final class` + 私有构造器 + `public static final`，中文注释，SCREAMING_SNAKE_CASE）。
 
@@ -49,7 +49,7 @@ MQTT 主题、字段名、header key（来源：MQTT handlers、`MqttPublisher`�
 - 客户端后缀：`INBOUND_SUFFIX = "-inbound"`、`OUTBOUND_SUFFIX = "-outbound"`
 
 ### 4. `schedule/ScheduleConstants.java`
-调度参数（来源：`CommandScheduler`）：
+调度参数（来源：`DeviceCommandScheduler`）：
 - `DISPATCH_FIXED_DELAY = 5000` 待下发扫描间隔 ms
 - `RETRY_FIXED_DELAY = 30000` 超时重试间隔 ms
 - `MARK_EXPIRED_FIXED_DELAY = 60000` 过期标记间隔 ms
@@ -80,5 +80,5 @@ MQTT 主题、字段名、header key（来源：MQTT handlers、`MqttPublisher`�
 ## 验证
 
 1. 在根目录执行 `mvn -q compile`（或对应构建脚本）确认三个模块能通过编译——这是本次重构的核心验证（仅改常量引用，不应有编译错误）。
-2. 双端抽查：确认 `DeviceCommandServiceImpl.prepareCommand` 中 `qos/source/operator` 等取值与重构前一致；`CommandScheduler` 各 `@Scheduled` 时间参数值不变；三个 MQTT handler 的 `supports()` 正则语义不变。
+2. 双端抽查：确认 `DeviceCommandServiceImpl.prepareCommand` 中 `qos/source/operator` 等取值与重构前一致；`DeviceCommandScheduler` 各 `@Scheduled` 时间参数值不变；三个 MQTT handler 的 `supports()` 正则语义不变。
 3. 运行 `web-module`（`mvn spring-boot:run`）确认应用正常启动、无 Bean 装配异常。

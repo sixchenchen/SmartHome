@@ -2,13 +2,14 @@ package com.womi.webmodule.service.impl;
 
 import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceInfoService;
+import com.womi.businessmodule.service.DeviceMqttAuthService;
 import com.womi.businessmodule.service.DeviceWhitelistService;
-import com.womi.businessmodule.service.MqttAuthService;
+import com.womi.businessmodule.service.DeviceMqttAuthService;
 import com.womi.commonmodule.constants.DeviceConstants;
-import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.constants.RegexConstants;
 import com.womi.commonmodule.enums.MqttErrorCode;
-import com.womi.commonmodule.enums.OfflineReason;
+import com.womi.commonmodule.enums.DeviceOfflineReason;
 import com.womi.commonmodule.utils.SignatureVerifierUtils;
 import com.womi.commonmodule.utils.TimestampValidatorUtils;
 import com.womi.webmodule.dto.mqtt.MqttCredential;
@@ -37,7 +38,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
     private final DeviceInfoService deviceInfoService;
     private final MqttProperties mqttProperties;
-    private final MqttAuthService mqttAuthService;
+    private final DeviceMqttAuthService mqttAuthService;
     private final MqttCredentialGenerator credentialGenerator;
     private final NonceService nonceService;
     private final DeviceWhitelistService deviceWhitelistService;
@@ -88,7 +89,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         // 4.1 时间戳校验
         if (request.getTimestamp() == null
                 || !TimestampValidatorUtils.isWithinWindow(request.getTimestamp(),
-                MqttConstants.REGISTER_TIMESTAMP_WINDOW_MS)) {
+                DeviceMqttConstants.REGISTER_TIMESTAMP_WINDOW_MS)) {
             return RegisterResponse.error(MqttErrorCode.INVALID_TIMESTAMP);
         }
         // 4.2 签名校验
@@ -246,38 +247,38 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         MqttProperties.Broker runtime = mqttProperties.getRuntime();
 
         Map<String, Object> mqtt = new LinkedHashMap<>();
-        mqtt.put(MqttConstants.FIELD_MQTT_HOST, runtime.getHost());
-        mqtt.put(MqttConstants.FIELD_MQTT_PORT, runtime.getPort());
-        mqtt.put(MqttConstants.FIELD_MQTT_CLIENT_ID, credential.getClientId());
-        mqtt.put(MqttConstants.FIELD_MQTT_USERNAME, credential.getUsername());
-        mqtt.put(MqttConstants.FIELD_MQTT_PASSWORD, credential.getPlainPassword());
-        mqtt.put(MqttConstants.FIELD_MQTT_KEEP_ALIVE, runtime.getKeepAliveInterval());
+        mqtt.put(DeviceMqttConstants.FIELD_MQTT_HOST, runtime.getHost());
+        mqtt.put(DeviceMqttConstants.FIELD_MQTT_PORT, runtime.getPort());
+        mqtt.put(DeviceMqttConstants.FIELD_MQTT_CLIENT_ID, credential.getClientId());
+        mqtt.put(DeviceMqttConstants.FIELD_MQTT_USERNAME, credential.getUsername());
+        mqtt.put(DeviceMqttConstants.FIELD_MQTT_PASSWORD, credential.getPlainPassword());
+        mqtt.put(DeviceMqttConstants.FIELD_MQTT_KEEP_ALIVE, runtime.getKeepAliveInterval());
         return mqtt;
     }
 
     private Map<String, Object> buildWillConfig(String deviceId, String product) {
         Map<String, Object> willPayload = new LinkedHashMap<>();
-        willPayload.put(MqttConstants.FIELD_DEVICE, deviceId);
-        willPayload.put(MqttConstants.FIELD_PRODUCT, product);
-        willPayload.put(MqttConstants.FIELD_TYPE, MqttConstants.MSG_TYPE_OFFLINE);
-        willPayload.put(MqttConstants.FIELD_TIMESTAMP, MqttConstants.WILL_TIMESTAMP_DEFAULT);
+        willPayload.put(DeviceMqttConstants.FIELD_DEVICE, deviceId);
+        willPayload.put(DeviceMqttConstants.FIELD_PRODUCT, product);
+        willPayload.put(DeviceMqttConstants.FIELD_TYPE, DeviceMqttConstants.MSG_TYPE_OFFLINE);
+        willPayload.put(DeviceMqttConstants.FIELD_TIMESTAMP, DeviceMqttConstants.WILL_TIMESTAMP_DEFAULT);
 
         Map<String, Object> willData = new LinkedHashMap<>();
-        willData.put(MqttConstants.FIELD_REASON, OfflineReason.MQTT_LWT.getCode());
-        willPayload.put(MqttConstants.FIELD_DATA, willData);
+        willData.put(DeviceMqttConstants.FIELD_REASON, DeviceOfflineReason.MQTT_LWT.getCode());
+        willPayload.put(DeviceMqttConstants.FIELD_DATA, willData);
 
         Map<String, Object> will = new LinkedHashMap<>();
-        will.put(MqttConstants.FIELD_WILL_TOPIC, String.format(MqttConstants.PRESENCE_TOPIC_FORMAT, deviceId));
-        will.put(MqttConstants.FIELD_WILL_QOS, MqttConstants.DEFAULT_QOS);
-        will.put(MqttConstants.FIELD_WILL_RETAIN, MqttConstants.PRESENCE_RETAINED);
-        will.put(MqttConstants.FIELD_WILL_PAYLOAD, willPayload);
+        will.put(DeviceMqttConstants.FIELD_WILL_TOPIC, String.format(DeviceMqttConstants.PRESENCE_TOPIC_FORMAT, deviceId));
+        will.put(DeviceMqttConstants.FIELD_WILL_QOS, DeviceMqttConstants.DEFAULT_QOS);
+        will.put(DeviceMqttConstants.FIELD_WILL_RETAIN, DeviceMqttConstants.PRESENCE_RETAINED);
+        will.put(DeviceMqttConstants.FIELD_WILL_PAYLOAD, willPayload);
         return will;
     }
 
     private Map<String, Object> buildDeviceConfig() {
         Map<String, Object> config = new LinkedHashMap<>();
-        config.put(MqttConstants.FIELD_HEARTBEAT_INTERVAL, MqttConstants.DEFAULT_HEARTBEAT_INTERVAL);
-        config.put(MqttConstants.FIELD_SENSOR_BATCH_SIZE, MqttConstants.DEFAULT_SENSOR_BATCH_SIZE);
+        config.put(DeviceMqttConstants.FIELD_HEARTBEAT_INTERVAL, DeviceMqttConstants.DEFAULT_HEARTBEAT_INTERVAL);
+        config.put(DeviceMqttConstants.FIELD_SENSOR_BATCH_SIZE, DeviceMqttConstants.DEFAULT_SENSOR_BATCH_SIZE);
         return config;
     }
 }

@@ -1,7 +1,5 @@
 server:
   port: 8080
-  servlet:
-    context-path: /api
 
 spring:
   profiles:
@@ -68,3 +66,14 @@ firmware:
   file-name-pattern: "firmware_%s_%s.bin"
   max-size: 16MB
   max-request-size: 20MB
+wm:
+  jwt:
+    # 设置jwt签名加密时使用的秘钥
+    admin-secret-key: itcast
+    # 设置jwt过期时间
+    admin-ttl: 7200000
+    # 设置前端传递过来的令牌名称
+    admin-token-name: token
+    user-secret-key: wm_laohua
+    user-ttl: 7200000
+    user-token-name: authentication

@@ -1,6 +1,6 @@
 package com.womi.webmodule.mqtt.core;
 
-import com.womi.commonmodule.constants.MqttConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
 
 /**
  * MQTT 消息处理器接口
@@ -32,9 +32,9 @@ public interface MqttMessageHandler {
      */
     default String extractDeviceId(String topic) {
         if (topic == null) return null;
-        String[] parts = topic.split(MqttConstants.TOPIC_SEPARATOR);
+        String[] parts = topic.split(DeviceMqttConstants.TOPIC_SEPARATOR);
         // parts = ["device", "{mac}", "xxx"]
-        if (parts.length >= 3 && MqttConstants.DEVICE_TOPIC_PREFIX.equals(parts[0])) {
+        if (parts.length >= 3 && DeviceMqttConstants.DEVICE_TOPIC_PREFIX.equals(parts[0])) {
             return parts[1];
         }
         return null;
@@ -46,11 +46,11 @@ public interface MqttMessageHandler {
      */
     default String extractProvisionDeviceId(String topic) {
         if (topic == null) return null;
-        String[] parts = topic.split(MqttConstants.TOPIC_SEPARATOR);
+        String[] parts = topic.split(DeviceMqttConstants.TOPIC_SEPARATOR);
         // parts = ["", "provision", "device", "{mac}", "register"]
         if (parts.length >= 5
                 && "provision".equals(parts[1])
-                && MqttConstants.DEVICE_TOPIC_PREFIX.equals(parts[2])) {
+                && DeviceMqttConstants.DEVICE_TOPIC_PREFIX.equals(parts[2])) {
             return parts[3];
         }
         return null;
@@ -64,8 +64,8 @@ public interface MqttMessageHandler {
      */
     default String extractMessageType(String topic) {
         if (topic == null) return null;
-        String[] parts = topic.split(MqttConstants.TOPIC_SEPARATOR);
-        if (parts.length >= 3 && MqttConstants.DEVICE_TOPIC_PREFIX.equals(parts[0])) {
+        String[] parts = topic.split(DeviceMqttConstants.TOPIC_SEPARATOR);
+        if (parts.length >= 3 && DeviceMqttConstants.DEVICE_TOPIC_PREFIX.equals(parts[0])) {
             return parts[2];
         }
         return null;

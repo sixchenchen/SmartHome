@@ -13,7 +13,7 @@ spring:
 
 mqtt:
   runtime:
-    host: 192.168.1.15
+    host: localhost
     port: 8883
     client-id: wm-laohua-server-dev
     username: RUNTIME_USER
@@ -42,7 +42,7 @@ mqtt:
     clean-session: true
 
   provision:
-    host: 192.168.1.15
+    host: localhost
     port: 8884
     client-id: wm-laohua-provision-dev
     username: PROVISION_USER
@@ -60,7 +60,7 @@ mqtt:
 
 firmware:
   upload-dir: D:/data/firmware/
-  base-url: http://192.168.1.15:8000/firmware/
+  base-url: http://localhost:8000/firmware/
 
 logging:
   level:

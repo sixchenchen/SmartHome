@@ -2,9 +2,10 @@ package com.womi.businessmodule.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.womi.businessmodule.mapper.DeviceSlaveDataMapper;
+import com.womi.businessmodule.model.DeviceSensorRecord;
 import com.womi.businessmodule.model.DeviceSlaveData;
+import com.womi.businessmodule.service.DeviceSensorRecordService;
 import com.womi.businessmodule.service.DeviceSlaveDataService;
-import com.womi.businessmodule.service.SensorRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ public class DeviceSlaveDataServiceImpl
         extends ServiceImpl<DeviceSlaveDataMapper, DeviceSlaveData>
         implements DeviceSlaveDataService {
 
-    private final SensorRecordService sensorRecordService;
+    private final DeviceSensorRecordService sensorRecordService;
 
     private static final String SOURCE_SLAVE = "slave";
 
@@ -49,7 +50,7 @@ public class DeviceSlaveDataServiceImpl
         Set<String> reportedKeys = new HashSet<>();
         List<DeviceSlaveData> toInsert = new ArrayList<>();
         List<DeviceSlaveData> toUpdate = new ArrayList<>();
-        List<com.womi.businessmodule.model.SensorRecord> historyRecords = new ArrayList<>();
+        List<com.womi.businessmodule.model.DeviceSensorRecord> historyRecords = new ArrayList<>();
 
         // 2. 处理上报的从机
         if (slaves != null) {
@@ -92,8 +93,8 @@ public class DeviceSlaveDataServiceImpl
                 }
 
                 // 组装历史记录
-                com.womi.businessmodule.model.SensorRecord record =
-                        new com.womi.businessmodule.model.SensorRecord();
+                DeviceSensorRecord record =
+                        new DeviceSensorRecord();
                 record.setDeviceId(deviceId);
                 record.setSource(SOURCE_SLAVE);
                 record.setSlaveAddress(address);

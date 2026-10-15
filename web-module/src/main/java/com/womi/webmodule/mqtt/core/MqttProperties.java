@@ -19,7 +19,7 @@ public class MqttProperties {
 
     @Data
     public static class Broker {
-        private String host = "192.168.124.6";
+        private String host = "localhost";
         private String caCert = "certs/cert.pem";
         private int port;
         private String clientId;

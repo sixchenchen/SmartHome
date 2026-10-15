@@ -2,9 +2,8 @@ package com.womi.webmodule.controller;
 
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.dto.http.request.SendCommandRequest;
-import com.womi.webmodule.dto.ota.request.OtaStartRequest;
-import com.womi.webmodule.dto.ota.response.OtaProgressVO;
-import com.womi.webmodule.dto.ota.response.OtaStartResponse;
+import com.womi.webmodule.dto.ota.response.DeviceOtaProgressVO;
+import com.womi.webmodule.dto.ota.response.DeviceOtaStartResponse;
 import com.womi.webmodule.service.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -21,8 +20,8 @@ public class DeviceOtaController {
      * POST /api/ota/start
      */
     @PostMapping("/start")
-    public ApiResponse<OtaStartResponse> start(@RequestBody SendCommandRequest req) {
-        OtaStartResponse response = deviceOtaService.startOta(req);
+    public ApiResponse<DeviceOtaStartResponse> start(@RequestBody SendCommandRequest req) {
+        DeviceOtaStartResponse response = deviceOtaService.startOta(req);
         return ApiResponse.success(response);
     }
 
@@ -31,8 +30,8 @@ public class DeviceOtaController {
      * GET /api/ota/{deviceId}/progress
      */
     @GetMapping("/{deviceId}/progress")
-    public ApiResponse<OtaProgressVO> progress(@PathVariable String deviceId) {
-        OtaProgressVO vo = deviceOtaService.getOtaProgress(deviceId);
+    public ApiResponse<DeviceOtaProgressVO> progress(@PathVariable String deviceId) {
+        DeviceOtaProgressVO vo = deviceOtaService.getOtaProgress(deviceId);
         return ApiResponse.success(vo);
     }
 }

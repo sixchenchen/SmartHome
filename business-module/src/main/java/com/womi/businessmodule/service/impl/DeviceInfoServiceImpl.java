@@ -6,8 +6,8 @@ import com.womi.businessmodule.mapper.DeviceInfoMapper;
 import com.womi.businessmodule.model.DeviceInfo;
 import com.womi.businessmodule.service.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceConstants;
-import com.womi.commonmodule.constants.OtaStateConstants;
-import com.womi.commonmodule.enums.OfflineReason;
+import com.womi.commonmodule.constants.DeviceOtaStateConstants;
+import com.womi.commonmodule.enums.DeviceOfflineReason;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -64,7 +64,7 @@ public class DeviceInfoServiceImpl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void markOffline(String deviceId, OfflineReason reason) {
+    public void markOffline(String deviceId, DeviceOfflineReason reason) {
         int rows = baseMapper.markOfflineByDeviceId(deviceId, reason.getCode());
         if (rows == 0) {
             log.debug("设备已离线或不存在，跳过 - deviceId: {}", deviceId);
@@ -102,7 +102,7 @@ public class DeviceInfoServiceImpl
                 // 仅当 online=1 且 last_heartbeat_time 未变时才标记
                 int rows = baseMapper.markOfflineIfTimeout(
                         device.getDeviceId(),
-                        OfflineReason.HEARTBEAT_TIMEOUT.getCode(),
+                        DeviceOfflineReason.HEARTBEAT_TIMEOUT.getCode(),
                         device.getLastHeartbeatTime());
 
                 if (rows > 0) {
@@ -176,8 +176,8 @@ public class DeviceInfoServiceImpl
         }
         // 设备已上报成功，但重启后运行版本与目标版本不一致 → 升级回滚，判定失败
         String version = reportedFirmware.trim();
-        if (OtaStateConstants.SUCCESS.equals(otaState) && !version.equals(otaVersion.trim())) {
-            baseMapper.updateOtaStateByDeviceId(deviceId, OtaStateConstants.FAILED, null, null);
+        if (DeviceOtaStateConstants.SUCCESS.equals(otaState) && !version.equals(otaVersion.trim())) {
+            baseMapper.updateOtaStateByDeviceId(deviceId, DeviceOtaStateConstants.FAILED, null, null);
             log.warn("OTA 版本校验不通过，判定升级回滚 - deviceId: {}, running: {}, target: {}",
                     deviceId, version, otaVersion);
         }

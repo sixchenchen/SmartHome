@@ -7,6 +7,7 @@ public enum ErrorCode {
 
     // ==================== 通用 ====================
     SUCCESS(200, "success"),
+    FAIL(401, "fail"),
     PARAM_ERROR(1000, "参数错误"),
     PARAM_MISSING(1001, "缺少必要参数"),
     PARAM_INVALID(1002, "参数值非法"),
