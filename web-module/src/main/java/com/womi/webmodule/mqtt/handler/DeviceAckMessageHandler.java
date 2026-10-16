@@ -1,7 +1,7 @@
 package com.womi.webmodule.mqtt.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;

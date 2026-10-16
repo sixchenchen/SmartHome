@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.womi.businessmodule.mapper.DeviceSensorRecordMapper">
+<mapper namespace="com.womi.businessmodule.mapper.device.DeviceSensorRecordMapper">
 
-    <select id="selectBySensorKey" resultType="com.womi.businessmodule.model.DeviceSensorRecord">
+    <select id="selectBySensorKey" resultType="com.womi.businessmodule.model.device.DeviceSensorRecord">
         SELECT *
         FROM device_sensor_record
         WHERE device_id = #{deviceId}
@@ -17,7 +17,7 @@
         ORDER BY timestamp DESC
     </select>
 
-    <select id="selectBySlaveChannel" resultType="com.womi.businessmodule.model.DeviceSensorRecord">
+    <select id="selectBySlaveChannel" resultType="com.womi.businessmodule.model.device.DeviceSensorRecord">
         SELECT *
         FROM device_sensor_record
         WHERE device_id = #{deviceId}

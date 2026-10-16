@@ -1,10 +1,10 @@
 package com.womi.webmodule.schedule;
 
-import com.womi.businessmodule.model.DeviceCommand;
-import com.womi.businessmodule.service.CommandSender;
-import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.businessmodule.model.device.DeviceCommand;
+import com.womi.businessmodule.service.common.CommandSender;
+import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
-import com.womi.webmodule.schedule.constants.ScheduleConstants;
+import com.womi.commonmodule.constants.ScheduleConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

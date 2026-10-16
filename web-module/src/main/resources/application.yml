@@ -50,7 +50,7 @@ spring:
       max-request-size: ${firmware.max-request-size:20MB}
 
 mybatis-plus:
-  mapper-locations: classpath*:mapper/*.xml
+  mapper-locations: classpath*:/mapper/**/*.xml
   type-aliases-package: com.womi.businessmodule.model
   global-config:
     db-config:

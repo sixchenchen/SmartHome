@@ -8,7 +8,7 @@ import com.womi.webmodule.dto.mqtt.request.RegisterRequest;
 import com.womi.webmodule.dto.mqtt.response.RegisterResponse;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
-import com.womi.webmodule.service.DeviceRegisterService;
+import com.womi.webmodule.service.device.DeviceRegisterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;

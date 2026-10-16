@@ -12,7 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.womi.commonmodule"
 })
 @EnableScheduling // 启动定时任务
-@MapperScan("com.womi.businessmodule.mapper") // 开启mapper层扫描
+@MapperScan("com.womi.businessmodule.mapper.**") // 开启mapper层扫描
 public class WebModuleApplication {
     public static void main(String[] args) {
         SpringApplication.run(WebModuleApplication.class, args);

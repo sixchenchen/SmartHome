@@ -1,12 +1,12 @@
 package com.womi.webmodule.controller;
 
-import com.womi.businessmodule.model.DeviceCommand;
-import com.womi.businessmodule.service.DeviceCommandService;
+import com.womi.businessmodule.model.device.DeviceCommand;
+import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.vo.CommandStatsVO;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.dto.http.request.SendCommandRequest;
-import com.womi.webmodule.service.DeviceControlService;
+import com.womi.webmodule.service.device.DeviceControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;

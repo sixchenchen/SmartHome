@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.womi.businessmodule.mapper.DeviceSlaveDataMapper">
+<mapper namespace="com.womi.businessmodule.mapper.device.DeviceSlaveDataMapper">
 
-    <select id="selectByDeviceId" resultType="com.womi.businessmodule.model.DeviceSlaveData">
+    <select id="selectByDeviceId" resultType="com.womi.businessmodule.model.device.DeviceSlaveData">
         SELECT *
         FROM device_slave_data
         WHERE device_id = #{deviceId}
