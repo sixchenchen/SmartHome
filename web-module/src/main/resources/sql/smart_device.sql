@@ -11,7 +11,7 @@
  Target Server Version : 80411 (8.4.11)
  File Encoding         : 65001
 
- Date: 15/10/2026 18:20:31
+ Date: 16/10/2026 18:54:10
 */
 
 SET NAMES utf8mb4;
@@ -39,7 +39,11 @@ CREATE TABLE `device_alert_record`  (
   INDEX `idx_device_time`(`device_id` ASC, `timestamp` DESC) USING BTREE,
   INDEX `idx_status`(`status` ASC) USING BTREE,
   INDEX `idx_level`(`alert_level` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备告警记录表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备告警记录表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_alert_record
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_binding
@@ -56,10 +60,14 @@ CREATE TABLE `device_binding`  (
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
-  INDEX `idx_device_binding_user`(`user_id` ASC) USING BTREE,
   UNIQUE INDEX `uk_device_binding_active`(`active_device_id` ASC) USING BTREE,
-  INDEX `idx_device_binding_device`(`device_id` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备绑定关系表' ROW_FORMAT = DYNAMIC;
+  INDEX `idx_device_binding_device`(`device_id` ASC) USING BTREE,
+  INDEX `idx_device_binding_user`(`user_id` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备绑定关系表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_binding
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_command
@@ -99,6 +107,10 @@ CREATE TABLE `device_command`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 112 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备下行控制指令表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of device_command
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for device_event_record
 -- ----------------------------
 DROP TABLE IF EXISTS `device_event_record`;
@@ -124,6 +136,10 @@ CREATE TABLE `device_event_record`  (
   INDEX `idx_timestamp`(`timestamp` ASC) USING BTREE,
   CONSTRAINT `device_event_record_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `device_info` (`device_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备事件记录表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_event_record
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_firmware
@@ -152,6 +168,10 @@ CREATE TABLE `device_firmware`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 18 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '固件版本表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of device_firmware
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for device_group
 -- ----------------------------
 DROP TABLE IF EXISTS `device_group`;
@@ -166,7 +186,11 @@ CREATE TABLE `device_group`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_parent`(`parent_id` ASC) USING BTREE,
   INDEX `idx_user`(`user_id` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备分组表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备分组表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_group
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_heartbeat_record
@@ -180,10 +204,14 @@ CREATE TABLE `device_heartbeat_record`  (
   `payload` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '消息内容',
   `create_time` datetime(3) NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`id`) USING BTREE,
-  INDEX `idx_timestamp`(`timestamp` ASC) USING BTREE,
   INDEX `idx_device_time`(`device_id` ASC, `timestamp` DESC) USING BTREE,
+  INDEX `idx_timestamp`(`timestamp` ASC) USING BTREE,
   CONSTRAINT `device_heartbeat_record_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `device_info` (`device_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 959 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '心跳记录表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_heartbeat_record
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_info
@@ -223,6 +251,10 @@ CREATE TABLE `device_info`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 15 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备信息表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of device_info
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for device_mqtt_auth
 -- ----------------------------
 DROP TABLE IF EXISTS `device_mqtt_auth`;
@@ -240,6 +272,12 @@ CREATE TABLE `device_mqtt_auth`  (
   UNIQUE INDEX `uk_username`(`username` ASC) USING BTREE,
   UNIQUE INDEX `uk_device_id`(`device_id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '统一MQTT认证账号表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_mqtt_auth
+-- ----------------------------
+INSERT INTO `device_mqtt_auth` VALUES (1, 'PROVISION_USER', 'f43c57babf15d80cd5e961e6dee8b1795dcff8805ca9a4aabc2d048d2499f172', '767f13ac5e1c4dbdddb7f4c288bb085b', 1, 1, NULL, '2026-10-15 18:36:10.738', '2026-10-15 18:36:35.665');
+INSERT INTO `device_mqtt_auth` VALUES (2, 'RUNTIME_USER', 'fae340eae69a2dfad416154a5d47474ce546d2c2ba9bc57fa8c0b833a6886aff', '667f13ac5e1c4dbdddb7f4c288bb0856', 1, 1, NULL, '2026-10-15 18:36:43.369', '2026-10-15 18:38:00.270');
 
 -- ----------------------------
 -- Table structure for device_ota_task
@@ -262,7 +300,11 @@ CREATE TABLE `device_ota_task`  (
   UNIQUE INDEX `uk_task_id`(`task_id` ASC) USING BTREE,
   INDEX `idx_status`(`status` ASC) USING BTREE,
   INDEX `idx_firmware`(`firmware_id` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'OTA 批量升级任务表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'OTA 批量升级任务表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_ota_task
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_sensor
@@ -290,6 +332,10 @@ CREATE TABLE `device_sensor`  (
   INDEX `idx_device_slave`(`device_id` ASC, `slave_address` ASC) USING BTREE,
   CONSTRAINT `device_sensor_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `device_info` (`device_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 28 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备传感器元数据表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_sensor
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_sensor_record
@@ -321,6 +367,10 @@ CREATE TABLE `device_sensor_record`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 25 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '传感器数据历史表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of device_sensor_record
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for device_sensor_threshold
 -- ----------------------------
 DROP TABLE IF EXISTS `device_sensor_threshold`;
@@ -347,6 +397,10 @@ CREATE TABLE `device_sensor_threshold`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 14 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '传感器阈值配置表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of device_sensor_threshold
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for device_slave_data
 -- ----------------------------
 DROP TABLE IF EXISTS `device_slave_data`;
@@ -355,6 +409,7 @@ CREATE TABLE `device_slave_data`  (
   `device_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '主机设备ID(MAC)',
   `address` int NOT NULL COMMENT '从机地址(RS-485)',
   `slave_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '从机外设类型: grating_counter/odor/temperature',
+  `channel` int NULL DEFAULT NULL COMMENT '同一从机多路同类型时使用，单通道为 NULL',
   `online_since` datetime(3) NOT NULL COMMENT '本次上线时间（用于计算在线时长）',
   `value` double NULL DEFAULT NULL COMMENT '当前值',
   `unit` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '单位',
@@ -368,6 +423,10 @@ CREATE TABLE `device_slave_data`  (
   INDEX `idx_timestamp`(`timestamp` ASC) USING BTREE,
   CONSTRAINT `device_slave_data_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `device_info` (`device_id`) ON DELETE CASCADE ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 18 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备从机数据表(在线即存在，离线即删除)' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_slave_data
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_state_record
@@ -389,6 +448,10 @@ CREATE TABLE `device_state_record`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备状态时序表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of device_state_record
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for device_whitelist
 -- ----------------------------
 DROP TABLE IF EXISTS `device_whitelist`;
@@ -404,6 +467,10 @@ CREATE TABLE `device_whitelist`  (
   UNIQUE INDEX `uk_device_id`(`device_id` ASC) USING BTREE,
   INDEX `idx_batch`(`batch` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备白名单（产线导入，允许注册的设备）' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of device_whitelist
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for sys_permission
@@ -427,6 +494,10 @@ CREATE TABLE `sys_permission`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '权限表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of sys_permission
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for sys_role
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_role`;
@@ -445,6 +516,10 @@ CREATE TABLE `sys_role`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
+-- Records of sys_role
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for sys_role_permission
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_role_permission`;
@@ -457,6 +532,10 @@ CREATE TABLE `sys_role_permission`  (
   UNIQUE INDEX `uk_sys_role_permission`(`role_id` ASC, `permission_id` ASC) USING BTREE,
   INDEX `idx_sys_role_permission_perm`(`permission_id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 19 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色-权限关联表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_role_permission
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for sys_user
@@ -477,7 +556,11 @@ CREATE TABLE `sys_user`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_user_username`(`username` ASC) USING BTREE,
   INDEX `idx_sys_user_status`(`status` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_user
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for sys_user_role
@@ -491,6 +574,10 @@ CREATE TABLE `sys_user_role`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_user_role`(`user_id` ASC, `role_id` ASC) USING BTREE,
   INDEX `idx_sys_user_role_role`(`role_id` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户-角色关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户-角色关联表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_user_role
+-- ----------------------------
 
 SET FOREIGN_KEY_CHECKS = 1;
