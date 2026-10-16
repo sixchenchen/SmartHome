@@ -18,7 +18,7 @@ mqtt:
     client-id: wm-laohua-server-dev
     username: RUNTIME_USER
     password: 123456
-    ca-cert: certs/cert.pem
+    ca-cert: certs/cacert.pem
     topics:
       - device/+/presence
       - device/+/heartbeat
@@ -47,7 +47,7 @@ mqtt:
     client-id: wm-laohua-provision-dev
     username: PROVISION_USER
     password: 123456
-    ca-cert: certs/cert.pem
+    ca-cert: certs/cacert.pem
     topics:
       - /provision/device/+/register
     qos:
