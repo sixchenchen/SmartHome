@@ -16,6 +16,8 @@ mqtt:
     host: 127.0.0.1
     port: 8883
     client-id: java-backend-runtime
+    username: java-backend
+    password: "123456"
     ca-cert: certs/iot-ca.crt
     client-cert: certs/java-client.p12
     client-cert-password: "123456"
@@ -44,6 +46,7 @@ mqtt:
   provision:
     host: 127.0.0.1
     port: 8884
+    username: java-backend-provision
     client-id: java-backend-provision
     ca-cert: certs/iot-ca.crt
     client-cert: certs/java-client.p12
@@ -66,3 +69,4 @@ logging:
   level:
     com.womi: debug
     com.womi.business.mapper: debug
+    org.eclipse.paho: DEBUG

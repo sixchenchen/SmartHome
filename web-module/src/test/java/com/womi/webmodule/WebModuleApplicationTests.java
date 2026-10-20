@@ -25,7 +25,7 @@ class WebModuleApplicationTests {
 
     // 注意：连接时使用 ssl:// 协议头
     String broker = "ssl://127.0.0.1:8883";
-    String clientId = "java-server-test-001";
+    String clientId = "java-backend";
     // 你的证书密码（前面打包 p12 时设置的密码）
     String password = "123456";
 
@@ -79,7 +79,8 @@ class WebModuleApplicationTests {
 
             // 如果还报 Hostname 不匹配，再放开这一行
             // options.setHttpsHostnameVerificationEnabled(false);
-
+            options.setUserName("java-backend");
+            options.setPassword("123456".toCharArray());
             // 回调
             client.setCallback(new MqttCallbackExtended() {
                 @Override

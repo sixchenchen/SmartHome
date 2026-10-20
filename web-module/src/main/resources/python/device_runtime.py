@@ -2,7 +2,7 @@
 模拟设备完整运行脚本（跳过注册阶段）
 
 功能：
-1. 直接用凭据连 8883
+1. 直接用凭据连 8883（mTLS 双向认证）
 2. 发送 online（presence topic，retain=true）
 3. 周期性发送 heartbeat
 4. 接收普通指令 → 回 ACK
@@ -31,21 +31,29 @@ import hashlib
 import os
 import urllib.request
 import urllib.error
+from pathlib import Path
+
 import paho.mqtt.client as mqtt
 
 # ==================== 配置（从注册响应复制过来）====================
-MQTT_HOST = "192.168.1.15"
+MQTT_HOST = "127.0.0.1"
 MQTT_PORT = 8883
 CLIENT_ID = "device-B4BFE90CDBA1"
 USERNAME = "dev_B4BFE90CDBA1"
-PASSWORD = "W6nf9SaZh2KCGYPc"
+# ==================== 配置替换注册的密码====================
+PASSWORD = "G68mX9mjRXTj8ekN" 
 KEEP_ALIVE = 60
 
 DEVICE_ID = "B4BFE90CDBA1"
 PRODUCT = "SmartHome-v1"
 FIRMWARE = "1.0.29"                     # 会被 OTA 更新
 
-CA_CERT = r"d:\software\emqx-5.3.0-windows-amd64\etc\certs\cert.pem"
+# ==================== TLS / mTLS 配置 ====================
+# mTLS 三件套：CA 证书（验证服务器） + 客户端证书 + 客户端私钥
+# 按你实际的证书存放位置修改下面三个路径
+CA_CERT     = r"E:\data\mqtt_key\iot-ca.crt"
+CLIENT_CERT = r"E:\data\mqtt_key\B4BFE90CDBA1.crt"
+CLIENT_KEY  = r"E:\data\mqtt_key\B4BFE90CDBA1.key"
 
 # ==================== presence 统一配置 ====================
 # online / offline / will 三者共用一个 topic，retain=true
@@ -416,7 +424,7 @@ def handle_ota_command(payload):
     ).start()
 
 
-# ==================== MQTT 回调 ====================
+# ==================== MQTT 回调（Callback API v1）====================
 def on_connect(c, userdata, flags, rc):
     if rc == 0:
         print(f"[OK] 已连接 {MQTT_HOST}:{MQTT_PORT}")
@@ -502,6 +510,27 @@ def graceful_shutdown(signum=None, frame=None):
     sys.exit(0)
 
 
+# ==================== TLS 证书检查 ====================
+def check_tls_files():
+    """启动前检查 mTLS 三件套是否齐全，缺哪个报哪个，避免 load_verify_locations 的模糊错误"""
+    checks = {
+        "CA_CERT (验证服务器)": CA_CERT,
+        "CLIENT_CERT (客户端证书)": CLIENT_CERT,
+        "CLIENT_KEY (客户端私钥)": CLIENT_KEY,
+    }
+    missing = []
+    for name, p in checks.items():
+        path = Path(p)
+        if not path.exists():
+            missing.append(f"  - {name}: {path}")
+    if missing:
+        print("[FATAL] 以下 TLS 文件不存在：")
+        for m in missing:
+            print(m)
+        print("\n请检查 EMQX certs 目录 / 你生成的客户端证书路径是否正确。")
+        sys.exit(1)
+
+
 # ==================== 主流程 ====================
 def main():
     global client
@@ -512,13 +541,16 @@ def main():
 
     print("=" * 60)
     print(f"模拟设备: {DEVICE_ID}")
-    print(f"连接: {MQTT_HOST}:{MQTT_PORT}")
+    print(f"连接: {MQTT_HOST}:{MQTT_PORT}  (mTLS)")
     print(f"固件版本: {FIRMWARE}")
     print(f"presence topic: {PRESENCE_TOPIC} (retain={PRESENCE_RETAIN})")
     print("=" * 60)
 
-    # 创建客户端
-    client = mqtt.Client(client_id=CLIENT_ID)
+    # 先检查证书文件
+    check_tls_files()
+
+    # 创建客户端（显式声明 v1 回调 API，消除 DeprecationWarning）
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, client_id=CLIENT_ID)
 
     # 设置遗嘱（发到 presence topic，retain=true）
     will_payload_str = json.dumps(WILL_PAYLOAD)
@@ -526,11 +558,30 @@ def main():
                     qos=PRESENCE_QOS, retain=PRESENCE_RETAIN)
     print(f"[LWT] 遗嘱已设置: {PRESENCE_TOPIC}")
 
-    # TLS
-    client.tls_set(ca_certs=CA_CERT, cert_reqs=ssl.CERT_REQUIRED)
-    client.tls_insecure_set(True)
+    # ==================== mTLS 配置 ====================
+    # ca_certs : 验证服务器证书
+    # certfile : 提供给 broker 验证的客户端证书
+    # keyfile  : 客户端证书对应的私钥
+    try:
+        client.tls_set(
+            ca_certs=CA_CERT,
+            certfile=CLIENT_CERT,
+            keyfile=CLIENT_KEY,
+            cert_reqs=ssl.CERT_REQUIRED,
+            tls_version=ssl.PROTOCOL_TLS_CLIENT,
+        )
+        # 连的是 IP，服务器证书 SAN 通常不含 IP，跳过主机名校验
+        # 注意：这只跳过 hostname 校验，证书链校验仍然生效
+        client.tls_insecure_set(True)
+        print(f"[TLS] mTLS 已启用")
+        print(f"      CA:   {CA_CERT}")
+        print(f"      Cert: {CLIENT_CERT}")
+        print(f"      Key:  {CLIENT_KEY}")
+    except Exception as e:
+        print(f"[FATAL] TLS 配置失败: {e}")
+        sys.exit(1)
 
-    # 凭据
+    # 凭据（如果 EMQX 只配了证书认证，这两项会被忽略；叠加用户名认证时保留）
     client.username_pw_set(USERNAME, PASSWORD)
 
     # 回调

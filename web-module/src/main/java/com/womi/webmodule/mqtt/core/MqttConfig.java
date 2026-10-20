@@ -2,6 +2,7 @@ package com.womi.webmodule.mqtt.core;
 
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.java.Log;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -47,7 +48,6 @@ public class MqttConfig {
 
         String serverURI = String.format("ssl://%s:%d", broker.getHost(), broker.getPort());
         options.setServerURIs(new String[]{serverURI});
-
         // 纯 mTLS 情况下，账号密码可以不设，或者作为双重认证的第二道防线
         if (broker.getUsername() != null && !broker.getUsername().isEmpty()) {
             options.setUserName(broker.getUsername());
