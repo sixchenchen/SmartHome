@@ -27,10 +27,14 @@ public class MqttProperties {
         private Integer port;
         /** 必填：yml 里必须配置 */
         private String username;
-        /** 必填：yml 里必须配置 */
+        /** 可不用配置 */
         private String password;
         /** 必填：CA 证书路径 */
         private String caCert;
+        /** 必填：Java 客户端证书 .p12 路径（用于向 EMQX 证明自己） */
+        private String clientCert;
+        /** 必填：.p12 证书的密码 */
+        private String clientCertPassword;
         private String clientId;
         private List<String> topics = new ArrayList<>();
         private List<Integer> qos = new ArrayList<>();

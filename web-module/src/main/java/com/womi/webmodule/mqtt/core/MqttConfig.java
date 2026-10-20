@@ -19,11 +19,13 @@ import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.InputStream;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 
@@ -46,20 +48,24 @@ public class MqttConfig {
         String serverURI = String.format("ssl://%s:%d", broker.getHost(), broker.getPort());
         options.setServerURIs(new String[]{serverURI});
 
-        if (broker.getUsername() != null) {
+        // 纯 mTLS 情况下，账号密码可以不设，或者作为双重认证的第二道防线
+        if (broker.getUsername() != null && !broker.getUsername().isEmpty()) {
             options.setUserName(broker.getUsername());
         }
-        if (broker.getPassword() != null) {
+        if (broker.getPassword() != null && !broker.getPassword().isEmpty()) {
             options.setPassword(broker.getPassword().toCharArray());
         }
-
         options.setKeepAliveInterval(broker.getKeepAliveInterval());
         options.setConnectionTimeout(broker.getConnectionTimeout());
         options.setAutomaticReconnect(broker.isAutomaticReconnect());
         options.setCleanSession(broker.isCleanSession());
         options.setMaxInflight(broker.getMaxInflight());
         try {
-            options.setSocketFactory(buildSslSocketFactory(broker.getCaCert()));
+            options.setSocketFactory(buildSslSocketFactory(
+                    broker.getCaCert(),
+                    broker.getClientCert(),
+                    broker.getClientCertPassword()
+            ));
         } catch (Exception e) {
             throw new IllegalStateException("[" + label + "] 初始化 TLS SocketFactory 失败", e);
         }
@@ -192,5 +198,35 @@ public class MqttConfig {
             ctx.init(null, tmf.getTrustManagers(), null);
             return ctx.getSocketFactory();
         }
+    }
+
+    /**
+     * 【核心修改】加载 CA 证书和 Java 客户端 P12 证书，构建双向认证的 SSLSocketFactory
+     */
+    private SSLSocketFactory buildSslSocketFactory(String caCertPath, String p12Path, String p12Password) throws Exception {
+        // 1. 加载客户端身份（KeyManager）
+        KeyStore keyStore = KeyStore.getInstance("PKCS12");
+        try (InputStream ksStream = new ClassPathResource(p12Path).getInputStream()) {
+            keyStore.load(ksStream, p12Password.toCharArray());
+        }
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(keyStore, p12Password.toCharArray());
+
+        // 2. 加载信任的根证书（TrustManager）
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        trustStore.load(null, null);
+        try (InputStream caStream = new ClassPathResource(caCertPath).getInputStream()) {
+            Certificate ca = cf.generateCertificate(caStream);
+            trustStore.setCertificateEntry("iot-ca", ca);
+        }
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(trustStore);
+
+        // 3. 构建 SSLContext
+        SSLContext ctx = SSLContext.getInstance("TLSv1.2");
+        ctx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), new SecureRandom());
+
+        return ctx.getSocketFactory();
     }
 }

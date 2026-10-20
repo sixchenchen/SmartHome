@@ -86,9 +86,9 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
         // ==================== 4. 安全校验（先验签，后处理 nonce） ====================
         // 4.1 时间戳校验
-        if (request.getTimestamp() == null
-                || !TimestampValidatorUtils.isWithinWindow(request.getTimestamp(),
+        if (request.getTimestamp() == null || !TimestampValidatorUtils.isWithinWindow(request.getTimestamp(),
                 DeviceMqttConstants.REGISTER_TIMESTAMP_WINDOW_MS)) {
+            log.warn("时间戳校验失败 - deviceId: {}, 设备时间: {}, 服务器时间: {}", deviceId, request.getTimestamp(), System.currentTimeMillis());
             return RegisterResponse.error(MqttErrorCode.INVALID_TIMESTAMP);
         }
         // 4.2 签名校验

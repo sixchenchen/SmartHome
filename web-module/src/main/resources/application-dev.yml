@@ -13,12 +13,12 @@ spring:
 
 mqtt:
   runtime:
-    host: localhost
+    host: 127.0.0.1
     port: 8883
-    client-id: wm-laohua-server-dev
-    username: RUNTIME_USER
-    password: 123456
-    ca-cert: certs/cacert.pem
+    client-id: java-backend-runtime
+    ca-cert: certs/iot-ca.crt
+    client-cert: certs/java-client.p12
+    client-cert-password: "123456"
     topics:
       - device/+/presence
       - device/+/heartbeat
@@ -42,12 +42,12 @@ mqtt:
     clean-session: true
 
   provision:
-    host: localhost
+    host: 127.0.0.1
     port: 8884
-    client-id: wm-laohua-provision-dev
-    username: PROVISION_USER
-    password: 123456
-    ca-cert: certs/cacert.pem
+    client-id: java-backend-provision
+    ca-cert: certs/iot-ca.crt
+    client-cert: certs/java-client.p12
+    client-cert-password: "123456"
     topics:
       - /provision/device/+/register
     qos:

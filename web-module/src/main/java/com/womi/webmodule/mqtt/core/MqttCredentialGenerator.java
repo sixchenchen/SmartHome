@@ -24,7 +24,7 @@ public class MqttCredentialGenerator {
      */
     public MqttCredential generate(String deviceId) {
         String clientId = DeviceMqttConstants.MQTT_CLIENT_ID_PREFIX + deviceId;
-        String username = DeviceMqttConstants.MQTT_USERNAME_PREFIX + deviceId;
+        String username = deviceId;
 
         String plainPassword = SaltPasswordUtils.generatePassword(SaltPasswordUtils.DEFAULT_PASSWORD_LENGTH);
         String salt = SaltPasswordUtils.generateSalt();
