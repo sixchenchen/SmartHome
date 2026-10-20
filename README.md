@@ -28,16 +28,16 @@
   | `timestamp` | 毫秒时间戳，校验 ±5 分钟，防过期重放 |
 - **重复注册策略**：同设备重启/网络重试允许换新密码；`pubkey` 不一致（疑似冒充或换密钥）拒绝并返回 `DEVICE_ALREADY_REGISTERED`。
 - **白名单**（`device_whitelist`）：未在白名单的设备直接拒绝注册。
-- **凭据生成**：`clientId=device-{mac}`、`username=dev_{mac}`、`password=UUID 去横线前 16 位`，落库 `mqtt_auth`（`salt` + `SHA-256(salt+password)`，供 EMQX 认证）。
+- **凭据生成**：`clientId=device-{mac}`、`username=dev_{mac}`、`password=UUID 去横线前 16 位`，落库 `_auth`（`salt` + `SHA-256(salt+password)`，供 EMQX 认证）。
 
 ### 2. 设备在线状态管理
 - 统一 **`presence`** 主题承载上线/下线：`type=online` 走 `markOnline`，`type=offline` 走 `markOffline`。
-- 离线原因枚举 `DeviceOfflineReason`：`shutdown`（正常关机）、`factory_reset`、`mqtt_lwt`（遗嘱/异常断线）、`heartbeat_timeout`（心跳超时）、`manual`。
+- 离线原因枚举 `DeviceOfflineReason`：`shutdown`（正常关机）、`factory_reset`、`_lwt`（遗嘱/异常断线）、`heartbeat_timeout`（心跳超时）、`manual`。
 - **心跳保活**：`heartbeat` 更新 `uptime`/`last_heartbeat_time` 并写 `heartbeat_record`；超过 `60s` 未收到心跳由定时任务判离线（阈值 = 3 个心跳周期）。
 - **遗嘱（LWT）**：由注册响应下发 `will` 配置，设备异常断线由 Broker 代发离线。
 
 ### 3. 指令下发与 ACK 状态机
-- HTTP 下发 → 入库 `device_command` → MQTT 发布 `device/{mac}/command` → 设备回 `ack` → 状态机收敛。
+- HTTP 下发 → 入库 `device_command` →  发布 `device/{mac}/command` → 设备回 `ack` → 状态机收敛。
 - **状态机**：`PENDING(0) → SENT(1) → SUCCESS(2) / FAILED(3)`，另有 `TIMEOUT(4)`、`CANCELLED(5)`、`ACCEPTED(6)`。
 - **ACK 决策**（`DeviceCommandServiceImpl`）：按「是否 OTA 最终 ACK / 是否接收确认 / 是否终态」分支流转；终态幂等，不重复处理。
 - **可靠性**：下发失败保持 `PENDING` 由定时器兜底；超时未 ACK 自动重试（`MAX_RETRY=3`）；到期未完成置 `TIMEOUT`；支持手动取消。
@@ -88,7 +88,7 @@
 ### 9. 统一异常与响应
 - HTTP 统一返回 `ApiResponse{code, message, data, timestamp}`。
 - 全局异常处理 `GlobalExceptionHandler` 覆盖业务异常、参数异常、上传超限、文件异常、系统异常等 8 类。
-- 错误码：HTTP `ErrorCode`（参数/业务/文件/固件/设备/OTA/系统）与 MQTT 注册 `MqttErrorCode` 双体系。
+- 错误码：HTTP `ErrorCode`（参数/业务/文件/固件/设备/OTA/系统）与  注册 `ErrorCode` 双体系。
 
 ---
 
@@ -96,9 +96,9 @@
 
 ```
 WM_LAOHUA
-├── common-module      公共层：常量/枚举/工具/异常/响应（不依赖 DB、Web、MQTT）
+├── common-module      公共层：常量/枚举/工具/异常/响应（不依赖 DB、Web、）
 ├── business-module    业务层：实体 / Mapper / Service（设备、指令、OTA、传感器、认证）
-└── web-module         接入层：HTTP Controller / MQTT 收发 / 定时任务 / 配置（可运行模块）
+└── web-module         接入层：HTTP Controller /  收发 / 定时任务 / 配置（可运行模块）
 ```
 
 依赖方向：`web-module → business-module → common-module`（单向，无循环）。
@@ -107,12 +107,12 @@ WM_LAOHUA
 | :--- | :--- |
 | common-module | Lombok、Jackson、BouncyCastle（ECDSA 验签） |
 | business-module | MyBatis-Plus、MySQL、Spring Tx |
-| web-module | Spring Web、Spring Integration MQTT（Paho）、Redis、Druid |
+| web-module | Spring Web、Spring Integration （Paho）、Redis、Druid |
 
 **通用常量收敛于 `common-module/.../constants/`**：
-`DeviceMqttConstants`（主题/字段/header）、`DeviceCommandConstants`、`DeviceConstants`、`DeviceFirmwareConstants`、`FileConstants`、`HttpStatusConstants`、`RegexConstants`、`ErrorInfoConstants`、`DeviceOtaStateConstants`。
+`DeviceConstants`（主题/字段/header）、`DeviceCommandConstants`、`DeviceConstants`、`DeviceFirmwareConstants`、`FileConstants`、`HttpStatusConstants`、`RegexConstants`、`ErrorInfoConstants`、`DeviceOtaStateConstants`。
 
-**枚举**：`DeviceCommandStatus`、`DeviceOfflineReason`、`MqttErrorCode`、`ErrorCode`。
+**枚举**：`DeviceCommandStatus`、`DeviceOfflineReason`、`ErrorCode`、`ErrorCode`。
 
 **工具**：`JsonUtils`、`SignatureVerifierUtils`、`TimestampValidatorUtils`、`DateTimeUtils`、`SaltPasswordUtils`、`DeviceOtaStateUtils`。
 
@@ -129,7 +129,7 @@ mysql -uroot -p < web-module/src/main/resources/sql/smart_device.sql
 ```
 
 ### 3. 修改配置
-编辑 `web-module/src/main/resources/application-dev.yml`：数据库/Redis 连接、MQTT 双 Broker 地址与账号、`firmware.upload-dir` 与 `firmware.base-url`。
+编辑 `web-module/src/main/resources/application-dev.yml`：数据库/Redis 连接、 双 Broker 地址与账号、`firmware.upload-dir` 与 `firmware.base-url`。
 
 ### 4. 启动
 ```bash
@@ -142,18 +142,18 @@ mvn -pl web-module spring-boot:run
 
 ---
 
-## 四、MQTT 通信协议
+## 四、 通信协议
 
 ### 4.1 双 Broker 双通道
 
 | 通道 | Broker | ClientId | 订阅主题 | QoS |
 | :--- | :--- | :--- | :--- | :--- |
-| **runtime**（业务） | `ssl://192.168.1.15:8883` | `wm-laohua-server-dev` | `device/+/presence`、`heartbeat`、`state`、`ack`、`event`、`sensor`、`ota_progress` | 1,0,1,1,1,0,0 |
-| **provision**（注册） | `ssl://192.168.1.15:8884` | `wm-laohua-provision-dev` | `/provision/device/+/register` | 1 |
+| **runtime**（业务） | `ssl://192.168.1.15:8883` | `java-backend-provision-provision-in/out` | `device/+/presence`、`heartbeat`、`state`、`ack`、`event`、`sensor`、`ota_progress` | 1,0,1,1,1,0,0 |
+| **provision**（注册） | `ssl://192.168.1.15:8884` | `java-backend-provision-runtime-in/out` | `/provision/device/+/register` | 1 |
 
 **入站链路**：
 ```
-MqttPahoMessageDrivenChannelAdapter
+PahoMessageDrivenChannelAdapter
   → runtimeInputChannel / provisionInputChannel
   → MqttMessageReceiver（提取 mqtt_receivedTopic / mqtt_receivedQos）
   → MqttMessageRouter.route() → 命中 supports() 的 Handler
