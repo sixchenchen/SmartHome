@@ -1,8 +1,8 @@
 package com.womi.webmodule.mqtt.core;
 
 import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.properties.MqttProperties;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.java.Log;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

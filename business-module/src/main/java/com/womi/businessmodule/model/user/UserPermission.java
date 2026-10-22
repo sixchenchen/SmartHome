@@ -1,4 +1,4 @@
-package com.womi.businessmodule.model.sys;
+package com.womi.businessmodule.model.user;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
  * 权限表
  */
 @Data
-@TableName(value = "sys_permission")
-public class SysPermission {
+@TableName(value = "user_permission")
+public class UserPermission {
 
     @TableId(type = IdType.AUTO)
     private Long id;

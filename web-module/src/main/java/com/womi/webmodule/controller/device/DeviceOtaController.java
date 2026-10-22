@@ -1,4 +1,4 @@
-package com.womi.webmodule.controller;
+package com.womi.webmodule.controller.device;
 
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.dto.http.request.SendCommandRequest;

@@ -1,4 +1,4 @@
-package com.womi.webmodule.controller;
+package com.womi.webmodule.controller.device;
 
 import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.service.device.DeviceCommandService;

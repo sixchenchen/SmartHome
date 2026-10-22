@@ -1,4 +1,4 @@
-package com.womi.businessmodule.model.sys;
+package com.womi.businessmodule.model.user;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
  * 角色表
  */
 @Data
-@TableName(value = "sys_role")
-public class SysRole {
+@TableName(value = "user_role_info")
+public class UserRoleInfo {
 
     @TableId(type = IdType.AUTO)
     private Long id;

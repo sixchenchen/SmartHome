@@ -4,7 +4,7 @@ import com.womi.commonmodule.constants.JwtClaimsConstant;
 import com.womi.commonmodule.context.BaseContext;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.properties.JwtProperties;
-import com.womi.commonmodule.utils.JwtUtil;
+import com.womi.commonmodule.utils.JwtTokenUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -45,10 +45,10 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
         //2、校验令牌
         try {
             log.info("jwt校验:{}", token);
-            Claims claims = JwtUtil.parseJWT(jwtProperties.getAdminSecretKey(), token);
-            Long empId = Long.valueOf(claims.get(JwtClaimsConstant.EMP_ID).toString());
-            log.info("当前员工id：", empId);
-            BaseContext.setCurrentId(empId);
+            Claims claims = JwtTokenUtil.parseJWT(jwtProperties.getAdminSecretKey(), token);
+            Long adminId = Long.valueOf(claims.get(JwtClaimsConstant.ADMIN_ID).toString());
+            log.info("当前用户id：", adminId);
+            BaseContext.setCurrentId(adminId);
             //3、通过，放行
             return true;
         } catch (Exception ex) {

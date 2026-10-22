@@ -15,7 +15,7 @@ import com.womi.webmodule.dto.mqtt.MqttCredential;
 import com.womi.webmodule.dto.mqtt.request.RegisterRequest;
 import com.womi.webmodule.dto.mqtt.response.RegisterResponse;
 import com.womi.webmodule.mqtt.core.MqttCredentialGenerator;
-import com.womi.webmodule.mqtt.core.MqttProperties;
+import com.womi.commonmodule.properties.MqttProperties;
 import com.womi.webmodule.service.device.DeviceRegisterService;
 import com.womi.webmodule.service.device.NonceService;
 import lombok.RequiredArgsConstructor;

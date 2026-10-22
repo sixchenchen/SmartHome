@@ -3,7 +3,7 @@ package com.womi.webmodule.intercepter;
 import com.womi.commonmodule.constants.JwtClaimsConstant;
 import com.womi.commonmodule.context.BaseContext;
 import com.womi.commonmodule.properties.JwtProperties;
-import com.womi.commonmodule.utils.JwtUtil;
+import com.womi.commonmodule.utils.JwtTokenUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -44,7 +44,7 @@ public class JwtTokenUserInterceptor implements HandlerInterceptor {
         //2、校验令牌
         try {
             log.info("jwt校验:{}", token);
-            Claims claims = JwtUtil.parseJWT(jwtProperties.getUserSecretKey(), token);
+            Claims claims = JwtTokenUtil.parseJWT(jwtProperties.getUserSecretKey(), token);
             Long userId = Long.valueOf(claims.get(JwtClaimsConstant.USER_ID).toString());
             log.info("当前用户的id：", userId);
             BaseContext.setCurrentId(userId);
