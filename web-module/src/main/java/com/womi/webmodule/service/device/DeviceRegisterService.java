@@ -1,8 +1,8 @@
 package com.womi.webmodule.service.device;
 
 
-import com.womi.webmodule.dto.mqtt.request.RegisterRequest;
-import com.womi.webmodule.dto.mqtt.response.RegisterResponse;
+import com.womi.businessmodule.dto.RegisterRequest;
+import com.womi.businessmodule.vo.RegisterResponse;
 
 public interface DeviceRegisterService {
 

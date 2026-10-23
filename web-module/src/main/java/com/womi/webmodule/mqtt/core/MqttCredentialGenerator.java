@@ -2,7 +2,7 @@
 
     import com.womi.commonmodule.constants.DeviceMqttConstants;
     import com.womi.commonmodule.utils.SaltPasswordUtils;
-    import com.womi.webmodule.dto.mqtt.MqttCredential;
+    import com.womi.businessmodule.model.mqtt.MqttCredential;
     import org.springframework.stereotype.Component;
 
     import java.util.UUID;

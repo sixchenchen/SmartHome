@@ -1,9 +1,9 @@
 package com.womi.webmodule.service.device;
 
 
-import com.womi.webmodule.dto.http.request.SendCommandRequest;
-import com.womi.webmodule.dto.ota.response.DeviceOtaProgressVO;
-import com.womi.webmodule.dto.ota.response.DeviceOtaStartResponse;
+import com.womi.businessmodule.dto.SendCommandRequest;
+import com.womi.businessmodule.vo.DeviceOtaProgressVO;
+import com.womi.businessmodule.vo.DeviceOtaStartResponse;
 
 public interface DeviceOtaService {
 

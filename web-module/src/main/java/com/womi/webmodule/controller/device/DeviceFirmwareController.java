@@ -1,8 +1,8 @@
 package com.womi.webmodule.controller.device;
 
 
-import com.womi.webmodule.dto.firmware.response.FirmwareUploadResponse;
-import com.womi.webmodule.dto.firmware.response.FirmwareVO;
+import com.womi.businessmodule.vo.FirmwareUploadResponse;
+import com.womi.businessmodule.vo.FirmwareVO;
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.service.device.DeviceFirmwareUploadService;
 import lombok.RequiredArgsConstructor;

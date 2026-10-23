@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.womi.businessmodule.mapper.sys.SysPermissionMapper">
+    <resultMap id="BaseResultMap" type="com.womi.businessmodule.model.user.SysPermission">
+        <id column="id" property="id"/>
+        <result column="perm_code" property="permCode"/>
+        <result column="perm_name" property="permName"/>
+        <result column="perm_type" property="permType"/>
+        <result column="resource" property="resource"/>
+        <result column="action" property="action"/>
+        <result column="description" property="description"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+    <sql id="Base_Column_List">
+        id, perm_code, perm_name, perm_type, resource, action, description, status, create_time, update_time, deleted
+    </sql>
+    <select id="selectByPermCode" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM sys_permission WHERE perm_code = #{permCode} AND deleted = 0 LIMIT 1
+    </select>
+
+    <select id="selectPermCodesByRoleIds" resultType="java.lang.String">
+        SELECT DISTINCT p.perm_code
+        FROM sys_role_permission rp
+        INNER JOIN sys_permission p ON rp.permission_id = p.id
+        WHERE rp.role_id IN
+        <foreach collection="roleIds" item="roleId" open="(" separator="," close=")">
+            #{roleId}
+        </foreach>
+        AND p.status = 1
+        AND p.deleted = 0
+    </select>
+</mapper>

@@ -1,7 +1,7 @@
 package com.womi.webmodule.service.device;
 
-import com.womi.webmodule.dto.firmware.response.FirmwareUploadResponse;
-import com.womi.webmodule.dto.firmware.response.FirmwareVO;
+import com.womi.businessmodule.vo.FirmwareUploadResponse;
+import com.womi.businessmodule.vo.FirmwareVO;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;

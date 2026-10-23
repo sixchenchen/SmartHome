@@ -1,73 +1,55 @@
 package com.womi.commonmodule.utils;
 
-
-import com.womi.commonmodule.constants.UserConstants;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtBuilder;
-import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.Map;
 
+@Component
 public class JwtTokenUtil {
 
-    @Value("${my.jwt.admin-secret-key}")
-    private String adminSecretKey;
+    private final SecretKey key;
+    private final long expirationMs;
 
-    @Value("${my.jwt.admin-ttl}")
-    private long adminTtl;
+    public JwtTokenUtil(@Value("${my.jwt.secret}") String secret,
+                        @Value("${my.jwt.expiration-ms:86400000}") long expirationMs) {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        this.expirationMs = expirationMs;
+    }
 
-    @Value("${my.jwt.user-secret-key}")
-    private String userSecretKey;
-
-    @Value("${my.jwt.user-ttl}")
-    private long userTtl;
-
-    public String generateToken(String username, String role, boolean isAdmin) {
-        String secret = isAdmin ? adminSecretKey : userSecretKey;
-        long ttl = isAdmin ? adminTtl : userTtl;
-
+    public String generateToken(UserDetails userDetails) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + ttl);
-
-        // 统一使用 Keys.hmacShaKeyFor
-        SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-
         return Jwts.builder()
-                .subject(username)
-                .claim(UserConstants.USER_ROLE, role)
+                .subject(userDetails.getUsername())
                 .issuedAt(now)
-                .expiration(expiryDate)
+                .expiration(new Date(now.getTime() + expirationMs))
                 .signWith(key)
                 .compact();
     }
 
-    public static String createJWT(String secretKey, long ttlMillis, Map<String, Object> claims) {
-        long expMillis = System.currentTimeMillis() + ttlMillis;
-        Date exp = new Date(expMillis);
-
-        SecretKey key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
-
-        JwtBuilder builder = Jwts.builder()
-                .claims(claims)
-                .expiration(exp)
-                .signWith(key);
-
-        return builder.compact();
+    public String extractUsername(String token) {
+        return parseClaims(token).getSubject();
     }
 
-    public static Claims parseJWT(String secretKey, String token) {
-        SecretKey key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+    public boolean validateToken(String token, UserDetails userDetails) {
+        try {
+            Claims claims = parseClaims(token);
+            return claims.getSubject().equals(userDetails.getUsername())
+                    && claims.getExpiration().after(new Date());
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
 
+    private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
     }
-
 }

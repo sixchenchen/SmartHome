@@ -11,7 +11,7 @@
  Target Server Version : 80411 (8.4.11)
  File Encoding         : 65001
 
- Date: 16/10/2026 18:54:10
+ Date: 23/10/2026 08:43:29
 */
 
 SET NAMES utf8mb4;
@@ -42,10 +42,6 @@ CREATE TABLE `device_alert_record`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备告警记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_alert_record
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_binding
 -- ----------------------------
 DROP TABLE IF EXISTS `device_binding`;
@@ -64,10 +60,6 @@ CREATE TABLE `device_binding`  (
   INDEX `idx_device_binding_device`(`device_id` ASC) USING BTREE,
   INDEX `idx_device_binding_user`(`user_id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备绑定关系表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of device_binding
--- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_command
@@ -107,10 +99,6 @@ CREATE TABLE `device_command`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 112 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备下行控制指令表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_command
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_event_record
 -- ----------------------------
 DROP TABLE IF EXISTS `device_event_record`;
@@ -136,10 +124,6 @@ CREATE TABLE `device_event_record`  (
   INDEX `idx_timestamp`(`timestamp` ASC) USING BTREE,
   CONSTRAINT `device_event_record_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `device_info` (`device_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备事件记录表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of device_event_record
--- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_firmware
@@ -168,10 +152,6 @@ CREATE TABLE `device_firmware`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 18 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '固件版本表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_firmware
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_group
 -- ----------------------------
 DROP TABLE IF EXISTS `device_group`;
@@ -189,10 +169,6 @@ CREATE TABLE `device_group`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备分组表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_group
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_heartbeat_record
 -- ----------------------------
 DROP TABLE IF EXISTS `device_heartbeat_record`;
@@ -207,11 +183,7 @@ CREATE TABLE `device_heartbeat_record`  (
   INDEX `idx_device_time`(`device_id` ASC, `timestamp` DESC) USING BTREE,
   INDEX `idx_timestamp`(`timestamp` ASC) USING BTREE,
   CONSTRAINT `device_heartbeat_record_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `device_info` (`device_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 959 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '心跳记录表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of device_heartbeat_record
--- ----------------------------
+) ENGINE = InnoDB AUTO_INCREMENT = 1647 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '心跳记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for device_info
@@ -248,11 +220,7 @@ CREATE TABLE `device_info`  (
   INDEX `idx_last_heartbeat`(`last_heartbeat_time` ASC) USING BTREE,
   INDEX `idx_ota_state`(`ota_state` ASC) USING BTREE,
   INDEX `idx_group_id`(`group_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 15 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备信息表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of device_info
--- ----------------------------
+) ENGINE = InnoDB AUTO_INCREMENT = 18 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备信息表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for device_mqtt_auth
@@ -271,13 +239,7 @@ CREATE TABLE `device_mqtt_auth`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_username`(`username` ASC) USING BTREE,
   UNIQUE INDEX `uk_device_id`(`device_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '统一MQTT认证账号表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of device_mqtt_auth
--- ----------------------------
-INSERT INTO `device_mqtt_auth` VALUES (1, 'PROVISION_USER', 'f43c57babf15d80cd5e961e6dee8b1795dcff8805ca9a4aabc2d048d2499f172', '767f13ac5e1c4dbdddb7f4c288bb085b', 1, 1, NULL, '2026-10-15 18:36:10.738', '2026-10-15 18:36:35.665');
-INSERT INTO `device_mqtt_auth` VALUES (2, 'RUNTIME_USER', 'fae340eae69a2dfad416154a5d47474ce546d2c2ba9bc57fa8c0b833a6886aff', '667f13ac5e1c4dbdddb7f4c288bb0856', 1, 1, NULL, '2026-10-15 18:36:43.369', '2026-10-15 18:38:00.270');
+) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '统一MQTT认证账号表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for device_ota_task
@@ -301,10 +263,6 @@ CREATE TABLE `device_ota_task`  (
   INDEX `idx_status`(`status` ASC) USING BTREE,
   INDEX `idx_firmware`(`firmware_id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = 'OTA 批量升级任务表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of device_ota_task
--- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_sensor
@@ -332,10 +290,6 @@ CREATE TABLE `device_sensor`  (
   INDEX `idx_device_slave`(`device_id` ASC, `slave_address` ASC) USING BTREE,
   CONSTRAINT `device_sensor_ibfk_1` FOREIGN KEY (`device_id`) REFERENCES `device_info` (`device_id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE = InnoDB AUTO_INCREMENT = 28 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备传感器元数据表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of device_sensor
--- ----------------------------
 
 -- ----------------------------
 -- Table structure for device_sensor_record
@@ -367,10 +321,6 @@ CREATE TABLE `device_sensor_record`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 25 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '传感器数据历史表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_sensor_record
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_sensor_threshold
 -- ----------------------------
 DROP TABLE IF EXISTS `device_sensor_threshold`;
@@ -397,10 +347,6 @@ CREATE TABLE `device_sensor_threshold`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 14 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '传感器阈值配置表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_sensor_threshold
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_slave_data
 -- ----------------------------
 DROP TABLE IF EXISTS `device_slave_data`;
@@ -425,10 +371,6 @@ CREATE TABLE `device_slave_data`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 18 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备从机数据表(在线即存在，离线即删除)' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_slave_data
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_state_record
 -- ----------------------------
 DROP TABLE IF EXISTS `device_state_record`;
@@ -448,10 +390,6 @@ CREATE TABLE `device_state_record`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备状态时序表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_state_record
--- ----------------------------
-
--- ----------------------------
 -- Table structure for device_whitelist
 -- ----------------------------
 DROP TABLE IF EXISTS `device_whitelist`;
@@ -469,79 +407,10 @@ CREATE TABLE `device_whitelist`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '设备白名单（产线导入，允许注册的设备）' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of device_whitelist
+-- Table structure for user_info
 -- ----------------------------
-
--- ----------------------------
--- Table structure for sys_permission
--- ----------------------------
-DROP TABLE IF EXISTS `sys_permission`;
-CREATE TABLE `sys_permission`  (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '权限ID',
-  `perm_code` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '权限编码，如 order:create',
-  `perm_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '权限名称',
-  `perm_type` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'ACTION' COMMENT '权限类型：MENU/BUTTON/API/ACTION',
-  `resource` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '资源，如 order',
-  `action` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '动作，如 create/update/delete/read',
-  `description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
-  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否，1是',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_sys_permission_code`(`perm_code` ASC) USING BTREE,
-  INDEX `idx_sys_permission_resource`(`resource` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '权限表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of sys_permission
--- ----------------------------
-
--- ----------------------------
--- Table structure for sys_role
--- ----------------------------
-DROP TABLE IF EXISTS `sys_role`;
-CREATE TABLE `sys_role`  (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '角色ID',
-  `role_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '角色编码，如 ADMIN、OPS、USER',
-  `role_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '角色名称',
-  `description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
-  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
-  `built_in` tinyint NOT NULL DEFAULT 0 COMMENT '是否内置：1是，0否',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否，1是',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_sys_role_code`(`role_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of sys_role
--- ----------------------------
-
--- ----------------------------
--- Table structure for sys_role_permission
--- ----------------------------
-DROP TABLE IF EXISTS `sys_role_permission`;
-CREATE TABLE `sys_role_permission`  (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `role_id` bigint NOT NULL COMMENT '角色ID',
-  `permission_id` bigint NOT NULL COMMENT '权限ID',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_sys_role_permission`(`role_id` ASC, `permission_id` ASC) USING BTREE,
-  INDEX `idx_sys_role_permission_perm`(`permission_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 19 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色-权限关联表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Records of sys_role_permission
--- ----------------------------
-
--- ----------------------------
--- Table structure for sys_user
--- ----------------------------
-DROP TABLE IF EXISTS `sys_user`;
-CREATE TABLE `sys_user`  (
+DROP TABLE IF EXISTS `user_info`;
+CREATE TABLE `user_info`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
   `username` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '登录名',
   `password_hash` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '密码哈希，BCrypt/Argon2',
@@ -559,14 +428,31 @@ CREATE TABLE `sys_user`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of sys_user
+-- Table structure for user_permission
 -- ----------------------------
+DROP TABLE IF EXISTS `user_permission`;
+CREATE TABLE `user_permission`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '权限ID',
+  `perm_code` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '权限编码，如 order:create',
+  `perm_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '权限名称',
+  `perm_type` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'ACTION' COMMENT '权限类型：MENU/BUTTON/API/ACTION',
+  `resource` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '资源，如 order',
+  `action` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '动作，如 create/update/delete/read',
+  `description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否，1是',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_permission_code`(`perm_code` ASC) USING BTREE,
+  INDEX `idx_sys_permission_resource`(`resource` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '权限表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Table structure for sys_user_role
+-- Table structure for user_role
 -- ----------------------------
-DROP TABLE IF EXISTS `sys_user_role`;
-CREATE TABLE `sys_user_role`  (
+DROP TABLE IF EXISTS `user_role`;
+CREATE TABLE `user_role`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `user_id` bigint NOT NULL COMMENT '用户ID',
   `role_id` bigint NOT NULL COMMENT '角色ID',
@@ -577,7 +463,35 @@ CREATE TABLE `sys_user_role`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户-角色关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Records of sys_user_role
+-- Table structure for user_role_info
 -- ----------------------------
+DROP TABLE IF EXISTS `user_role_info`;
+CREATE TABLE `user_role_info`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '角色ID',
+  `role_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '角色编码，如 ADMIN、OPS、USER',
+  `role_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '角色名称',
+  `description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '描述',
+  `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
+  `built_in` tinyint NOT NULL DEFAULT 0 COMMENT '是否内置：1是，0否',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否，1是',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_role_code`(`role_code` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for user_role_permission
+-- ----------------------------
+DROP TABLE IF EXISTS `user_role_permission`;
+CREATE TABLE `user_role_permission`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `role_id` bigint NOT NULL COMMENT '角色ID',
+  `permission_id` bigint NOT NULL COMMENT '权限ID',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_role_permission`(`role_id` ASC, `permission_id` ASC) USING BTREE,
+  INDEX `idx_sys_role_permission_perm`(`permission_id` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 19 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色-权限关联表' ROW_FORMAT = DYNAMIC;
 
 SET FOREIGN_KEY_CHECKS = 1;

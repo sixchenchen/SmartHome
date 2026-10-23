@@ -1,16 +1,19 @@
 package com.womi.webmodule.config;
 
 import com.womi.webmodule.filter.JwtAuthenticationFilter;
+import com.womi.webmodule.handler.JsonAccessDeniedHandler;
+import com.womi.webmodule.handler.JsonAuthenticationEntryPoint;
+import com.womi.webmodule.service.user.impl.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -18,48 +21,54 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // 替代 @EnableGlobalMethodSecurity
+@EnableMethodSecurity          // 开启 @PreAuthorize 等注解
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final UserDetailsService userDetailsService;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final JsonAuthenticationEntryPoint authenticationEntryPoint;
+    private final JsonAccessDeniedHandler accessDeniedHandler;
+
+    /** 密码编码器：BCrypt 强度 12 */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
+    }
+
+    /** 认证提供者：连接自定义 UserDetailsService 与 PasswordEncoder */
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1. 禁用 CSRF（前后端分离项目通常禁用）
-                .csrf(csrf -> csrf.disable())
-                // 2. 设置无状态会话，Spring Security 不会创建或使用 HttpSession
+                .csrf(csrf -> csrf.disable())                          // 前后端分离，关闭 CSRF
+                .cors(cors -> cors.configure(http))                    // 开启 CORS（需额外配置 CorsConfigurationSource）
                 .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 3. 配置请求授权规则
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))  // 无状态
                 .authorizeHttpRequests(auth -> auth
-                        // 放行登录、注册及公开端点
-                        .requestMatchers("/admin/login", "/user/login", "/api/public/**").permitAll()
-                        // 放行 Knife4j/Swagger 文档相关路径（关键！）
-                        .requestMatchers(
-                                "/doc.html", "/webjars/**", "/v3/api-docs/**",
-                                "/swagger-resources/**", "/favicon.ico"
-                        ).permitAll()
-                        // 对其他所有请求都要求认证
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .anyRequest().authenticated()                  // 其余全部需要认证
                 )
-                // 4. 添加自定义的 JWT 过滤器，在用户名密码认证过滤器之前执行
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)   // 401 JSON
+                        .accessDeniedHandler(accessDeniedHandler)             // 403 JSON
+                )
+                .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    // 5. 提供 AuthenticationManager Bean（用于登录接口）
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
-
-    // 6. 密码编码器（用于加密和校验密码）
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }

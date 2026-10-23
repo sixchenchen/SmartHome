@@ -5,7 +5,7 @@ import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.vo.CommandStatsVO;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.response.ApiResponse;
-import com.womi.webmodule.dto.http.request.SendCommandRequest;
+import com.womi.businessmodule.dto.SendCommandRequest;
 import com.womi.webmodule.service.device.DeviceControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
