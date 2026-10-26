@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
  * 用户表
  */
 @Data
-@TableName(value = "sys_info")
-public class SysInfo {
+@TableName(value = "sys_user")
+public class SysUser {
 
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -45,5 +45,6 @@ public class SysInfo {
     private LocalDateTime updateTime;
 
     /** 逻辑删除：0否，1是 */
+    @TableLogic(value = "0", delval = "1")
     private Integer deleted;
 }

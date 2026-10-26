@@ -27,22 +27,11 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
         registry.addResourceHandler("/webjars/**").addResourceLocations("classpath:/META-INF/resources/webjars/");
     }
 
-
     @Bean
     public GroupedOpenApi userApi() {
         return GroupedOpenApi.builder()
                 .group("user")
-                .pathsToMatch("/**")
                 .packagesToScan("com.womi.webmodule.controller.user")
-                .build();
-    }
-
-    @Bean
-    public GroupedOpenApi adminApi() {
-        return GroupedOpenApi.builder()
-                .group("admin")
-                .pathsToMatch("/admin/**")
-                .packagesToScan("com.womi.webmodule.controller.admin")
                 .build();
     }
 
@@ -50,8 +39,15 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
     public GroupedOpenApi deviceApi() {
         return GroupedOpenApi.builder()
                 .group("device")
-//                .pathsToMatch("/device/**")
                 .packagesToScan("com.womi.webmodule.controller.device")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi adminApi() {
+        return GroupedOpenApi.builder()
+                .group("admin")
+                .packagesToScan("com.womi.webmodule.controller.admin")
                 .build();
     }
 

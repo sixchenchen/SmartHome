@@ -1,11 +1,12 @@
 package com.womi.webmodule.service.user.impl;
 
-import com.womi.businessmodule.mapper.sys.SysInfoMapper;
+import com.womi.businessmodule.mapper.sys.SysUserMapper;
 import com.womi.businessmodule.mapper.sys.SysPermissionMapper;
 import com.womi.businessmodule.mapper.sys.SysRoleInfoMapper;
 import com.womi.businessmodule.mapper.sys.SysRoleMapper;
-import com.womi.businessmodule.model.sys.SysInfo;
+import com.womi.businessmodule.model.sys.SysUser;
 import com.womi.businessmodule.model.sys.SysRole;
+import com.womi.webmodule.service.user.SecurityUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,7 +22,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
 
-    private final SysInfoMapper sysInfoMapper;
+    private final SysUserMapper sysUserMapper;
     private final SysRoleInfoMapper sysRoleInfoMapper;
     private final SysRoleMapper sysRoleMapper;
     private final SysPermissionMapper sysPermissionMapper;
@@ -29,7 +30,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // 1. 查用户
-        SysInfo user = sysInfoMapper.selectByUsername(username);
+        SysUser user = sysUserMapper.selectByUsername(username);
         if (user == null) {
             throw new UsernameNotFoundException("用户不存在: " + username);
         }

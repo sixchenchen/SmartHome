@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.enums.MqttErrorCode;
 import com.womi.commonmodule.utils.JsonUtils;
-import com.womi.businessmodule.dto.RegisterRequest;
-import com.womi.businessmodule.vo.RegisterResponse;
+import com.womi.businessmodule.dto.DeviceRegisterRequest;
+import com.womi.businessmodule.vo.DeviceRegisterResponse;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import com.womi.webmodule.service.device.DeviceRegisterService;
@@ -63,20 +63,20 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
             JsonNode json = jsonUtils.parse(payload);
             if (json == null) {
                 log.warn("payload 解析失败 - Topic: {}", topic);
-                sendResponse(deviceId, RegisterResponse.error(MqttErrorCode.INVALID_PAYLOAD));
+                sendResponse(deviceId, DeviceRegisterResponse.error(MqttErrorCode.INVALID_PAYLOAD));
                 return;
             }
 
             String payloadDevice = jsonUtils.getString(json, DeviceMqttConstants.FIELD_DEVICE);
             if (payloadDevice != null && !payloadDevice.equals(deviceId)) {
                 log.warn("注册 device 与 topic 不一致 - topic: {}, payload: {}", topic, payloadDevice);
-                sendResponse(deviceId, RegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID));
+                sendResponse(deviceId, DeviceRegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID));
                 return;
             }
             // 3. 提取字段 → 组装 RegisterRequest
-            RegisterRequest request = buildRequest(deviceId, json);
+            DeviceRegisterRequest request = buildRequest(deviceId, json);
             // 4. 调业务层（含验签、防重放、分配凭据）
-            RegisterResponse response = deviceRegisterService.register(request);
+            DeviceRegisterResponse response = deviceRegisterService.register(request);
             // 5. 发送响应
             sendResponse(deviceId, response);
             log.info("设备注册处理完成 - deviceId: {}, success: {}",deviceId, response.isSuccess());
@@ -89,8 +89,8 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
     /**
      * 从 JSON 构建 RegisterRequest
      */
-    private RegisterRequest buildRequest(String deviceId, JsonNode json) {
-        RegisterRequest request = new RegisterRequest();
+    private DeviceRegisterRequest buildRequest(String deviceId, JsonNode json) {
+        DeviceRegisterRequest request = new DeviceRegisterRequest();
         request.setDeviceId(deviceId);
         request.setTimestamp(jsonUtils.getLong(json, DeviceMqttConstants.FIELD_TIMESTAMP));
 
@@ -108,7 +108,7 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
     /**
      * 发送注册响应到 /provision/device/{mac}/config
      */
-    private void sendResponse(String deviceId, RegisterResponse response) {
+    private void sendResponse(String deviceId, DeviceRegisterResponse response) {
         String responseTopic = String.format(DeviceMqttConstants.PROVISION_CONFIG_TOPIC_FORMAT, deviceId);
 
         Map<String, Object> payload = new LinkedHashMap<>();

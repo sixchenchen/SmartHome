@@ -1,0 +1,22 @@
+P0 + P1 完整修复清单
+📋 P0：上线前必改（不改会出问题）
+#	问题	现状	修复方案要点	涉及文件/类	验收标准	预估
+P0-1	last_login_time 从未更新	登录成功后只签 token，没写库；用户看到的"上次登录时间"永远为空	登录成功后 AuthService.recordLoginSuccess(username, ip)：sysInfoMapper.updateById(user) 写入 last_login_time = now()，顺带记 IP/UA	UserController.login 或 AuthService 新增方法	连续登录两次，第二次返回的 lastLoginTime = 第一次登录时间	1h
+P0-2	登录失败无限制	攻击者可无限次试密码，弱口令账号秒破	Redis 计数器：key=login:fail:{username}，5 次失败锁定 15 分钟；无 Redis 用 ConcurrentHashMap 内存计数（重启失效可接受）	新增 LoginAttemptService，接入 UserController.login	连续输错 5 次后返回"账号已锁定，请 15 分钟后再试"，"第 6 次请求日志可见 认证失败 - type: IllegalStateException，且响应耗时 < 50ms"（不跑 BCrypt 是快的最直观证据）	2h
+P0-3	isEnabled() 未反映 status	数据库中 status=0 的禁用账号仍可正常登录，属于逻辑漏洞	SecurityUser.isEnabled() 改为 return user.getStatus() != null && user.getStatus() == 1；isAccountNonLocked/NonExpired 视业务返回 true	SecurityUser.java	手动把某用户 status=0，用正确密码登录返回"账号已禁用"（DisabledException）	30min
+P0-4	默认角色不存在只 warn	用户注册成功但 authorities=[]，所有 @PreAuthorize 接口都 403，用户只觉得"系统坏了"	改成 throw new IllegalStateException("默认角色未初始化，请联系管理员")；或保留注册成功但登录返回 roles: [] 让前端提示	AuthService.register	明确："返回 {code: 5001, message: '默认角色未初始化，请联系管理员'}，且 sys_user 表没有新增记录"（事务回滚验证），不产生"孤儿用户"，明确"注册失败"策略：默认角色不存在时 throw（不要 warn），避免产生"已注册但永远 403"的孤儿用户。这条我建议从"或保留注册成功"改成强制失败	30min
+P0-5	用户名唯一索引 vs 逻辑删除	uk_sys_user_username(username) 不含 deleted，逻辑删除后用户名永久被占用，重注册直接撞唯一索引	三选一：①加 UNIQUE(username, deleted)（仅能删一次）；②deleted 改 BIGINT 存删除时间戳；③删除时 username = CONCAT(username,'#DEL#',id)	sys_user DDL + SysInfo 逻辑删除配置	需要前置：目前没有"删除用户"接口。要么 P0-5 顺带加一个 DELETE /api/admin/users/{id}，要么标注"待有删除接口后验证，先用手工 SQL 验证"成功	1h
+P0-6	@TableName 未确认	SysInfo/SysRole 若无 @TableName，BaseMapper.insert 会操作 sys_info/sys_role 表（不存在），运行时崩溃	在 SysInfo 上加 @TableName("sys_user")，SysRole 上加 @TableName("sys_role")	SysInfo.java、SysRole.java	启动日志无 Table doesn't exist；注册/登录全链路跑通	15min
+P0-7	SysUser.deleted 缺 @TableLogic	你贴的 SysUser 只有 private Integer deleted;，没有 @TableLogic 注解。这意味着：selectById、selectCount、selectList 会查到已删除用户。方案 C 依赖 @TableLogic 在 SELECT 时自动追加 deleted=0，不加注解整个方案 C 就失效了	极高
+P0-8	SysInfoMapper → SysUserMapper 全量替换	你之前的 SysInfoMapper、UserDetailsServiceImpl、AuthService 里全部引用 SysInfo/SysInfoMapper。现在实体叫 SysUser，XML namespace、resultMap type、Service 层注入都要同步改，否则编译不过	高（阻塞编译）
+P0-9	MetaObjectHandler 是否已实现	SysUser.createTime/updateTime 用了 @TableField(fill = FieldFill.INSERT/INSERT_UPDATE)，但必须有 MetaObjectHandler Bean 才能自动填充。如果没有：① 注册时 createTime/updateTime 为 null → 数据库中为默认值/报错；② P0-1 更新 last_login_time 时 update_time 不刷新
+P0-10	LoginResponse 加 lastLoginTime	P0-1 的验收标准是"第二次登录返回的 lastLoginTime = 第一次登录时间"，但你现在的 LoginResponse 只有 {token, username}，根本没有这个字段。这条要么现在补，要么把 P0-1 的验收改成"查数据库确认"。建议补字段，让前端能展示"上次登录：2026-10-26 12:00"
+P0-11	SecurityConfig 放行规则补充	做完 P1-2/P1-3 后要加 /api/auth/refresh（不能 permitAll，要自己验 refreshToken，但 Spring Security 层面也不能要求 accessToken，否则 refresh 就没意义了）和 /api/auth/logout（需要 accessToken，不能放行）。这两条现在清单里没有，容易在 P1-2 实施时踩坑
+P0-12	Redis 环境预检	P0-2、P1-2、P1-3 全部依赖 Redis。上线前先确认：① spring-boot-starter-data-redis 依赖在不在；② application.yml 的 Redis 配置；③ redis-cli ping 能通。P0-2 动手前先做这一步，否则写一半发现没 Redis
+🟡 P1：上线前应该补（影响体验/安全）
+#	问题	现状	修复方案要点	涉及文件/类	验收标准	预估
+P1-1	登录返回信息太少	仅返回 {token, username}，前端无法渲染菜单/按钮，无法提示"即将过期"	扩展 LoginResponse：nickname、roles[]、permissions[]、expiresIn、expiresAt	LoginResponse.java、UserController.login	响应 JSON 包含至少 roles + permissions + expiresAt，LoginResponse 增加 nickname、avatar（如果后续有）、deviceSessions（配合 P1-2 展示"我登录的设备"）	1h
+P1-2	无 Refresh Token	accessToken 2h 过期，用户每隔 2h 必须重新输密码，体验极差	加 sys_refresh_token 表 + POST /api/auth/refresh 接口；refreshToken 7 天有效，可主动撤销	新建表、RefreshTokenService、AuthController.refresh	用 accessToken 调受保护接口 → 过期 → 用 refreshToken 换新 token → 正常访问	4h
+P1-3	无登出接口	JWT 无状态，前端只能删 localStorage；token 被窃取后有效期内一直可用	最小可用：删 sys_refresh_token 记录；进阶：Redis 存 jti 黑名单（与 accessToken 剩余有效期一致）	AuthController.logout、TokenBlacklistService	登出后原 token 调用受保护接口返回 401	2h
+P1-4	无登录上下文记录	表里只有 last_login_time，无 IP/UA/结果；排查异常登录无据可查	新建 sys_login_log 表（username, ip, ua, success, reason, create_time），AuthService 成功/失败各记一条	sys_login_log DDL、AuthService	登录成功/失败后 sys_login_log 各产生一条记录	2h
+P1-5	CORS 实际未生效	.cors(cors -> cors.configure(http)) 只是启用过滤器，没配来源；跨域浏览器一律拒绝	注册 CorsConfigurationSource Bean：允许 origin、method、header、credential；SecurityConfig 用 .cors(Customizer.withDefaults())	SecurityConfig 或新建 CorsConfig	从 http://localhost:5173 发起跨域请求，响应头含 Access-Control-Allow-Origin	1h

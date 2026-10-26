@@ -3,7 +3,7 @@ package com.womi.businessmodule.dto;
 import lombok.Data;
 
 @Data
-public class RegisterRequest {
+public class DeviceRegisterRequest {
     /** 设备 MAC */
     private String deviceId;
     /** 产品型号 */

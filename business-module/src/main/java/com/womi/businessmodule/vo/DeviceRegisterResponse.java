@@ -6,7 +6,7 @@ import lombok.Data;
 import java.util.Map;
 
 @Data
-public class RegisterResponse {
+public class DeviceRegisterResponse {
     /**
      * 是否成功
      */
@@ -35,10 +35,10 @@ public class RegisterResponse {
     /**
      * 成功响应
      */
-    public static RegisterResponse success(Map<String, Object> mqtt,
-                                           Map<String, Object> will,
-                                           Map<String, Object> config) {
-        RegisterResponse response = new RegisterResponse();
+    public static DeviceRegisterResponse success(Map<String, Object> mqtt,
+                                                 Map<String, Object> will,
+                                                 Map<String, Object> config) {
+        DeviceRegisterResponse response = new DeviceRegisterResponse();
         response.setSuccess(true);
         response.setMqtt(mqtt);
         response.setWill(will);
@@ -46,8 +46,8 @@ public class RegisterResponse {
         return response;
     }
 
-    public static RegisterResponse error(MqttErrorCode errorCode) {
-        RegisterResponse response = new RegisterResponse();
+    public static DeviceRegisterResponse error(MqttErrorCode errorCode) {
+        DeviceRegisterResponse response = new DeviceRegisterResponse();
         response.setSuccess(false);
         response.setError(errorCode.getCode());
         response.setMessage(errorCode.getMessage());
@@ -57,8 +57,8 @@ public class RegisterResponse {
     /**
      * 带自定义消息的错误响应
      */
-    public static RegisterResponse error(MqttErrorCode errorCode, String customMessage) {
-        RegisterResponse response = new RegisterResponse();
+    public static DeviceRegisterResponse error(MqttErrorCode errorCode, String customMessage) {
+        DeviceRegisterResponse response = new DeviceRegisterResponse();
         response.setSuccess(false);
         response.setError(errorCode.getCode());
         response.setMessage(customMessage != null ? customMessage : errorCode.getMessage());

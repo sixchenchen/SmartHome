@@ -40,5 +40,6 @@ public class SysRole {
     private LocalDateTime updateTime;
 
     /** 逻辑删除：0否，1是 */
+    @TableLogic(value = "0", delval = "1")
     private Integer deleted;
 }

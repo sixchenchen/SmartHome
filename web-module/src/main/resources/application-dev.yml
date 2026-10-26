@@ -65,8 +65,3 @@ firmware:
   upload-dir: D:/data/firmware/
   base-url: http://localhost:8000/firmware/
 
-logging:
-  level:
-    com.womi: debug
-    com.womi.business.mapper: debug
-    org.eclipse.paho: DEBUG

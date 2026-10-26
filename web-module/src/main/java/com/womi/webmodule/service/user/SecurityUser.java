@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.user.impl;
+package com.womi.webmodule.service.user;
 
 import com.womi.businessmodule.model.sys.SysUser;
 import lombok.Getter;

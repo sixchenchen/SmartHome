@@ -66,6 +66,8 @@ public final class ErrorInfoConstants {
     /** 网络异常 */
     public static final String NETWORK_ERROR = "网络异常";
 
+    public static final String JWT_SECRET_NOT_CONFIG = "jwt.secret 未配置";
+    public static final String JWT_SECRET_TOO_SHORT = "jwt.secret 至少32字节";
     /**
      * 格式化：拼接自定义信息
      * 例： format(FIRMWARE_EXIST, "version=1.0.1") →  "固件已存在: version=1.0.1"

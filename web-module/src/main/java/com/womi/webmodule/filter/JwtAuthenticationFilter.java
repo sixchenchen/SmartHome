@@ -1,12 +1,16 @@
 package com.womi.webmodule.filter;
 
 import com.womi.commonmodule.utils.JwtTokenUtil;
+import com.womi.webmodule.service.user.impl.TokenBlacklistService;
 import com.womi.webmodule.service.user.impl.UserDetailsServiceImpl;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,12 +21,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenUtil jwtTokenUtil;
     private final UserDetailsServiceImpl userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -36,6 +42,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = header.substring(7);
         try {
+            String jti = jwtTokenUtil.extractJti(token); // 提取 jti
+
+            // 检查黑名单
+            if (jti != null && tokenBlacklistService.isBlacklisted(jti)) {
+                filterChain.doFilter(request, response); // 已登出，放行让 Security 拦截 (返回401)
+                return;
+            }
             String username = jwtTokenUtil.extractUsername(token);
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
@@ -48,8 +61,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
-        } catch (Exception ignored) {
-            // token 无效时直接放行，后续由 ExceptionTranslationFilter 返回 401
+        } catch (ExpiredJwtException e) {
+            log.debug("Token 已过期: {}", request.getRequestURI());
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Token 无效: {} ({})", e.getMessage(), request.getRequestURI());
         }
         filterChain.doFilter(request, response);
     }

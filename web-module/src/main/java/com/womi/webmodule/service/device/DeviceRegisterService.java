@@ -1,8 +1,8 @@
 package com.womi.webmodule.service.device;
 
 
-import com.womi.businessmodule.dto.RegisterRequest;
-import com.womi.businessmodule.vo.RegisterResponse;
+import com.womi.businessmodule.dto.DeviceRegisterRequest;
+import com.womi.businessmodule.vo.DeviceRegisterResponse;
 
 public interface DeviceRegisterService {
 
@@ -12,5 +12,5 @@ public interface DeviceRegisterService {
      * @param request 注册请求
      * @return 注册响应（含 MQTT 凭据）
      */
-    RegisterResponse register(RegisterRequest request);
+    DeviceRegisterResponse register(DeviceRegisterRequest request);
 }

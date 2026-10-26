@@ -31,7 +31,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 
 /**
- * MQTT 配置：运行时（1883）+ 注册（1884）双通道
+ * MQTT 配置：运行时（8883）+ 注册（8884）双通道
  */
 @Slf4j
 @Configuration
@@ -181,27 +181,7 @@ public class MqttConfig {
     }
 
     /**
-     * 从 classpath 加载 CA 证书，构建 SSLSocketFactory
-     */
-    private SSLSocketFactory buildSslSocketFactory(String caCertPath) throws Exception {
-        CertificateFactory cf = CertificateFactory.getInstance("X.509");
-        try (InputStream is = new ClassPathResource(caCertPath).getInputStream()) {
-            Certificate ca = cf.generateCertificate(is);
-            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-            ks.load(null, null);
-            ks.setCertificateEntry("ca", ca);
-
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(ks);
-
-            SSLContext ctx = SSLContext.getInstance("TLS");
-            ctx.init(null, tmf.getTrustManagers(), null);
-            return ctx.getSocketFactory();
-        }
-    }
-
-    /**
-     * 【核心修改】加载 CA 证书和 Java 客户端 P12 证书，构建双向认证的 SSLSocketFactory
+     * 加载 CA 证书和 Java 客户端 P12 证书，构建双向认证的 SSLSocketFactory
      */
     private SSLSocketFactory buildSslSocketFactory(String caCertPath, String p12Path, String p12Password) throws Exception {
         // 1. 加载客户端身份（KeyManager）

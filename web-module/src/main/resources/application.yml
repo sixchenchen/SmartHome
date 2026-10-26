@@ -69,6 +69,16 @@ firmware:
 my:
   jwt:
     # 设置jwt签名加密时使用的秘钥
-    secret: itcast
+    secret: dGhpc2lzYXZlcnlzZWNyZXRrZXlmb3Jqd3R0b2tlbnVzZTEyMzQ1Ng==
     # 设置jwt过期时间
     expiration-ms: 86400000
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+logging:
+  level:
+    com.womi: debug
+    com.womi.business.mapper: debug
+#    org.eclipse.paho: DEBUG
