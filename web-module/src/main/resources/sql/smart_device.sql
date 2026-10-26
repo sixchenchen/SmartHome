@@ -11,7 +11,7 @@
  Target Server Version : 80411 (8.4.11)
  File Encoding         : 65001
 
- Date: 26/10/2026 11:12:22
+ Date: 26/10/2026 18:06:01
 */
 
 SET NAMES utf8mb4;
@@ -1164,6 +1164,53 @@ CREATE TABLE `device_whitelist`  (
 INSERT INTO `device_whitelist` VALUES (1, 'B4BFE90CDBA1', '2610171622', 1, NULL, '2026-10-17 16:22:22.910', '2026-10-17 16:22:22.910');
 
 -- ----------------------------
+-- Table structure for sys_login_log
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_login_log`;
+CREATE TABLE `sys_login_log`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+  `username` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '尝试登录的用户名',
+  `ip` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '客户端IP',
+  `user_agent` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '浏览器/客户端 UA',
+  `status` tinyint NOT NULL COMMENT '状态：1-成功，0-失败',
+  `message` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '提示消息/失败原因',
+  `login_time` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '登录时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_username`(`username` ASC) USING BTREE,
+  INDEX `idx_login_time`(`login_time` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 27 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户登录日志表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of sys_login_log
+-- ----------------------------
+INSERT INTO `sys_login_log` VALUES (1, 'public1', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:55:48.565');
+INSERT INTO `sys_login_log` VALUES (2, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 16:56:11.482');
+INSERT INTO `sys_login_log` VALUES (3, 'admin', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:56:26.942');
+INSERT INTO `sys_login_log` VALUES (4, 'admin', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 16:56:37.634');
+INSERT INTO `sys_login_log` VALUES (5, 'babo', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:57:16.935');
+INSERT INTO `sys_login_log` VALUES (6, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:57:31.991');
+INSERT INTO `sys_login_log` VALUES (7, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:57:32.699');
+INSERT INTO `sys_login_log` VALUES (8, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:57:33.281');
+INSERT INTO `sys_login_log` VALUES (9, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:57:33.895');
+INSERT INTO `sys_login_log` VALUES (10, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '用户名或密码错误', '2026-10-26 16:57:34.473');
+INSERT INTO `sys_login_log` VALUES (11, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '账号已锁定，请稍后再试', '2026-10-26 16:57:34.746');
+INSERT INTO `sys_login_log` VALUES (12, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '账号已锁定，请稍后再试', '2026-10-26 16:57:44.786');
+INSERT INTO `sys_login_log` VALUES (13, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '账号已锁定，请稍后再试', '2026-10-26 16:58:32.080');
+INSERT INTO `sys_login_log` VALUES (14, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 0, '账号已禁用', '2026-10-26 16:58:44.031');
+INSERT INTO `sys_login_log` VALUES (15, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:16:40.969');
+INSERT INTO `sys_login_log` VALUES (16, 'public', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:22:47.817');
+INSERT INTO `sys_login_log` VALUES (17, 'admin', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:24:44.712');
+INSERT INTO `sys_login_log` VALUES (18, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:25:35.367');
+INSERT INTO `sys_login_log` VALUES (19, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:27:28.119');
+INSERT INTO `sys_login_log` VALUES (20, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:29:38.381');
+INSERT INTO `sys_login_log` VALUES (21, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:30:21.640');
+INSERT INTO `sys_login_log` VALUES (22, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:32:14.886');
+INSERT INTO `sys_login_log` VALUES (23, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:40:46.453');
+INSERT INTO `sys_login_log` VALUES (24, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:41:58.326');
+INSERT INTO `sys_login_log` VALUES (25, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:47:37.622');
+INSERT INTO `sys_login_log` VALUES (26, 'tom123', '0:0:0:0:0:0:0:1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0', 1, '登录成功', '2026-10-26 17:49:28.473');
+
+-- ----------------------------
 -- Table structure for sys_permission
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_permission`;
@@ -1182,11 +1229,67 @@ CREATE TABLE `sys_permission`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_permission_code`(`perm_code` ASC) USING BTREE,
   INDEX `idx_sys_permission_resource`(`resource` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '权限表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 31 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '权限表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_permission
 -- ----------------------------
+INSERT INTO `sys_permission` VALUES (13, 'device:list', '查询设备列表', 'API', 'device', 'read', '获取设备分页列表', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (14, 'device:read', '查看设备详情', 'API', 'device', 'read', '获取单台设备详细信息', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (15, 'device:create', '添加设备', 'API', 'device', 'create', '录入新设备', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (16, 'device:update', '修改设备', 'API', 'device', 'update', '修改设备名称、位置等信息', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (17, 'device:delete', '删除设备', 'API', 'device', 'delete', '移除设备', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (18, 'device:bind', '绑定设备', 'API', 'device', 'update', '用户绑定设备', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (19, 'device:unbind', '解绑设备', 'API', 'device', 'update', '用户解绑设备', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (20, 'command:send', '下发指令', 'API', 'command', 'create', '向设备下发控制指令(mos/led/servo等)', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (21, 'firmware:list', '查询固件', 'API', 'firmware', 'read', '查看固件版本列表', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (22, 'firmware:upload', '上传固件', 'API', 'firmware', 'create', '上传新的固件包', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (23, 'ota:create', '发起OTA', 'API', 'ota', 'create', '发起固件升级任务', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (24, 'ota:cancel', '取消OTA', 'API', 'ota', 'update', '取消正在进行的升级任务', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (25, 'alert:list', '查询告警', 'API', 'alert', 'read', '查看告警记录', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (26, 'alert:handle', '处理告警', 'API', 'alert', 'update', '确认或解决告警', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (27, 'user:list', '查询用户', 'API', 'user', 'read', '查看用户列表', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (28, 'user:create', '创建用户', 'API', 'user', 'create', '管理员添加用户', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (29, 'user:update', '修改用户', 'API', 'user', 'update', '修改用户状态或角色', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_permission` VALUES (30, 'system:config', '系统配置', 'API', 'system', 'update', '修改系统级参数', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+
+-- ----------------------------
+-- Table structure for sys_refresh_token
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_refresh_token`;
+CREATE TABLE `sys_refresh_token`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL COMMENT '用户ID',
+  `token_hash` char(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT 'RefreshToken的SHA256哈希',
+  `device_type` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'web' COMMENT '设备类型',
+  `expires_at` datetime(3) NOT NULL COMMENT '过期时间',
+  `revoked` tinyint NOT NULL DEFAULT 0 COMMENT '0-有效 1-已撤销',
+  `create_time` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `update_time` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_token_hash`(`token_hash` ASC) USING BTREE,
+  INDEX `idx_user_revoked`(`user_id` ASC, `revoked` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 17 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户Refresh Token表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of sys_refresh_token
+-- ----------------------------
+INSERT INTO `sys_refresh_token` VALUES (1, 6, '94ca57cdac2f6e40b18b55fbd7651d1609cd44bc77e008b3d722c54bbc0654ed', 'web', '2026-11-02 17:16:40.865', 0, '2026-10-26 17:16:40.868', '2026-10-26 17:16:40.868');
+INSERT INTO `sys_refresh_token` VALUES (2, 6, '242143e2441c410f9377e2adf787ead60666ffd0377cc9563eb15dd469745a9b', 'web', '2026-11-02 17:22:47.729', 0, '2026-10-26 17:22:47.733', '2026-10-26 17:22:47.733');
+INSERT INTO `sys_refresh_token` VALUES (3, 5, '63c86c169546d4dcbbea92aa2987474f981877bf2442a3e589a4a8ac18e9c29f', 'web', '2026-11-02 17:24:44.703', 0, '2026-10-26 17:24:44.704', '2026-10-26 17:24:44.704');
+INSERT INTO `sys_refresh_token` VALUES (4, 1, '4358d5811368131a7588522a5d5715501748a6410f838b221d3f877a6ff61ab7', 'web', '2026-11-02 17:25:35.358', 0, '2026-10-26 17:25:35.358', '2026-10-26 17:25:35.358');
+INSERT INTO `sys_refresh_token` VALUES (5, 1, '682af4b65f09ab6e610dedb634a0efcda35de9bc6bb1be81aa9d2b3456a492c5', 'web', '2026-11-02 17:27:28.113', 1, '2026-10-26 17:27:28.113', '2026-10-26 17:28:48.449');
+INSERT INTO `sys_refresh_token` VALUES (6, 1, '51744a53fe318ba9b8e78bd8bf76c5e2ebdd3041fa1ae3f794767369c9023745', 'web', '2026-11-02 17:29:38.371', 0, '2026-10-26 17:29:38.372', '2026-10-26 17:29:38.372');
+INSERT INTO `sys_refresh_token` VALUES (7, 1, 'f07a3ccb4d2a3eeaff586823a0f84abbce1301d0185839a183f6b91ada1671a1', 'web', '2026-11-02 17:30:21.635', 1, '2026-10-26 17:30:21.635', '2026-10-26 17:30:59.296');
+INSERT INTO `sys_refresh_token` VALUES (8, 1, '89c1f3f5f6ec777792c8f138c0726665a2f33a48821a3ca4033b3d5a96b8b59d', 'web', '2026-11-02 17:32:14.877', 1, '2026-10-26 17:32:14.877', '2026-10-26 17:32:49.278');
+INSERT INTO `sys_refresh_token` VALUES (9, 1, '3cddd7257bc1849692f53fdaca27c1e2cc89cf146bc71e468876724981756c54', 'web', '2026-11-02 17:32:49.302', 0, '2026-10-26 17:32:49.302', '2026-10-26 17:32:49.302');
+INSERT INTO `sys_refresh_token` VALUES (10, 1, 'e77949feb3cc315181ad4d97ae74f9b6e3a77ecb71f23ec71c9d02cbf412d906', 'web', '2026-11-02 17:40:46.446', 1, '2026-10-26 17:40:46.446', '2026-10-26 17:41:40.464');
+INSERT INTO `sys_refresh_token` VALUES (11, 1, '4d21b71caa1210cc575500f3cd7ace337e85f3391c5dd0aff3dfaa6b9a11b963', 'web', '2026-11-02 17:41:58.318', 1, '2026-10-26 17:41:58.319', '2026-10-26 17:42:45.480');
+INSERT INTO `sys_refresh_token` VALUES (12, 1, '528124e34542ff5ab2d15382c5cb3ae4538a69c27be319d8a55bef26bb8193db', 'web', '2026-11-02 17:42:45.487', 0, '2026-10-26 17:42:45.487', '2026-10-26 17:42:45.487');
+INSERT INTO `sys_refresh_token` VALUES (13, 1, '6c2cefe23297b1ae046661ec895fe590d026992e329bfad473869722a447f96e', 'web', '2026-11-02 17:47:37.617', 1, '2026-10-26 17:47:37.617', '2026-10-26 17:48:26.874');
+INSERT INTO `sys_refresh_token` VALUES (14, 1, 'c9b4ea1843a4d4313a9d081b1857d46ff1b2dd77ffe25002d32267b0798a25b6', 'web', '2026-11-02 17:48:26.879', 1, '2026-10-26 17:48:26.879', '2026-10-26 17:48:48.214');
+INSERT INTO `sys_refresh_token` VALUES (15, 1, 'ad11b99aba2d0a940ec3a175c0aa4deff5beef5eb7b6f8840330f91612bdd4c1', 'web', '2026-11-02 17:48:48.222', 0, '2026-10-26 17:48:48.222', '2026-10-26 17:48:48.222');
+INSERT INTO `sys_refresh_token` VALUES (16, 1, 'e7e08f9e228919c5611ea1b08a1e0799265086ec147162787cd086a4bcd91c8c', 'web', '2026-11-02 17:49:28.467', 1, '2026-10-26 17:49:28.467', '2026-10-26 17:49:51.624');
 
 -- ----------------------------
 -- Table structure for sys_role
@@ -1204,11 +1307,14 @@ CREATE TABLE `sys_role`  (
   `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除：0否，1是',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_role_code`(`role_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_role
 -- ----------------------------
+INSERT INTO `sys_role` VALUES (4, 'ADMIN', '超级管理员', '系统最高权限，管理所有设备、用户及系统配置', 1, 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_role` VALUES (5, 'OPS', '运维人员', '负责设备管理、固件升级、告警处理，不可修改系统核心配置', 1, 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
+INSERT INTO `sys_role` VALUES (6, 'USER', '普通用户', '终端用户，只能查看和控制自己绑定的设备', 1, 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
 
 -- ----------------------------
 -- Table structure for sys_role_info
@@ -1222,11 +1328,14 @@ CREATE TABLE `sys_role_info`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_user_role`(`user_id` ASC, `role_id` ASC) USING BTREE,
   INDEX `idx_sys_user_role_role`(`role_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户-角色关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户-角色关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_role_info
 -- ----------------------------
+INSERT INTO `sys_role_info` VALUES (1, 4, 6, '2026-10-26 16:06:00');
+INSERT INTO `sys_role_info` VALUES (2, 5, 4, '2026-10-26 16:23:05');
+INSERT INTO `sys_role_info` VALUES (3, 6, 6, '2026-10-26 16:26:56');
 
 -- ----------------------------
 -- Table structure for sys_role_permission
@@ -1240,11 +1349,48 @@ CREATE TABLE `sys_role_permission`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_role_permission`(`role_id` ASC, `permission_id` ASC) USING BTREE,
   INDEX `idx_sys_role_permission_perm`(`permission_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 19 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色-权限关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 72 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色-权限关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_role_permission
 -- ----------------------------
+INSERT INTO `sys_role_permission` VALUES (19, 4, 26, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (20, 4, 25, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (21, 4, 20, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (22, 4, 18, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (23, 4, 15, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (24, 4, 17, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (25, 4, 13, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (26, 4, 14, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (27, 4, 19, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (28, 4, 16, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (29, 4, 21, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (30, 4, 22, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (31, 4, 24, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (32, 4, 23, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (33, 4, 30, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (34, 4, 28, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (35, 4, 27, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (36, 4, 29, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (50, 5, 25, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (51, 5, 26, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (52, 5, 20, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (53, 5, 13, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (54, 5, 14, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (55, 5, 15, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (56, 5, 16, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (57, 5, 17, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (58, 5, 18, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (59, 5, 19, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (60, 5, 21, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (61, 5, 22, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (62, 5, 23, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (63, 5, 24, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (65, 6, 20, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (66, 6, 18, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (67, 6, 13, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (68, 6, 14, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (69, 6, 19, '2026-10-26 16:03:52');
 
 -- ----------------------------
 -- Table structure for sys_user
@@ -1265,10 +1411,15 @@ CREATE TABLE `sys_user`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_user_username`(`username` ASC) USING BTREE,
   INDEX `idx_sys_user_status`(`status` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '用户表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_user
 -- ----------------------------
+INSERT INTO `sys_user` VALUES (1, 'tom123', '$2a$12$tEFa.HGblOLYEOOUhB9B.u/3iUQdzPgKoi5puXnp4Itxqiz5QAATC', 'tom123', '123@qq.com', '17786174112', 1, '2026-10-26 17:49:28', '2026-10-26 11:53:23', '2026-10-26 17:49:28', 0);
+INSERT INTO `sys_user` VALUES (2, 'kity123#DEL#2', '$2a$12$iZlVyeaysy/Nhs/YC7.sxOh6CDw6iF1H/5/XwRBGORFJp/0YUSq9G', 'kity123', '123@qq.com', '17786174112', 1, '2026-10-26 15:49:27', '2026-10-26 14:47:38', '2026-10-26 17:24:57', 1);
+INSERT INTO `sys_user` VALUES (4, 'babo123#DEL#4', '$2a$12$AN/XgPPH3FwFqBUEx5ayKeeY7wzHsH.gwnuUfz6FY0v6HJAACyJ9m', 'babo123', '123@qq.com', '17786174112', 1, '2026-10-26 16:24:01', '2026-10-26 16:06:00', '2026-10-26 16:34:23', 1);
+INSERT INTO `sys_user` VALUES (5, 'admin', '$2a$12$wThUxuRGa5RP6rpEtpfKAerFg0OOo312Wo5aqSUEWvflU/Z0tPIim', 'admin123', '123@qq.com', '17786174112', 1, '2026-10-26 17:24:45', '2026-10-26 16:23:05', '2026-10-26 17:24:45', 0);
+INSERT INTO `sys_user` VALUES (6, 'public', '$2a$12$Vs84o9vWNOPlTWSFoJboD.uRIhbzR18sCr/D/YtcGbbynee69LNFO', 'public123', '123@qq.com', '17786174112', 1, '2026-10-26 17:22:48', '2026-10-26 16:26:56', '2026-10-26 17:22:48', 0);
 
 SET FOREIGN_KEY_CHECKS = 1;
