@@ -1,16 +1,19 @@
-package com.womi.webmodule.service.user.impl;
+package com.womi.webmodule.service.auth;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.womi.businessmodule.mapper.sys.SysRefreshTokenMapper;
 import com.womi.businessmodule.model.sys.SysRefreshToken;
+import com.womi.commonmodule.constants.UserConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.UUID;
 
 @Service
@@ -31,8 +34,8 @@ public class RefreshTokenService {
         SysRefreshToken entity = new SysRefreshToken();
         entity.setUserId(userId);
         entity.setTokenHash(hashToken(rawToken));
-        entity.setDeviceType(deviceType != null && !deviceType.isEmpty() ? deviceType : "web");
-        entity.setExpiresAt(LocalDateTime.now().plusDays(7)); // 7天有效
+        entity.setDeviceType(StringUtils.hasText(deviceType) ? deviceType : UserConstants.DEFAULT_DEVICE_TYPE);
+        entity.setExpiresAt(LocalDateTime.now().plusDays(UserConstants.REFRESH_TOKEN_EXPIRE_DAYS));
         entity.setRevoked(0);
         refreshTokenMapper.insert(entity);
 
@@ -81,17 +84,12 @@ public class RefreshTokenService {
      */
     private String hashToken(String token) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            // 👈 使用常量
+            MessageDigest digest = MessageDigest.getInstance(UserConstants.HASH_ALGORITHM_SHA256);
             byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
+            return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 算法不存在", e);
+            throw new IllegalStateException("系统缺少 " + UserConstants.HASH_ALGORITHM_SHA256 + " 算法", e);
         }
     }
 }

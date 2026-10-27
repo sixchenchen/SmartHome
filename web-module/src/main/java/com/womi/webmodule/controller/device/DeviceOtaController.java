@@ -4,7 +4,7 @@ import com.womi.commonmodule.response.ApiResponse;
 import com.womi.businessmodule.dto.SendCommandRequest;
 import com.womi.businessmodule.vo.DeviceOtaProgressVO;
 import com.womi.businessmodule.vo.DeviceOtaStartResponse;
-import com.womi.webmodule.service.device.DeviceOtaService;
+import com.womi.webmodule.service.mqtt.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

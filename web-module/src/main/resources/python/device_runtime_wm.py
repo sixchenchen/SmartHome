@@ -41,7 +41,7 @@ MQTT_PORT = 8883
 CLIENT_ID = "device-B4BFE90CDBA1"
 USERNAME = "dev_B4BFE90CDBA1"
 # ==================== 配置替换注册的密码====================
-PASSWORD = "SgQiT28TTtXv66H2" 
+PASSWORD = "dSXAXrFBZweS9Fpa" 
 KEEP_ALIVE = 60
 
 DEVICE_ID = "B4BFE90CDBA1"

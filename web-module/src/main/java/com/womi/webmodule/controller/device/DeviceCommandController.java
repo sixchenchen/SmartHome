@@ -6,7 +6,7 @@ import com.womi.businessmodule.vo.CommandStatsVO;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.businessmodule.dto.SendCommandRequest;
-import com.womi.webmodule.service.device.DeviceControlService;
+import com.womi.webmodule.service.mqtt.DeviceControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;

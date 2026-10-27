@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.device.impl;
+package com.womi.webmodule.service.mqtt.impl;
 
 import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.model.device.DeviceInfo;
@@ -11,7 +11,7 @@ import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
-import com.womi.webmodule.service.device.DeviceControlService;
+import com.womi.webmodule.service.mqtt.DeviceControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -1,5 +1,6 @@
-package com.womi.webmodule.service.user.impl;
+package com.womi.webmodule.service.auth;
 
+import com.womi.commonmodule.constants.UserConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -10,8 +11,6 @@ import java.util.Date;
 @Service
 @RequiredArgsConstructor
 public class TokenBlacklistService {
-
-    private static final String BLACKLIST_KEY_PREFIX = "token:blacklist:";
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -24,8 +23,8 @@ public class TokenBlacklistService {
         if (ttlMillis > 0) {
             // 将 jti 存入 Redis，过期时间与 Token 的剩余寿命一致，过期后自动清理
             redisTemplate.opsForValue().set(
-                    BLACKLIST_KEY_PREFIX + jti,
-                    "1",
+                    UserConstants.REDIS_TOKEN_BLACKLIST_PREFIX + jti,
+                    UserConstants.REDIS_BLACKLIST_VALUE,
                     Duration.ofMillis(ttlMillis)
             );
         }
@@ -35,6 +34,6 @@ public class TokenBlacklistService {
      * 检查 Token 是否在黑名单中
      */
     public boolean isBlacklisted(String jti) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_KEY_PREFIX + jti));
+        return Boolean.TRUE.equals(redisTemplate.hasKey(UserConstants.REDIS_TOKEN_BLACKLIST_PREFIX + jti));
     }
 }

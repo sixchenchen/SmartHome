@@ -1,6 +1,6 @@
-package com.womi.webmodule.service.device.impl;
+package com.womi.webmodule.service.mqtt.impl;
 
-import com.womi.webmodule.service.device.NonceService;
+import com.womi.webmodule.service.mqtt.NonceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

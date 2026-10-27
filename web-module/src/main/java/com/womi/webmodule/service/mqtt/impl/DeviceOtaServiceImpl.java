@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.device.impl;
+package com.womi.webmodule.service.mqtt.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.womi.businessmodule.model.device.DeviceCommand;
@@ -18,8 +18,8 @@ import com.womi.businessmodule.dto.SendCommandRequest;
 import com.womi.businessmodule.dto.DeviceOtaParam;
 import com.womi.businessmodule.vo.DeviceOtaProgressVO;
 import com.womi.businessmodule.vo.DeviceOtaStartResponse;
-import com.womi.webmodule.service.device.DeviceControlService;
-import com.womi.webmodule.service.device.DeviceOtaService;
+import com.womi.webmodule.service.mqtt.DeviceControlService;
+import com.womi.webmodule.service.mqtt.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

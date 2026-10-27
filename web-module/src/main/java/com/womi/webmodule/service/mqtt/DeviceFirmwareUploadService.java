@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.device;
+package com.womi.webmodule.service.mqtt;
 
 import com.womi.businessmodule.vo.FirmwareUploadResponse;
 import com.womi.businessmodule.vo.FirmwareVO;

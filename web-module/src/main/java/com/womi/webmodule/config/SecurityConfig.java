@@ -3,7 +3,7 @@ package com.womi.webmodule.config;
 import com.womi.webmodule.filter.JwtAuthenticationFilter;
 import com.womi.webmodule.handler.JsonAccessDeniedHandler;
 import com.womi.webmodule.handler.JsonAuthenticationEntryPoint;
-import com.womi.webmodule.service.user.impl.UserDetailsServiceImpl;
+import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

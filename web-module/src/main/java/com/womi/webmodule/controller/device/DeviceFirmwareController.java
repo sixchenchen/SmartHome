@@ -4,7 +4,7 @@ package com.womi.webmodule.controller.device;
 import com.womi.businessmodule.vo.FirmwareUploadResponse;
 import com.womi.businessmodule.vo.FirmwareVO;
 import com.womi.commonmodule.response.ApiResponse;
-import com.womi.webmodule.service.device.DeviceFirmwareUploadService;
+import com.womi.webmodule.service.mqtt.DeviceFirmwareUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;

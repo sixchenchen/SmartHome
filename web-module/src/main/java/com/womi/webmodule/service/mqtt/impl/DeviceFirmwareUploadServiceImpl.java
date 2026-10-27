@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.device.impl;
+package com.womi.webmodule.service.mqtt.impl;
 
 import com.womi.businessmodule.model.device.DeviceFirmware;
 import com.womi.businessmodule.service.device.DeviceFirmwareService;
@@ -10,7 +10,7 @@ import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.DateTimeUtils;
 import com.womi.businessmodule.vo.FirmwareUploadResponse;
 import com.womi.businessmodule.vo.FirmwareVO;
-import com.womi.webmodule.service.device.DeviceFirmwareUploadService;
+import com.womi.webmodule.service.mqtt.DeviceFirmwareUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

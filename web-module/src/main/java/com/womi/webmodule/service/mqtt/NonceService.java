@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.device;
+package com.womi.webmodule.service.mqtt;
 
 /**
  * Nonce 防重放服务:用于注册接口的防重放校验，nonce 一旦被使用，短时间内不可重复。

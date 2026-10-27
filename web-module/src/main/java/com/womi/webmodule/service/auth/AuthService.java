@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.user.impl;
+package com.womi.webmodule.service.auth;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -81,8 +81,8 @@ public class AuthService {
         SysRole defaultRole = sysRoleMapper.selectOne(
                 new LambdaQueryWrapper<SysRole>()
                         .eq(SysRole::getRoleCode, UserConstants.DEFAULT_ROLE_CODE)
-                        .eq(SysRole::getStatus, 1)
-                        .eq(SysRole::getDeleted, 0)
+                        .eq(SysRole::getStatus, UserConstants.ENABLE_USER)
+                        .eq(SysRole::getDeleted, UserConstants.NOT_DELETED)
                         .last("LIMIT 1"));
         if (defaultRole == null) {
             log.error("默认角色 [{}] 未初始化，无法完成用户 [{}] 注册",
@@ -106,19 +106,17 @@ public class AuthService {
      */
     public void recordLoginSuccess(String username, HttpServletRequest request) {
         String ip = extractClientIp(request);
-        String ua = truncate(request.getHeader("User-Agent"), 512);
+        String ua = truncate(request.getHeader("User-Agent"), UserConstants.USER_AGENT_MAX_LENGTH);
 
-        // 只构造"要更新的字段"，updateTime 由 MetaObjectHandler 自动填
         SysUser update = new SysUser();
         update.setLastLoginTime(LocalDateTime.now());
 
-        int rows = sysUserMapper.update(update,
-                new LambdaUpdateWrapper<SysUser>().eq(SysUser::getUsername, username));
+        int rows = sysUserMapper.update(update, new LambdaUpdateWrapper<SysUser>().eq(SysUser::getUsername, username));
 
         if (rows == 0) {
             log.warn("记录登录成功时更新 last_login_time 失败: username={}", username);
         }
-        saveLoginLog(username, ip, ua, 1, "登录成功");
+        saveLoginLog(username, ip, ua, UserConstants.LOGIN_STATUS_SUCCESS, UserConstants.MSG_LOGIN_SUCCESS);
         log.info("用户登录成功: username={}, ip={}, ua={}", username, ip, ua);
     }
 
@@ -171,9 +169,9 @@ public class AuthService {
      */
     public void recordLoginFailure(String username, HttpServletRequest request, String reason) {
         String ip = extractClientIp(request);
-        String ua = truncate(request.getHeader("User-Agent"), 512);
+        String ua = truncate(request.getHeader("User-Agent"), UserConstants.USER_AGENT_MAX_LENGTH);
 
-        saveLoginLog(username, ip, ua, 0, reason);
+        saveLoginLog(username, ip, ua, UserConstants.LOGIN_STATUS_FAILURE, reason);
 
         log.warn("用户登录失败: username={}, ip={}, reason={}", username, ip, reason);
     }
@@ -196,48 +194,36 @@ public class AuthService {
         loginAttemptService.recordSuccess(username); // 清 Redis 锁
         recordLoginSuccess(username, request);
 
-        // 4. 组装返回
-        List<String> roles = new ArrayList<>();
-        List<String> permissions = new ArrayList<>();
-        for (GrantedAuthority authority : userDetails.getAuthorities()) {
-            String auth = authority.getAuthority();
-            if (auth.startsWith("ROLE_")) roles.add(auth.substring(5));
-            else permissions.add(auth);
-        }
-
-        return LoginResponse.builder()
-                .token(accessToken)
-                .refreshToken(refreshToken)
-                .username(username)
-                .nickname(user.getNickname() != null ? user.getNickname() : username)
-                .roles(roles)
-                .permissions(permissions)
-                .lastLoginTime(user.getLastLoginTime())
-                .expiresAt(LocalDateTime.now().plusNanos(jwtTokenUtil.getExpirationMs() * 1_000_000L))
-                .build();
+        return buildLoginResponse(userDetails, user, accessToken, refreshToken);
     }
 
     public LoginResponse processRefreshSuccess(UserDetails userDetails, SysUser user, String deviceType) {
         String accessToken = jwtTokenUtil.generateToken(userDetails);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getId(),deviceType);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId(), deviceType);
 
+        return buildLoginResponse(userDetails, user, accessToken, refreshToken);
+    }
+
+    private LoginResponse buildLoginResponse(UserDetails userDetails, SysUser user, String accessToken, String refreshToken) {
         List<String> roles = new ArrayList<>();
         List<String> permissions = new ArrayList<>();
         for (GrantedAuthority authority : userDetails.getAuthorities()) {
             String auth = authority.getAuthority();
-            if (auth.startsWith("ROLE_")) roles.add(auth.substring(5));
-            else permissions.add(auth);
+            if (auth.startsWith(UserConstants.ROLE_PREFIX)) {
+                roles.add(auth.substring(UserConstants.ROLE_PREFIX.length()));
+            } else {
+                permissions.add(auth);
+            }
         }
-
         return LoginResponse.builder()
                 .token(accessToken)
                 .refreshToken(refreshToken)
                 .username(user.getUsername())
-                .nickname(user.getNickname())
+                .nickname(user.getNickname() != null ? user.getNickname() : user.getUsername())
                 .roles(roles)
                 .permissions(permissions)
                 .lastLoginTime(user.getLastLoginTime())
-                .expiresAt(LocalDateTime.now().plusNanos(jwtTokenUtil.getExpirationMs() * 1_000_000L))
+                .expiresAt(LocalDateTime.now().plusNanos(jwtTokenUtil.getExpirationMs() * UserConstants.NANOS_PER_MILLI))
                 .build();
     }
 }

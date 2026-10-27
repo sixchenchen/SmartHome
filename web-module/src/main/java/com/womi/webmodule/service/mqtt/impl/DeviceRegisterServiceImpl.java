@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.device.impl;
+package com.womi.webmodule.service.mqtt.impl;
 
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.device.DeviceInfoService;
@@ -9,6 +9,7 @@ import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.constants.RegexConstants;
 import com.womi.commonmodule.enums.MqttErrorCode;
 import com.womi.commonmodule.enums.DeviceOfflineReason;
+import com.womi.commonmodule.utils.MacUtils;
 import com.womi.commonmodule.utils.SignatureVerifierUtils;
 import com.womi.commonmodule.utils.TimestampValidatorUtils;
 import com.womi.businessmodule.model.mqtt.MqttCredential;
@@ -16,8 +17,8 @@ import com.womi.businessmodule.dto.DeviceRegisterRequest;
 import com.womi.businessmodule.vo.DeviceRegisterResponse;
 import com.womi.webmodule.mqtt.core.MqttCredentialGenerator;
 import com.womi.commonmodule.properties.MqttProperties;
-import com.womi.webmodule.service.device.DeviceRegisterService;
-import com.womi.webmodule.service.device.NonceService;
+import com.womi.webmodule.service.mqtt.DeviceRegisterService;
+import com.womi.webmodule.service.mqtt.NonceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -45,15 +46,17 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DeviceRegisterResponse register(DeviceRegisterRequest request) {
-        // ==================== 1. 基础校验 ====================
-        String deviceId = request.getDeviceId();
-        if (deviceId == null || deviceId.isBlank()) {
-            return DeviceRegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID);
-        }
-        if (!deviceId.matches(RegexConstants.MAC)) {
+        // ==================== 1. 基础校验 & 全局清洗 ====================
+        // 👈 清洗并直接覆盖，从此 request.getDeviceId() 永远是无冒号大写格式
+        String cleanMac = MacUtils.normalize(request.getDeviceId());
+        if (cleanMac == null || cleanMac.isBlank() || !cleanMac.matches(RegexConstants.MAC)) {
             return DeviceRegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID,
                     MqttErrorCode.INVALID_DEVICE_ID.getMessage());
         }
+        request.setDeviceId(cleanMac); // 👈 核心魔法：覆盖原对象
+
+        String deviceId = request.getDeviceId(); // 后续全用这个，其实与 cleanMac 等价
+
         if (request.getProduct() == null || request.getProduct().isBlank()) {
             return DeviceRegisterResponse.error(MqttErrorCode.PARAM_MISSING,
                     MqttErrorCode.PARAM_MISSING.getMessage());
@@ -73,25 +76,29 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         // ==================== 3. 已注册设备校验 ====================
         DeviceInfo existing = deviceInfoService.getByDeviceId(deviceId);
         boolean isReregister = false;
+        boolean isPreRegistered = false;
 
-        if (existing != null && existing.getPubkey() != null && !existing.getPubkey().isBlank()) {
-            // 已注册 → 必须 pubkey 一致才能重注册
-            if (!existing.getPubkey().equals(request.getPubkey())) {
-                log.warn("pubkey 不一致，疑似冒充 - deviceId: {}", deviceId);
-                return DeviceRegisterResponse.error(MqttErrorCode.DEVICE_ALREADY_REGISTERED);
+        if (existing != null) {
+            if (existing.getPubkey() != null && !existing.getPubkey().isBlank()) {
+                if (!existing.getPubkey().equals(request.getPubkey())) {
+                    log.warn("pubkey 不一致，疑似冒充 - deviceId: {}", deviceId);
+                    return DeviceRegisterResponse.error(MqttErrorCode.DEVICE_ALREADY_REGISTERED);
+                }
+                isReregister = true;
+                log.info("设备重注册（pubkey 一致）- deviceId: {}", deviceId);
+            } else {
+                isPreRegistered = true;
+                log.info("预登记设备首次激活 - deviceId: {}", deviceId);
             }
-            isReregister = true;
-            log.info("设备重注册（pubkey 一致）- deviceId: {}", deviceId);
         }
 
         // ==================== 4. 安全校验（先验签，后处理 nonce） ====================
-        // 4.1 时间戳校验
         if (request.getTimestamp() == null || !TimestampValidatorUtils.isWithinWindow(request.getTimestamp(),
                 DeviceMqttConstants.REGISTER_TIMESTAMP_WINDOW_MS)) {
             log.warn("时间戳校验失败 - deviceId: {}, 设备时间: {}, 服务器时间: {}", deviceId, request.getTimestamp(), System.currentTimeMillis());
             return DeviceRegisterResponse.error(MqttErrorCode.INVALID_TIMESTAMP);
         }
-        // 4.2 签名校验
+
         String verifyPubkey = (existing != null && existing.getPubkey() != null && !existing.getPubkey().isBlank())
                 ? existing.getPubkey()
                 : request.getPubkey();
@@ -99,20 +106,20 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
             log.warn("签名验证失败 - deviceId: {}", deviceId);
             return DeviceRegisterResponse.error(MqttErrorCode.INVALID_SIGNATURE);
         }
-        // 4.3 nonce 防重放：先检查（不消耗），事务提交后才真正消耗
+
         String nonce = request.getNonce();
         if (nonceService.exists(nonce)) {
             return DeviceRegisterResponse.error(MqttErrorCode.REPLAY_ATTACK);
         }
 
         // ==================== 5. 业务处理 ====================
-        // 5.1 生成 MQTT 凭据
         MqttCredential credential = credentialGenerator.generate(deviceId);
 
-        // 5.2 保存设备信息 + 凭据（首次注册 or 重注册）
         try {
             if (isReregister) {
                 saveReregister(existing, request, credential);
+            } else if (isPreRegistered) {
+                activatePreRegistered(existing, request, credential);
             } else {
                 saveFirstTimeDevice(request, credential);
             }
@@ -121,7 +128,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
             return DeviceRegisterResponse.error(MqttErrorCode.DEVICE_ALREADY_REGISTERED);
         }
 
-        // 5.3 事务提交后消耗 nonce
         registerNonceConsumption(nonce);
 
         // ==================== 6. 组装响应 ====================
@@ -138,9 +144,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
     // ==================== 私有方法 ====================
 
-    /**
-     * 校验签名材料（pubkey / nonce / signature）的长度与格式
-     */
     private boolean isValidSignatureMaterial(DeviceRegisterRequest request) {
         String pubkey = request.getPubkey();
         String nonce = request.getNonce();
@@ -161,19 +164,12 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         return true;
     }
 
-    /**
-     * 校验签名
-     *
-     * @param pubkey 用于验签的公钥（重注册用数据库的，首次用请求的）
-     */
     private boolean verifySignature(String pubkey, DeviceRegisterRequest request) {
+        // 👈 此时 request.getDeviceId() 已经是清洗过的无冒号格式
         String signData = request.getDeviceId() + "|" + request.getTimestamp() + "|" + request.getNonce();
         return SignatureVerifierUtils.verify(pubkey, signData, request.getSignature());
     }
 
-    /**
-     * 事务提交后消耗 nonce：确保业务失败回滚时 nonce 不被消耗，允许设备重试。
-     */
     private void registerNonceConsumption(String nonce) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             nonceService.tryAcquire(nonce);
@@ -194,14 +190,12 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         });
     }
 
-    /**
-     * 首次注册：保存设备信息 + MQTT 凭据
-     */
     private void saveFirstTimeDevice(DeviceRegisterRequest request, MqttCredential credential) {
-        // 1. 保存 device_info
+        // 👈 不需要再 normalize 了，直接用
+        String deviceId = request.getDeviceId();
         LocalDateTime now = LocalDateTime.now();
         DeviceInfo device = new DeviceInfo();
-        device.setDeviceId(request.getDeviceId());
+        device.setDeviceId(deviceId);
         device.setProduct(request.getProduct());
         device.setFirmware(request.getFirmware());
         device.setPubkey(request.getPubkey());
@@ -211,9 +205,8 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         device.setUpdateTime(now);
         deviceInfoService.save(device);
 
-        // 2. 保存 MQTT 凭据
         mqttAuthService.saveOrUpdateDeviceAuth(
-                request.getDeviceId(),
+                deviceId, // 👈 直接用
                 credential.getUsername(),
                 credential.getPasswordHash(),
                 credential.getSalt(),
@@ -221,18 +214,29 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         );
     }
 
-    /**
-     * 重注册：只更新设备信息（product/firmware），重新分配 MQTT 凭据
-     * <p>pubkey 保持不变（出厂预置），不覆盖
-     */
     private void saveReregister(DeviceInfo existing, DeviceRegisterRequest request, MqttCredential credential) {
-        // 1. 更新 device_info（不动 pubkey）
+        // 👈 不需要再 normalize 了，直接用
         existing.setProduct(request.getProduct());
         existing.setFirmware(request.getFirmware());
         existing.setUpdateTime(LocalDateTime.now());
         deviceInfoService.updateById(existing);
 
-        // 2. 覆盖 MQTT 凭据（旧凭据作废）
+        mqttAuthService.saveOrUpdateDeviceAuth(
+                request.getDeviceId(), // 👈 直接用
+                credential.getUsername(),
+                credential.getPasswordHash(),
+                credential.getSalt(),
+                DeviceConstants.MQTT_STATUS_ENABLE
+        );
+    }
+
+    private void activatePreRegistered(DeviceInfo existing, DeviceRegisterRequest request, MqttCredential credential) {
+        existing.setPubkey(request.getPubkey());
+        existing.setFirmware(request.getFirmware());
+        existing.setUpdateTime(LocalDateTime.now());
+        deviceInfoService.updateById(existing);
+
+        // 👈 彻底修复：这里原来用的是未清洗的 request.getDeviceId()，现在安全了
         mqttAuthService.saveOrUpdateDeviceAuth(
                 request.getDeviceId(),
                 credential.getUsername(),
@@ -244,7 +248,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
     private Map<String, Object> buildMqttConfig(MqttCredential credential) {
         MqttProperties.Broker runtime = mqttProperties.getRuntime();
-
         Map<String, Object> mqtt = new LinkedHashMap<>();
         mqtt.put(DeviceMqttConstants.FIELD_MQTT_HOST, runtime.getHost());
         mqtt.put(DeviceMqttConstants.FIELD_MQTT_PORT, runtime.getPort());

@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.device.impl;
+package com.womi.webmodule.service.mqtt.impl;
 
 import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.service.common.CommandSender;

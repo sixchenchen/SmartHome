@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.user.impl;
+package com.womi.webmodule.service.auth.impl;
 
 import com.womi.businessmodule.mapper.sys.SysUserMapper;
 import com.womi.businessmodule.mapper.sys.SysPermissionMapper;
@@ -6,7 +6,8 @@ import com.womi.businessmodule.mapper.sys.SysRoleInfoMapper;
 import com.womi.businessmodule.mapper.sys.SysRoleMapper;
 import com.womi.businessmodule.model.sys.SysUser;
 import com.womi.businessmodule.model.sys.SysRole;
-import com.womi.webmodule.service.user.SecurityUser;
+import com.womi.commonmodule.constants.UserConstants;
+import com.womi.webmodule.service.auth.SecurityUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -40,16 +41,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
 
         if (!CollectionUtils.isEmpty(roleIds)) {
-            // 3. 批量查角色实体（避免在循环里查库）
             List<SysRole> roles = sysRoleMapper.selectRolesByIds(roleIds);
             if (!CollectionUtils.isEmpty(roles)) {
-                // 组装角色权限（注意加上 ROLE_ 前缀）
                 roles.stream()
-                        .filter(role -> role.getStatus() != null && role.getStatus() == 1)
-                        .forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleCode())));
+                        .filter(role -> UserConstants.ENABLE_USER.equals(role.getStatus()))
+                        .forEach(role -> authorities.add(new SimpleGrantedAuthority(UserConstants.ROLE_PREFIX + role.getRoleCode())));
             }
 
-            // 4. 批量查权限编码（通过角色-权限关联表联表查询）
             List<String> permCodes = sysPermissionMapper.selectPermCodesByRoleIds(roleIds);
             if (!CollectionUtils.isEmpty(permCodes)) {
                 permCodes.forEach(code -> authorities.add(new SimpleGrantedAuthority(code)));

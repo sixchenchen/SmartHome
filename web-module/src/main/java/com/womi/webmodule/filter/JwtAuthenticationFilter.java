@@ -1,8 +1,8 @@
 package com.womi.webmodule.filter;
 
 import com.womi.commonmodule.utils.JwtTokenUtil;
-import com.womi.webmodule.service.user.impl.TokenBlacklistService;
-import com.womi.webmodule.service.user.impl.UserDetailsServiceImpl;
+import com.womi.webmodule.service.auth.TokenBlacklistService;
+import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;

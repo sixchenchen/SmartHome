@@ -20,7 +20,7 @@ public class DeviceBinding {
     private String deviceId;
 
     /** 生成列：仅有效绑定时=device_id */
-    @TableField("active_device_id")
+    @TableField(insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)
     private String activeDeviceId;
 
     /** 用户ID */

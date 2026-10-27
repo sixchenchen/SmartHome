@@ -26,7 +26,10 @@ import paho.mqtt.client as mqtt
 MQTT_HOST = "192.168.1.15"
 PROVISION_PORT = 8884        # 注册端口
 RUNTIME_PORT = 8883          # 业务端口
-CA_CERT = r"d:\software\emqx-5.3.0-windows-amd64\etc\certs\cert.pem"            # 证书路径（和脚本同目录或绝对路径）
+
+CA_CERT = r"D:\data\mqtt_auth_key\server_key\iot-ca.crt"           
+CLIENT_CERT = r"D:\data\mqtt_auth_key\server_key\B4BFE90CDBA1.crt" 
+CLIENT_KEY = r"D:\data\mqtt_auth_key\server_key\B4BFE90CDBA1.key"  
 
 PROVISION_USER = "PROVISION_USER"
 PROVISION_PASS = "123456"    # 你的 PROVISION_USER 密码
@@ -136,7 +139,7 @@ def do_register():
         print(f"[WARN] 8884 连接断开，返回码: {rc}")
 
     client.username_pw_set(PROVISION_USER, PROVISION_PASS)
-    client.tls_set(ca_certs=CA_CERT, cert_reqs=ssl.CERT_REQUIRED)
+    client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=CLIENT_KEY,cert_reqs=ssl.CERT_REQUIRED)
     client.tls_insecure_set(True)
     client.on_connect = on_connect
     client.on_message = on_message
@@ -214,7 +217,7 @@ def start_runtime(config):
             print(f"     Payload(raw): {msg.payload.decode('utf-8', errors='ignore')}")
 
     client.username_pw_set(username, password)
-    client.tls_set(ca_certs=CA_CERT, cert_reqs=ssl.CERT_REQUIRED)
+    client.tls_set(ca_certs=CA_CERT, certfile=CLIENT_CERT, keyfile=CLIENT_KEY,cert_reqs=ssl.CERT_REQUIRED)
     client.tls_insecure_set(True)
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
