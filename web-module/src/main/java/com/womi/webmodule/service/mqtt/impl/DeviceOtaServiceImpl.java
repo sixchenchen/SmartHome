@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.model.device.DeviceFirmware;
 import com.womi.businessmodule.model.device.DeviceInfo;
+import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceFirmwareService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
@@ -18,14 +19,20 @@ import com.womi.businessmodule.dto.SendCommandRequest;
 import com.womi.businessmodule.dto.DeviceOtaParam;
 import com.womi.businessmodule.vo.DeviceOtaProgressVO;
 import com.womi.businessmodule.vo.DeviceOtaStartResponse;
+import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.service.mqtt.DeviceControlService;
 import com.womi.webmodule.service.mqtt.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * OTA 升级服务：前端请求示例
@@ -48,6 +55,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     private final DeviceFirmwareService firmwareService;
     private final DeviceCommandService deviceCommandService;
     private final DeviceControlService deviceControlService;
+    private final CommandSender commandSender;
 
     // ==================== 主入口 ====================
 
@@ -231,5 +239,125 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             throw new BusinessException(ErrorCode.PARAM_INVALID, "firmwareId 必须大于 0");
         }
         return id;
+    }
+    /**
+     * 管理员批量下发 OTA 升级
+     * @param firmwareId 固件ID
+     * @param targetProduct 目标产品型号（如果为空，代表全量）
+     * @param operator 操作人
+     * @return 本次涉及升级的指令数量
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int batchDispatchOta(Long firmwareId, String targetProduct, String operator) {
+        // 1. 校验固件状态
+        DeviceFirmware firmware = firmwareService.getById(firmwareId);
+        if (firmware == null || firmware.getStatus() != 1) {
+            log.warn("批量 OTA 失败：固件不存在或未启用 - firmwareId: {}", firmwareId);
+            throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND, "固件不存在或已被禁用");
+        }
+        log.info("[OTA-Dispatch] 开始执行批量下发 - 目标固件: {}, 目标版本: {}, 目标产品: {}",
+                firmwareId, firmware.getVersion(), StringUtils.hasText(targetProduct) ? targetProduct : "全部");
+
+        // 2. 筛选目标设备 (必须在线的，且当前版本不等于目标版本的)
+        LambdaQueryWrapper<DeviceInfo> wrapper = new LambdaQueryWrapper<DeviceInfo>()
+                .eq(DeviceInfo::getOnline, 1) // 条件 A: 必须在线
+                .ne(DeviceInfo::getFirmware, firmware.getVersion()); // 条件 B: 版本不一致
+
+        if (StringUtils.hasText(targetProduct)) {
+            wrapper.eq(DeviceInfo::getProduct, targetProduct); // 条件 C: 产品匹配
+        }
+
+        List<DeviceInfo> devices = deviceInfoService.list(wrapper);
+
+        // 👈 日志：打印在线且满足条件的设备数量
+        log.info("[OTA-Dispatch] 筛选到 {} 台在线且版本不匹配的设备", devices.size());
+
+        if (devices.isEmpty()) {
+            log.info("[OTA-Dispatch] 结束：没有符合条件的设备可升级");
+            return 0;
+        }
+
+        // 3. 组装 OTA 参数
+        DeviceOtaParam otaParam = DeviceOtaParam.builder()
+                .url(firmware.getUrl())
+                .version(firmware.getVersion())
+                .sha256(firmware.getSha256())
+                .size(firmware.getSize())
+                .build();
+
+        // 4. 批量生成指令记录
+        List<DeviceCommand> commands = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (DeviceInfo device : devices) {
+            // 👈 日志：打印当前处理的设备
+            log.info("[OTA-Dispatch] 正在检查设备: {}, 当前版本: {}", device.getDeviceId(), device.getFirmware());
+
+            // 5. 防并发检查：检查该设备是否有未完成的 OTA 指令
+            boolean existsRunning = deviceCommandService.exists(
+                    new LambdaQueryWrapper<DeviceCommand>()
+                            .eq(DeviceCommand::getDeviceId, device.getDeviceId())
+                            .eq(DeviceCommand::getTarget, "ota")
+                            .in(DeviceCommand::getStatus,
+                                    DeviceCommandStatus.PENDING.getCode(),
+                                    DeviceCommandStatus.SENT.getCode(),
+                                    DeviceCommandStatus.ACCEPTED.getCode())
+            );
+            if (existsRunning) {
+                // 👈 日志：记录被跳过的设备及原因
+                log.warn("[OTA-Dispatch] 跳过设备 {}：存在未完成的 OTA 指令", device.getDeviceId());
+                continue;
+            }
+
+            DeviceCommand cmd = new DeviceCommand();
+            cmd.setCommandId(UUID.randomUUID().toString().replace("-", ""));
+            cmd.setDeviceId(device.getDeviceId());
+            cmd.setAction("start");
+            cmd.setTarget("ota");
+            cmd.setChannel(null);
+            cmd.setParams(otaParam.toMap());
+            cmd.setQos(1);
+            cmd.setRetain(0);
+            cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
+            cmd.setRetryCount(0);
+            cmd.setMaxRetry(3);
+            cmd.setOperator(operator != null ? operator : "admin");
+            cmd.setSource("WEB");
+            cmd.setExpireTime(now.plusMinutes(30));
+            cmd.setCreateTime(now);
+            cmd.setUpdateTime(now);
+
+            commands.add(cmd);
+        }
+
+        if (commands.isEmpty()) {
+            // 👈 日志：虽然有设备，但全被防并发检查拦截了
+            log.info("[OTA-Dispatch] 结束：所有符合条件的设备都存在未完成的 OTA 指令，无需重新生成");
+            return 0;
+        }
+
+        // 6. 批量落库
+        deviceCommandService.saveBatch(commands);
+
+        log.info("[OTA-Dispatch] 成功生成 {} 条 OTA 升级指令，等待定时任务下发", commands.size());
+        // 落库后立即发送 MQTT 并更新状态
+        for (DeviceCommand cmd : commands) {
+            try {
+                // 调用发送器把消息发出去
+                commandSender.send(cmd);
+
+                // 发送成功，把状态从 0(PENDING) 改为 1(SENT)
+                deviceCommandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
+                // 增加一次重试计数（代表已经发了一次）
+                deviceCommandService.incrementRetryCount(cmd.getId());
+
+                log.info("[OTA-Dispatch] OTA 指令立即下发成功 - commandId: {}", cmd.getCommandId());
+            } catch (Exception e) {
+                // 发送失败不用管，状态依然是 0(PENDING)，后面要靠定时任务兜底
+                log.error("[OTA-Dispatch] OTA 指令立即下发失败 - commandId: {}", cmd.getCommandId(), e);
+            }
+        }
+        return commands.size();
     }
 }

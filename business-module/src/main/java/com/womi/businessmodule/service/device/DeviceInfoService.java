@@ -77,4 +77,11 @@ public interface DeviceInfoService extends IService<DeviceInfo> {
      * 清理设备 OTA 状态（定向更新，只清 ota_state/ota_progress）
      */
     void clearOtaState(String deviceId);
+
+    /**
+     * 更新当前设备状态
+     * @param deviceId 设备ID
+     * @param currentState 设备当前状态
+     */
+    void updateCurrentState(String deviceId, String currentState);
 }

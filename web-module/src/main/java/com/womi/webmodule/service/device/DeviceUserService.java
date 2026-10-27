@@ -1,6 +1,7 @@
 package com.womi.webmodule.service.device;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.DeviceControlRequest;
 import com.womi.businessmodule.model.device.DeviceInfo;
 
 public interface DeviceUserService {
@@ -12,4 +13,6 @@ public interface DeviceUserService {
 
     /** 查询我的设备 */
     Page<DeviceInfo> getMyDevices(Long userId, Integer pageNum, Integer pageSize);
+
+    void sendControlCommand(Long userId, DeviceControlRequest request);
 }

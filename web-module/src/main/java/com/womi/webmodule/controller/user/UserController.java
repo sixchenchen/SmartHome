@@ -1,5 +1,6 @@
 package com.womi.webmodule.controller.user;
 
+import com.womi.businessmodule.dto.DeviceControlRequest;
 import com.womi.businessmodule.dto.LoginRequest;
 import com.womi.businessmodule.dto.UserRegisterRequest;
 import com.womi.businessmodule.mapper.sys.SysUserMapper;
@@ -11,11 +12,9 @@ import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.commonmodule.utils.JwtTokenUtil;
-import com.womi.webmodule.service.auth.AuthService;
-import com.womi.webmodule.service.auth.LoginAttemptService;
-import com.womi.webmodule.service.auth.RefreshTokenService;
-import com.womi.webmodule.service.auth.TokenBlacklistService;
+import com.womi.webmodule.service.auth.*;
 import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
+import com.womi.webmodule.service.device.DeviceUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.Data;
@@ -124,4 +123,7 @@ public class UserController {
 
         return ApiResponse.success(null);
     }
+
+
+
 }

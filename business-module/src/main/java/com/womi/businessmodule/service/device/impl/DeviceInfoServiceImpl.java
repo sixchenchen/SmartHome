@@ -1,6 +1,7 @@
 package com.womi.businessmodule.service.device.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.womi.businessmodule.mapper.device.DeviceInfoMapper;
 import com.womi.businessmodule.model.device.DeviceInfo;
@@ -190,5 +191,17 @@ public class DeviceInfoServiceImpl
     @Transactional(rollbackFor = Exception.class)
     public void clearOtaState(String deviceId) {
         baseMapper.clearOtaStateByDeviceId(deviceId);
+    }
+
+    @Override
+    public void updateCurrentState(String deviceId, String currentState) {
+        boolean updated = update(new LambdaUpdateWrapper<DeviceInfo>()
+                .set(DeviceInfo::getCurrentState, currentState)
+                .set(DeviceInfo::getUpdateTime, java.time.LocalDateTime.now())
+                .eq(DeviceInfo::getDeviceId, deviceId));
+
+        if (!updated) {
+            log.warn("更新设备状态失败，设备可能不存在 - deviceId: {}", deviceId);
+        }
     }
 }

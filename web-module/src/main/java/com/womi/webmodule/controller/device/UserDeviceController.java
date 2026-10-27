@@ -1,10 +1,12 @@
 package com.womi.webmodule.controller.device;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.DeviceControlRequest;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.service.auth.SecurityUser;
 import com.womi.webmodule.service.device.DeviceUserService;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -49,6 +51,15 @@ public class UserDeviceController {
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize) {
         return ApiResponse.success(deviceUserService.getMyDevices(getCurrentUserId(), pageNum, pageSize));
+    }
+
+    /**
+     * 控制设备（开灯、关灯等）
+     */
+    @PostMapping("/control")
+    public ApiResponse<Void> controlDevice(@RequestBody @Valid DeviceControlRequest request) {
+        deviceUserService.sendControlCommand(getCurrentUserId(), request);
+        return ApiResponse.success(null);
     }
 
     /**

@@ -1,14 +1,19 @@
 package com.womi.webmodule.mqtt.handler;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.womi.businessmodule.mapper.device.DeviceBindingMapper;
+import com.womi.businessmodule.model.device.DeviceBinding;
 import com.womi.businessmodule.service.device.DeviceHeartbeatRecordService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 /*
@@ -35,6 +40,8 @@ public class DeviceHeartbeatMessageHandler implements MqttMessageHandler {
     private final JsonUtils jsonUtils;
     private final DeviceInfoService deviceInfoService;
     private final DeviceHeartbeatRecordService heartbeatRecordService;
+    private final DeviceBindingMapper deviceBindingMapper;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public boolean supports(String topic) {
@@ -62,8 +69,15 @@ public class DeviceHeartbeatMessageHandler implements MqttMessageHandler {
             // 3. 更新设备心跳（同时把设备标记为在线）
             deviceInfoService.updateHeartbeat(deviceId, uptime, payload);
             // 4. 写心跳历史
-            heartbeatRecordService.recordHeartbeat(deviceId, uptime, payload);
-            log.debug("心跳处理完成 - deviceId: {}, uptime: {}", deviceId, uptime);
+            Boolean isBound = redisTemplate.opsForSet().isMember(RedisConstants.BOUND_DEVICES_KEY, deviceId);
+
+            if (Boolean.TRUE.equals(isBound)) {
+                // 5. 只有被绑定的设备，才记录心跳明细
+                heartbeatRecordService.recordHeartbeat(deviceId, uptime, payload);
+                log.debug("心跳处理完成（已绑定） - deviceId: {}", deviceId);
+            } else {
+                log.debug("未绑定设备心跳，仅更新主表状态 - deviceId: {}", deviceId);
+            }
         } catch (Exception e) {
             log.error("处理心跳消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
         }

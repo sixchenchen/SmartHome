@@ -17,4 +17,8 @@ public interface DeviceOtaService {
      */
     DeviceOtaProgressVO getOtaProgress(String deviceId);
 
+    /**
+     * 管理员批量下发 OTA 升级
+     */
+    public int batchDispatchOta(Long firmwareId, String targetProduct, String operator);
 }

@@ -47,7 +47,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     @Transactional(rollbackFor = Exception.class)
     public DeviceRegisterResponse register(DeviceRegisterRequest request) {
         // ==================== 1. 基础校验 & 全局清洗 ====================
-        // 👈 清洗并直接覆盖，从此 request.getDeviceId() 永远是无冒号大写格式
+        // 清洗并直接覆盖，从此 request.getDeviceId() 永远是无冒号大写格式
         String cleanMac = MacUtils.normalize(request.getDeviceId());
         if (cleanMac == null || cleanMac.isBlank() || !cleanMac.matches(RegexConstants.MAC)) {
             return DeviceRegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID,

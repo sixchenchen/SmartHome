@@ -55,7 +55,7 @@ public enum ErrorCode {
     FIRMWARE_FILE_NOT_FOUND(4104, "固件文件不存在"),
     FIRMWARE_VERSION_EMPTY(4105, "版本号不能为空"),
     FIRMWARE_FORMAT_MUST_BIN(4106, "文件格式必须是 .bin"),
-
+    FIRMWARE_COMPUTE_FILE_HASH(4107, "计算文件哈希失败"),
     // ==================== 设备（4200-4209） ====================
     DEVICE_NOT_FOUND(4200, "设备不存在"),
     DEVICE_OFFLINE(4201, "设备离线"),

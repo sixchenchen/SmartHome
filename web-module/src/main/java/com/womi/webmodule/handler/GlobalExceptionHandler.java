@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import java.nio.file.AccessDeniedException;
 
 /**
  * 全局异常处理器
@@ -140,6 +143,15 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(ErrorCode.FILE_TOO_LARGE.getCode(), ErrorCode.FILE_TOO_LARGE.getMessage());
     }
 
+    /**
+     * 拦截 @PreAuthorize 权限不足异常
+     */
+    @ExceptionHandler({AccessDeniedException.class, AuthorizationDeniedException.class})
+    @ResponseStatus(HttpStatus.FORBIDDEN) // 返回 403 状态码
+    public ApiResponse<Void> handleAccessDeniedException(Exception e, HttpServletRequest request) {
+        log.warn("权限不足 - uri: {}, message: {}", request.getRequestURI(), e.getMessage());
+        return ApiResponse.error(ErrorCode.FAIL.getCode(), "权限不足，无法访问该资源"); // 你的 ErrorCode.FAIL 是 401 还是自定义的 403，请根据实际调整
+    }
     // ==================== 兜底 ====================
 
     /**
