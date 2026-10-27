@@ -13,6 +13,7 @@ public final class UserConstants {
      */
     public static final Integer NOT_DELETED = 0;
     public static final Integer LOGIC_DELETE_USER = 1;
+    public static final String DELETE_USER_NAME = "#DEL#";
 
     /**
      * 角色与权限
@@ -33,9 +34,9 @@ public final class UserConstants {
     public static final int LOGIN_MAX_FAIL = 5;                  // 最大失败次数
     public static final long LOGIN_LOCK_MINUTES = 15;            // 锁定时长(分钟)
     public static final long SECONDS_PER_MINUTE = 60;            // 1分钟对应的秒数
-    public static final String REDIS_LOGIN_FAIL_PREFIX = "login:fail:";
-    public static final String REDIS_LOGIN_LOCK_PREFIX = "login:lock:";
-    public static final String REDIS_LOCK_VALUE = "1";           // 锁定的占位值
+
+
+
     // ==================== RefreshToken 相关 ====================
     public static final long REFRESH_TOKEN_EXPIRE_DAYS = 7; // 刷新令牌有效天数
     public static final Integer REVOKED_YES = 1;             // 已撤销
@@ -45,4 +46,5 @@ public final class UserConstants {
     // ==================== 缓存相关 ====================
     public static final String REDIS_TOKEN_BLACKLIST_PREFIX = "token:blacklist:";
     public static final String REDIS_BLACKLIST_VALUE = "1";  // 黑名单占位值
+
 }

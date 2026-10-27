@@ -19,12 +19,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminOtaController {
 
-    // 👈 直接注入第一段代码的 Service
     private final DeviceFirmwareUploadService firmwareUploadService;
     private final DeviceOtaService deviceOtaService;
 
     // ==================== 1. 固件库管理 ====================
-
     /**
      * 上传固件
      */
@@ -37,7 +35,6 @@ public class AdminOtaController {
             @RequestParam(value = "releaseNotes", required = false) String releaseNotes,
             @RequestParam(value = "operator", required = false) String operator) {
 
-        // 调用你第一段代码的 upload 方法，完美返回
         FirmwareUploadResponse response = firmwareUploadService.upload(file, version, product, releaseNotes, operator);
         return ApiResponse.success(response);
     }

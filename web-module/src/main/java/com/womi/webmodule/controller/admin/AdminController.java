@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
-public class UserAdminController {
+public class AdminController {
 
     private final SysUserService sysUserService;
 

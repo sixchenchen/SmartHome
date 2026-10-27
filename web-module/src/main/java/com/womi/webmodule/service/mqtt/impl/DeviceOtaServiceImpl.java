@@ -11,6 +11,7 @@ import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.constants.FirmwareConstants;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
@@ -252,7 +253,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     public int batchDispatchOta(Long firmwareId, String targetProduct, String operator) {
         // 1. 校验固件状态
         DeviceFirmware firmware = firmwareService.getById(firmwareId);
-        if (firmware == null || firmware.getStatus() != 1) {
+        if (firmware == null || firmware.getStatus() != FirmwareConstants.FIRMWARE_ENABLE) {
             log.warn("批量 OTA 失败：固件不存在或未启用 - firmwareId: {}", firmwareId);
             throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND, "固件不存在或已被禁用");
         }
@@ -261,7 +262,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
 
         // 2. 筛选目标设备 (必须在线的，且当前版本不等于目标版本的)
         LambdaQueryWrapper<DeviceInfo> wrapper = new LambdaQueryWrapper<DeviceInfo>()
-                .eq(DeviceInfo::getOnline, 1) // 条件 A: 必须在线
+                .eq(DeviceInfo::getOnline, DeviceConstants.DEVICE_STATUS_ONLINE) // 条件 A: 必须在线
                 .ne(DeviceInfo::getFirmware, firmware.getVersion()); // 条件 B: 版本不一致
 
         if (StringUtils.hasText(targetProduct)) {
@@ -270,7 +271,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
 
         List<DeviceInfo> devices = deviceInfoService.list(wrapper);
 
-        // 👈 日志：打印在线且满足条件的设备数量
+        // 日志：打印在线且满足条件的设备数量
         log.info("[OTA-Dispatch] 筛选到 {} 台在线且版本不匹配的设备", devices.size());
 
         if (devices.isEmpty()) {
@@ -291,21 +292,21 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         LocalDateTime now = LocalDateTime.now();
 
         for (DeviceInfo device : devices) {
-            // 👈 日志：打印当前处理的设备
+            // 日志：打印当前处理的设备
             log.info("[OTA-Dispatch] 正在检查设备: {}, 当前版本: {}", device.getDeviceId(), device.getFirmware());
 
             // 5. 防并发检查：检查该设备是否有未完成的 OTA 指令
             boolean existsRunning = deviceCommandService.exists(
                     new LambdaQueryWrapper<DeviceCommand>()
                             .eq(DeviceCommand::getDeviceId, device.getDeviceId())
-                            .eq(DeviceCommand::getTarget, "ota")
+                            .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
                             .in(DeviceCommand::getStatus,
                                     DeviceCommandStatus.PENDING.getCode(),
                                     DeviceCommandStatus.SENT.getCode(),
                                     DeviceCommandStatus.ACCEPTED.getCode())
             );
             if (existsRunning) {
-                // 👈 日志：记录被跳过的设备及原因
+                // 日志：记录被跳过的设备及原因
                 log.warn("[OTA-Dispatch] 跳过设备 {}：存在未完成的 OTA 指令", device.getDeviceId());
                 continue;
             }
@@ -313,8 +314,8 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             DeviceCommand cmd = new DeviceCommand();
             cmd.setCommandId(UUID.randomUUID().toString().replace("-", ""));
             cmd.setDeviceId(device.getDeviceId());
-            cmd.setAction("start");
-            cmd.setTarget("ota");
+            cmd.setAction(DeviceMqttConstants.ACTION_START);
+            cmd.setTarget(DeviceMqttConstants.TARGET_OTA);
             cmd.setChannel(null);
             cmd.setParams(otaParam.toMap());
             cmd.setQos(1);
@@ -322,8 +323,8 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
             cmd.setRetryCount(0);
             cmd.setMaxRetry(3);
-            cmd.setOperator(operator != null ? operator : "admin");
-            cmd.setSource("WEB");
+            cmd.setOperator(operator != null ? operator : DeviceCommandConstants.DEFAULT_OPERATOR);
+            cmd.setSource(DeviceCommandConstants.SOURCE_WEB);
             cmd.setExpireTime(now.plusMinutes(30));
             cmd.setCreateTime(now);
             cmd.setUpdateTime(now);
@@ -332,7 +333,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         }
 
         if (commands.isEmpty()) {
-            // 👈 日志：虽然有设备，但全被防并发检查拦截了
+            // 日志：虽然有设备，但全被防并发检查拦截了
             log.info("[OTA-Dispatch] 结束：所有符合条件的设备都存在未完成的 OTA 指令，无需重新生成");
             return 0;
         }

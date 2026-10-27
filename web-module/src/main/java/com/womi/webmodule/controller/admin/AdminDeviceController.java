@@ -1,4 +1,4 @@
-package com.womi.webmodule.controller.device;
+package com.womi.webmodule.controller.admin;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.womi.businessmodule.dto.DeviceCreateRequest;
@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/admin/devices")
 @RequiredArgsConstructor
-public class DeviceAdminController {
+public class AdminDeviceController {
 
     private final DeviceAdminService deviceAdminService;
 

@@ -20,5 +20,5 @@ public interface DeviceOtaService {
     /**
      * 管理员批量下发 OTA 升级
      */
-    public int batchDispatchOta(Long firmwareId, String targetProduct, String operator);
+    int batchDispatchOta(Long firmwareId, String targetProduct, String operator);
 }

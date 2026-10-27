@@ -4,19 +4,19 @@ import com.womi.businessmodule.model.device.DeviceFirmware;
 import com.womi.businessmodule.service.device.DeviceFirmwareService;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.ErrorInfoConstants;
-import com.womi.commonmodule.constants.FileConstants;
+import com.womi.commonmodule.constants.FirmwareConstants;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
+import com.womi.commonmodule.properties.FirmwareProperties;
 import com.womi.commonmodule.utils.DateTimeUtils;
 import com.womi.businessmodule.vo.FirmwareUploadResponse;
 import com.womi.businessmodule.vo.FirmwareVO;
 import com.womi.webmodule.service.mqtt.DeviceFirmwareUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.unit.DataSize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -27,6 +27,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static com.womi.commonmodule.enums.ErrorCode.FILE_UPLOAD_FAILED;
@@ -38,17 +39,7 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
 
     private final DeviceFirmwareService firmwareService;
 
-    @Value("${firmware.upload-dir:D:/data/firmware/}")
-    private String uploadDir;
-
-    @Value("${firmware.base-url:http://localhost:8000/firmware/}")
-    private String baseUrl;
-
-    @Value("${firmware.file-name-pattern:firmware_%s_%s.bin}")
-    private String fileNamePattern;
-
-    @Value("${firmware.max-size:16MB}")
-    private DataSize maxFirmwareSize;
+    private final FirmwareProperties firmwareProperties;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -59,13 +50,13 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ErrorCode.FILE_EMPTY);
         }
-        if (file.getSize() > maxFirmwareSize.toBytes()) {
+        if (file.getSize() > firmwareProperties.getMaxSize().toBytes()) {
             throw new BusinessException(ErrorCode.FILE_TOO_LARGE, ErrorInfoConstants.FIRMWARE_FILE_TOO_LARGE);
         }
         if (version == null || version.isBlank()) {
             throw new BusinessException(ErrorCode.PARAM_MISSING, ErrorInfoConstants.VERSION_EMPTY);
         }
-        if (!file.getOriginalFilename().endsWith(FileConstants.FIRMWARE_EXTENSION)) {
+        if (!Objects.requireNonNull(file.getOriginalFilename()).endsWith(FirmwareConstants.FIRMWARE_EXTENSION)) {
             throw new BusinessException(ErrorCode.FILE_FORMAT_ERROR, ErrorInfoConstants.FILE_FORMAT_MUST_BIN);
         }
 
@@ -79,46 +70,47 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
         Path targetPath = null;
         try {
             String timestamp = DateTimeUtils.nowCompact();
-            String fileName = String.format(fileNamePattern, version, timestamp);
+            String fileName = String.format(firmwareProperties.getFileNamePattern(), version, timestamp);
 
-            Path dirPath = Paths.get(uploadDir);
+            Path dirPath = Paths.get(firmwareProperties.getUploadDir());
             Files.createDirectories(dirPath);
             targetPath = dirPath.resolve(fileName);
 
             // 流式写入 + 算 MD5
             String md5 = computeAndSave(file, targetPath);
             String sha256 = computeSha256(targetPath);
-            String url = baseUrl + fileName;
+            String url = firmwareProperties.getBaseUrl() + fileName;
 
             // ==================== 3. 入库 ====================
-            DeviceFirmware firmware = new DeviceFirmware();
-            firmware.setVersion(version);
-            firmware.setProduct(product);
-            firmware.setReleaseNotes(releaseNotes);
-            firmware.setUrl(url);
-            firmware.setFileName(file.getOriginalFilename());
-            firmware.setFilePath(targetPath.toString());
-            firmware.setMd5(md5);
-            firmware.setSha256(sha256);
-            firmware.setSize(file.getSize());
-            firmware.setUploadedBy(operator != null ? operator : DeviceCommandConstants.DEFAULT_OPERATOR);
-            firmware.setUploadTime(LocalDateTime.now());
-            firmware.setStatus(1);
+            DeviceFirmware firmware = DeviceFirmware.builder()
+                    .version(version)
+                    .product(product)
+                    .releaseNotes(releaseNotes)
+                    .url(url)
+                    .fileName(file.getOriginalFilename())
+                    .filePath(targetPath.toString())
+                    .md5(md5)
+                    .sha256(sha256)
+                    .size(file.getSize())
+                    .uploadedBy(StringUtils.hasText(operator) ? operator : DeviceCommandConstants.DEFAULT_OPERATOR)
+                    .uploadTime(LocalDateTime.now())
+                    .status(1)
+                    .build();
 
             firmware = firmwareService.saveFirmware(firmware);
 
             log.info("固件上传成功 - id: {}, version: {}, md5: {}, size: {}", firmware.getId(), version, md5, file.getSize());
 
             // ==================== 4. 组装响应 ====================
-            FirmwareUploadResponse response = new FirmwareUploadResponse();
-            response.setId(firmware.getId());
-            response.setVersion(version);
-            response.setProduct(product);
-            response.setUrl(url);
-            response.setMd5(md5);
-            response.setSha256(sha256);
-            response.setSize(file.getSize());
-            return response;
+            return FirmwareUploadResponse.builder()
+                    .id(firmware.getId())
+                    .version(version)
+                    .product(product)
+                    .url(url)
+                    .md5(md5)
+                    .sha256(sha256)
+                    .size(file.getSize())
+                    .build();
 
         } catch (Exception e) {
             // 入库失败时清理已写入的文件
@@ -174,7 +166,7 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
         try (InputStream in = file.getInputStream();
              OutputStream out = Files.newOutputStream(targetPath)) {
 
-            byte[] buffer = new byte[FileConstants.UPLOAD_BUFFER_SIZE];
+            byte[] buffer = new byte[FirmwareConstants.UPLOAD_BUFFER_SIZE];
             int n;
             while ((n = in.read(buffer)) > 0) {
                 md5Digest.update(buffer, 0, n);
@@ -191,7 +183,7 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
     private String computeSha256(Path path) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         try (InputStream in = Files.newInputStream(path)) {
-            byte[] buffer = new byte[FileConstants.UPLOAD_BUFFER_SIZE];
+            byte[] buffer = new byte[FirmwareConstants.UPLOAD_BUFFER_SIZE];
             int n;
             while ((n = in.read(buffer)) > 0) {
                 digest.update(buffer, 0, n);

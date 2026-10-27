@@ -85,10 +85,8 @@ public class AuthService {
                         .eq(SysRole::getDeleted, UserConstants.NOT_DELETED)
                         .last("LIMIT 1"));
         if (defaultRole == null) {
-            log.error("默认角色 [{}] 未初始化，无法完成用户 [{}] 注册",
-                    UserConstants.DEFAULT_ROLE_CODE, req.getUsername());
-            throw new BusinessException(ErrorCode.CONFIG_ERROR,
-                    "默认角色 [" + UserConstants.DEFAULT_ROLE_CODE + "] 未初始化，请联系管理员");
+            log.error("默认角色 [{}] 未初始化，无法完成用户 [{}] 注册",UserConstants.DEFAULT_ROLE_CODE, req.getUsername());
+            throw new BusinessException(ErrorCode.CONFIG_ERROR, "默认角色 [" + UserConstants.DEFAULT_ROLE_CODE + "] 未初始化，请联系管理员");
         } else {
             // 见下方说明：优先用 BaseMapper.insert，如果没有就用自定义 SQL
             sysRoleInfoMapper.insertUserRole(user.getId(), defaultRole.getId());

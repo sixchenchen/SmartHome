@@ -84,7 +84,7 @@ public class RefreshTokenService {
      */
     private String hashToken(String token) {
         try {
-            // 👈 使用常量
+            // 使用常量
             MessageDigest digest = MessageDigest.getInstance(UserConstants.HASH_ALGORITHM_SHA256);
             byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);

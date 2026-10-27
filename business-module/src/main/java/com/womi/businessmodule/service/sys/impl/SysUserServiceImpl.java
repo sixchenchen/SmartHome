@@ -23,7 +23,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         // 生成改名后的用户名
-        String deletedUsername = user.getUsername() + "#DEL#" + userId;
+        String deletedUsername = user.getUsername() + UserConstants.DELETE_USER_NAME  + userId;
 
         // 使用 UpdateWrapper 直接更新（绕开逻辑删除导致找不到数据的坑）
         boolean updated = lambdaUpdate()

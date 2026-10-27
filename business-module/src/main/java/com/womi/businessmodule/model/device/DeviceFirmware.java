@@ -1,6 +1,7 @@
 package com.womi.businessmodule.model.device;
 
 import com.baomidou.mybatisplus.annotation.*;
+import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
  * 固件版本
  */
 @Data
+@Builder
 @TableName("device_firmware")
 public class DeviceFirmware {
 

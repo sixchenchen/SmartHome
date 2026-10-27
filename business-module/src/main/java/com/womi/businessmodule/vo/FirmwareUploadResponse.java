@@ -1,8 +1,10 @@
 package com.womi.businessmodule.vo;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
+@Builder
 public class FirmwareUploadResponse {
 
     private Long id;

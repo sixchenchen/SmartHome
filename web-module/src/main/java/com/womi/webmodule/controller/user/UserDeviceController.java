@@ -1,4 +1,4 @@
-package com.womi.webmodule.controller.device;
+package com.womi.webmodule.controller.user;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.womi.businessmodule.dto.DeviceControlRequest;
