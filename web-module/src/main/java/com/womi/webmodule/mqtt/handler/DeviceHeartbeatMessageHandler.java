@@ -40,7 +40,6 @@ public class DeviceHeartbeatMessageHandler implements MqttMessageHandler {
     private final JsonUtils jsonUtils;
     private final DeviceInfoService deviceInfoService;
     private final DeviceHeartbeatRecordService heartbeatRecordService;
-    private final DeviceBindingMapper deviceBindingMapper;
     private final StringRedisTemplate redisTemplate;
 
     @Override

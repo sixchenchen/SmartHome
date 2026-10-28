@@ -8,7 +8,6 @@ import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.service.auth.SecurityUser;
 import com.womi.webmodule.service.device.DeviceUserService;
 import jakarta.validation.Valid;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -62,6 +61,6 @@ public class UserDeviceController {
      */
     private Long getCurrentUserId() {
         SecurityUser securityUser = (SecurityUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return securityUser.getSysUser().getId();
+        return securityUser.sysUser().getId();
     }
 }

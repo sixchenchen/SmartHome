@@ -8,6 +8,7 @@ import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
+import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
@@ -169,7 +170,7 @@ public class DeviceControlServiceImpl implements DeviceControlService {
 
         // 在线标志
         if (device.getOnline() == null
-                || device.getOnline() != DeviceConstants.DEVICE_STATUS_ONLINE) {
+                || device.getOnline() != DeviceOnlineStatus.ONLINE.getCode()) {
             log.warn("指令拒绝：设备不在线 - deviceId: {}, online: {}", deviceId, device.getOnline());
             throw new BusinessException(ErrorCode.DEVICE_OFFLINE);
         }

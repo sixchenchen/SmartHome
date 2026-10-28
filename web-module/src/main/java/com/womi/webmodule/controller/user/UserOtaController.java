@@ -20,7 +20,7 @@ public class UserOtaController {
      */
     private Long getCurrentUserId() {
         SecurityUser user = (SecurityUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return user.getSysUser().getId();
+        return user.sysUser().getId();
     }
 
     /**

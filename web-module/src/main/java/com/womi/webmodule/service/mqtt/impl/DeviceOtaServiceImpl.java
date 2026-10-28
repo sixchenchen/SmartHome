@@ -13,6 +13,8 @@ import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.constants.FirmwareConstants;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
+import com.womi.commonmodule.enums.DeviceOnlineStatus;
+import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.DeviceOtaStateUtils;
@@ -173,7 +175,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND);
         }
         if (firmware.getStatus() == null
-                || firmware.getStatus() != DeviceConstants.FIRMWARE_STATUS_ENABLE) {
+                || firmware.getStatus() != EnableStatus.ENABLED.getCode()) {
             throw new BusinessException(ErrorCode.FIRMWARE_DISABLED);
         }
         return firmware;
@@ -262,7 +264,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
 
         // 2. 筛选目标设备 (必须在线的，且当前版本不等于目标版本的)
         LambdaQueryWrapper<DeviceInfo> wrapper = new LambdaQueryWrapper<DeviceInfo>()
-                .eq(DeviceInfo::getOnline, DeviceConstants.DEVICE_STATUS_ONLINE) // 条件 A: 必须在线
+                .eq(DeviceInfo::getOnline, DeviceOnlineStatus.ONLINE.getCode()) // 条件 A: 必须在线
                 .ne(DeviceInfo::getFirmware, firmware.getVersion()); // 条件 B: 版本不一致
 
         if (StringUtils.hasText(targetProduct)) {

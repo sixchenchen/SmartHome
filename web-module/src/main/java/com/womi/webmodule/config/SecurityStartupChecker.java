@@ -11,9 +11,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class SecurityStartupChecker implements ApplicationRunner {
 
+    String defaultSecret = "dGhpc2lzYXZlcnlzZWNyZXRrZXlmb3Jqd3R0b2tlbnVzZTEyMzQ1Ng==";
     @Value("${my.jwt.secret}")
     private String jwtSecret;
-
     private final Environment environment;
 
     public SecurityStartupChecker(Environment environment) {
@@ -22,7 +22,6 @@ public class SecurityStartupChecker implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        String defaultSecret = "dGhpc2lzYXZlcnlzZWNyZXRrZXlmb3Jqd3R0b2tlbnVzZTEyMzQ1Ng==";
         boolean isProd = false;
         for (String profile : environment.getActiveProfiles()) {
             if ("prod".equalsIgnoreCase(profile)) {

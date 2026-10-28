@@ -3,12 +3,6 @@ package com.womi.commonmodule.constants;
 public final class UserConstants {
 
     /**
-     * 用户状态
-     */
-    public static final Integer ENABLE_USER = 1;
-    public static final Integer DISENABLE_USER = 0;
-
-    /**
      * 逻辑删除
      */
     public static final Integer NOT_DELETED = 0;

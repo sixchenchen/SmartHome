@@ -9,6 +9,7 @@ import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceOtaStateConstants;
 import com.womi.commonmodule.enums.DeviceOfflineReason;
+import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.utils.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,7 @@ public class DeviceInfoServiceImpl
         if (info == null) {
             info = new DeviceInfo();
             info.setDeviceId(deviceId);
-            info.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
+            info.setOnline(DeviceOnlineStatus.OFFLINE.getCode());
             save(info);
             log.info("创建新设备 - deviceId: {}", deviceId);
         }
@@ -60,7 +61,7 @@ public class DeviceInfoServiceImpl
         }
 
         // 1. 直接给实体对象赋值
-        device.setOnline(DeviceConstants.DEVICE_STATUS_ONLINE);
+        device.setOnline(DeviceOnlineStatus.ONLINE.getCode());
         device.setLastOnlineTime(LocalDateTime.now());
         device.setLastHeartbeatTime(LocalDateTime.now());
         device.setProduct(product);

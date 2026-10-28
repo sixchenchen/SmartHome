@@ -181,6 +181,12 @@ public final class DeviceMqttConstants {
     public static final String FIELD_SIGNATURE = "signature";
     public static final String FIELD_SLAVES = "slaves";
     public static final String FIELD_SLAVE = "slave";
+    public static final String FILED_MESSAGE = "message";
+    public static final String FILED_CODE = "code";
+    public static final String TRIGGER_SOURCE = "trigger_source";
+    public static final String FIELD_SENSOR_KEY = "sensor_key";
+    public static final String SOURCE = "source";
+    public static final String FIELD_ADDRESS = "address";
 
     // ---------- 消息类型（payload.type） ----------
     public static final String MSG_TYPE_ONLINE = "online";
@@ -324,4 +330,5 @@ public final class DeviceMqttConstants {
      * 舵机角度
      */
     public static final String FIELD_ANGLE = "angle";
+
 }

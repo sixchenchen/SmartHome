@@ -13,19 +13,11 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /*
-  OTA 进度上报处理器
-  topic: device/{mac}/ota_progress
+  传感器上报处理器
+  topic: device/{mac}/sensor
   payload:
   {
-    "device": "B4BFE90CDBA1",
-    "type": "ota_progress",
-    "commandId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "timestamp": 1710000000000,
-    "data": {
-      "otaState": "downloading",
-      "progress": 45,
-      "version": "1.0.30"
-    }
+
   }
 */
 
@@ -36,8 +28,6 @@ import org.springframework.stereotype.Component;
 public class DeviceSensorMessageHandler implements MqttMessageHandler {
 
     private final JsonUtils jsonUtils;
-    private final DeviceSensorThresholdService thresholdService;
-    private final DeviceAlertRecordService alertRecordService;
     private final DeviceSensorDataService deviceSensorDataService;
 
     @Override

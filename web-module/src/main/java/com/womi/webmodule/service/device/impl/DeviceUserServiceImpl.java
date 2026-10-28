@@ -10,8 +10,11 @@ import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
+import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.RedisConstants;
+import com.womi.commonmodule.enums.BindStatus;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
+import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
 import com.womi.webmodule.service.device.DeviceUserService;
@@ -68,7 +71,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         DeviceBinding binding = new DeviceBinding();
         binding.setDeviceId(cleanMac);
         binding.setUserId(userId);
-        binding.setBindStatus(1);
+        binding.setBindStatus( BindStatus.BOUND.getCode());
         binding.setBindTime(LocalDateTime.now());
 
         try {
@@ -98,7 +101,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
 
         // 2. 更新为解绑状态
         // 更新后，数据库的 active_device_id 会自动变为 NULL，解除唯一锁定
-        binding.setBindStatus(0);
+        binding.setBindStatus( BindStatus.UNBOUND.getCode());
         binding.setUnbindTime(LocalDateTime.now());
         deviceBindingMapper.updateById(binding);
         redisTemplate.opsForSet().remove(RedisConstants.BOUND_DEVICES_KEY, cleanMac);
@@ -111,7 +114,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         List<DeviceBinding> bindings = deviceBindingMapper.selectList(
                 new LambdaQueryWrapper<DeviceBinding>()
                         .eq(DeviceBinding::getUserId, userId)
-                        .eq(DeviceBinding::getBindStatus, 1));
+                        .eq(DeviceBinding::getBindStatus,  BindStatus.BOUND.getCode()));
 
         Page<DeviceInfo> page = new Page<>(pageNum, pageSize);
 
@@ -151,7 +154,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         }
 
         // ==================== 场景 4：校验在线状态 ====================
-        if (device.getOnline() != 1) {
+        if (device.getOnline() != DeviceOnlineStatus.ONLINE.getCode()) {
             throw new BusinessException(400, "设备当前离线，请检查电源后重试");
         }
 

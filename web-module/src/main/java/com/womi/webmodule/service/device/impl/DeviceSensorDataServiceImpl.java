@@ -4,6 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.womi.businessmodule.model.device.*;
 import com.womi.businessmodule.service.device.*;
+import com.womi.commonmodule.constants.DeviceConstants;
+import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.enums.AlertStatus;
+import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.service.common.WebSocketPushService;
 import com.womi.webmodule.service.device.DeviceSensorDataService;
@@ -35,17 +39,17 @@ public class DeviceSensorDataServiceImpl implements DeviceSensorDataService {
         LocalDateTime now = LocalDateTime.now();
 
         for (JsonNode node : dataArray) {
-            String sensorType = jsonUtils.getString(node, "sensor_type");
+            String sensorType = jsonUtils.getString(node, DeviceMqttConstants.FIELD_SENSOR_TYPE);
             if (sensorType == null) continue;
 
-            String sensorKey = jsonUtils.getString(node, "sensor_key");
-            Double value = jsonUtils.getDouble(node, "value");
-            String unit = jsonUtils.getString(node, "unit");
-            String source = jsonUtils.getString(node, "source");
+            String sensorKey = jsonUtils.getString(node, DeviceMqttConstants.FIELD_SENSOR_KEY);
+            Double value = jsonUtils.getDouble(node, DeviceMqttConstants.FIELD_VALUE);
+            String unit = jsonUtils.getString(node, DeviceMqttConstants.FIELD_UNIT);
+            String source = jsonUtils.getString(node, DeviceMqttConstants.SOURCE);
 
             // 1. 提取从机地址和通道号
-            Integer address = jsonUtils.getInt(node, "address");
-            Integer channel = jsonUtils.getInt(node, "channel");
+            Integer address = jsonUtils.getInt(node, DeviceMqttConstants.FIELD_ADDRESS);
+            Integer channel = jsonUtils.getInt(node, DeviceMqttConstants.FIELD_CHANNEL);
 
             // 2. 组装历史记录
             DeviceSensorRecord record = new DeviceSensorRecord();
@@ -56,7 +60,7 @@ public class DeviceSensorDataServiceImpl implements DeviceSensorDataService {
             record.setUnit(unit);
             record.setSource(source);
 
-            // 3. 将地址和通道号赋给实体（前提是你的实体类里叫 slaveAddress 和 channel）
+            // 3. 将地址和通道号赋给实体
             if (address != null) record.setSlaveAddress(address);
             if (channel != null) record.setChannel(channel);
 
@@ -65,7 +69,7 @@ public class DeviceSensorDataServiceImpl implements DeviceSensorDataService {
             records.add(record);
 
             // 4. 更新从机实时值（如果是从机数据）
-            if ("slave".equals(source) && address != null) {
+            if (DeviceMqttConstants.FIELD_SLAVE.equals(source) && address != null) {
                 // 5. 把 channel 也传给更新方法
                 slaveDataService.updateSlaveValue(deviceId, address, channel, sensorType, value, now);
             }
@@ -88,7 +92,7 @@ public class DeviceSensorDataServiceImpl implements DeviceSensorDataService {
                 new LambdaQueryWrapper<DeviceSensorThreshold>()
                         .eq(DeviceSensorThreshold::getDeviceId, deviceId)
                         .eq(DeviceSensorThreshold::getSensorKey, sensorKey)
-                        .eq(DeviceSensorThreshold::getEnabled, 1)
+                        .eq(DeviceSensorThreshold::getEnabled, EnableStatus.ENABLED.getCode())
         );
 
         if (threshold == null) return;
@@ -112,13 +116,12 @@ public class DeviceSensorDataServiceImpl implements DeviceSensorDataService {
             alert.setDeviceId(deviceId);
             alert.setSensorKey(sensorKey);
             alert.setAlertLevel(threshold.getAlarmLevel() != null ? threshold.getAlarmLevel() : 3);
-            alert.setAlertType("threshold");
+            alert.setAlertType(DeviceConstants.DEVICE_SENSOR_ALERT_TYPE);
             alert.setMessage(msg);
             alert.setValue(value);
             alert.setThreshold(triggerThreshold);
-            alert.setStatus(0);
+            alert.setStatus(AlertStatus.PENDING.getCode());
             alert.setTimestamp(LocalDateTime.now());
-            alert.setCreateTime(LocalDateTime.now());
 
             alertRecordService.save(alert);
             webSocketPushService.pushAlert(deviceId, alert);

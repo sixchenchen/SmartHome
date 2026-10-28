@@ -52,12 +52,12 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
                             StompPrincipal principal = new StompPrincipal(
-                                    securityUser.getSysUser().getId(), username, isAdmin);
+                                    securityUser.sysUser().getId(), username, isAdmin);
 
                             // 保存到 sessionAttributes 中，供后续 SUBSCRIBE 取用
                             Map<String, Object> sessionAttributes = accessor.getSessionAttributes();
                             if (sessionAttributes != null) {
-                                sessionAttributes.put("userId", securityUser.getSysUser().getId());
+                                sessionAttributes.put("userId", securityUser.sysUser().getId());
                                 sessionAttributes.put("isAdmin", isAdmin);
                             }
 

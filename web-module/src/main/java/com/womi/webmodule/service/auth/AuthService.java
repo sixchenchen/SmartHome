@@ -12,6 +12,7 @@ import com.womi.businessmodule.model.sys.SysRole;
 import com.womi.businessmodule.model.sys.SysUser;
 import com.womi.businessmodule.vo.LoginResponse;
 import com.womi.commonmodule.constants.UserConstants;
+import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.JwtTokenUtil;
@@ -67,7 +68,7 @@ public class AuthService {
                 ? req.getNickname() : req.getUsername());
         user.setEmail(req.getEmail());
         user.setPhone(req.getPhone());
-        user.setStatus(UserConstants.ENABLE_USER);
+        user.setStatus(EnableStatus.ENABLED.getCode());
         user.setDeleted(UserConstants.NOT_DELETED);
 
         // 3. 插入，唯一索引
@@ -81,7 +82,7 @@ public class AuthService {
         SysRole defaultRole = sysRoleMapper.selectOne(
                 new LambdaQueryWrapper<SysRole>()
                         .eq(SysRole::getRoleCode, UserConstants.DEFAULT_ROLE_CODE)
-                        .eq(SysRole::getStatus, UserConstants.ENABLE_USER)
+                        .eq(SysRole::getStatus, EnableStatus.ENABLED.getCode())
                         .eq(SysRole::getDeleted, UserConstants.NOT_DELETED)
                         .last("LIMIT 1"));
         if (defaultRole == null) {

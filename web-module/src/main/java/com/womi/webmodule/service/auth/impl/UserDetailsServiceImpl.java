@@ -7,6 +7,7 @@ import com.womi.businessmodule.mapper.sys.SysRoleMapper;
 import com.womi.businessmodule.model.sys.SysUser;
 import com.womi.businessmodule.model.sys.SysRole;
 import com.womi.commonmodule.constants.UserConstants;
+import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.webmodule.service.auth.SecurityUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -44,7 +45,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             List<SysRole> roles = sysRoleMapper.selectRolesByIds(roleIds);
             if (!CollectionUtils.isEmpty(roles)) {
                 roles.stream()
-                        .filter(role -> UserConstants.ENABLE_USER.equals(role.getStatus()))
+                        .filter(role -> EnableStatus.fromCode(role.getStatus()) == EnableStatus.ENABLED)
                         .forEach(role -> authorities.add(new SimpleGrantedAuthority(UserConstants.ROLE_PREFIX + role.getRoleCode())));
             }
 

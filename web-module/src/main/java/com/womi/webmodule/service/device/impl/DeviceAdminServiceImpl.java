@@ -11,7 +11,10 @@ import com.womi.businessmodule.model.device.DeviceBinding;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.model.device.DeviceMqttAuth;
 import com.womi.businessmodule.model.device.DeviceWhitelist;
+import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.RegexConstants;
+import com.womi.commonmodule.enums.DeviceOnlineStatus;
+import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
 import com.womi.webmodule.service.device.DeviceAdminService;
@@ -71,7 +74,7 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
         device.setDeviceName(StringUtils.hasText(request.getDeviceName()) ? request.getDeviceName() : cleanMac);
         device.setProduct(request.getProduct());
         device.setLocation(request.getLocation());
-        device.setOnline(0); // 默认离线
+        device.setOnline(DeviceOnlineStatus.OFFLINE.getCode()); // 默认离线
         deviceInfoMapper.insert(device);
 
         // 3. ：安全插入/更新 device_whitelist
@@ -81,15 +84,15 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
 
         if (existingWhitelist != null) {
             // 如果白名单已存在（比如之前是禁用的），直接恢复启用状态
-            existingWhitelist.setEnabled(1);
-            existingWhitelist.setRemark("管理员后台录入覆盖更新");
+            existingWhitelist.setEnabled(EnableStatus.ENABLED.getCode());
+            existingWhitelist.setRemark(DeviceConstants.WHITELIST_REMARK_ADMIN_OVERRIDE);
             deviceWhitelistMapper.updateById(existingWhitelist);
         } else {
             // 如果不存在，则新建
             DeviceWhitelist whitelist = new DeviceWhitelist();
             whitelist.setDeviceId(cleanMac);
-            whitelist.setEnabled(1);
-            whitelist.setRemark("管理员后台录入自动生成");
+            whitelist.setEnabled(EnableStatus.ENABLED.getCode());
+            whitelist.setRemark(DeviceConstants.WHITELIST_REMARK_ADMIN_CREATE);
             deviceWhitelistMapper.insert(whitelist);
         }
 

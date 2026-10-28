@@ -54,19 +54,19 @@ public class DeviceEventMessageHandler implements MqttMessageHandler {
 
             // 提取 data 节点中的事件信息
             String eventType = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TYPE); // error 或 event
-            String eventName = jsonUtils.getString(dataNode, "event");
-            String code = jsonUtils.getString(dataNode, "code");
-            String message = jsonUtils.getString(dataNode, "message");
-            String context = jsonUtils.getString(dataNode, "context");
-            String target = jsonUtils.getString(dataNode, "target");
-            Integer channel = jsonUtils.getInt(dataNode, "channel");
-            String triggerSource = jsonUtils.getString(dataNode, "trigger_source");
+            String eventName = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_EVENT);
+            String code = jsonUtils.getString(dataNode, DeviceMqttConstants.FILED_CODE);
+            String message = jsonUtils.getString(dataNode, DeviceMqttConstants.FILED_MESSAGE);
+            String context = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_CONTEXT);
+            String target = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TARGET);
+            Integer channel = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_CHANNEL);
+            String triggerSource = jsonUtils.getString(dataNode, DeviceMqttConstants.TRIGGER_SOURCE);
 
             // 组装实体
             DeviceEventRecord record = new DeviceEventRecord();
             record.setDeviceId(deviceId);
             // 如果 data.type 没传，默认按 event 存
-            record.setType(eventType != null ? eventType : "event");
+            record.setType(eventType != null ? eventType :DeviceMqttConstants.MSG_TYPE_EVENT);
             record.setEvent(eventName);
             record.setCode(code);
             record.setMessage(message);
@@ -85,8 +85,8 @@ public class DeviceEventMessageHandler implements MqttMessageHandler {
             eventRecordService.save(record);
 
             // 根据级别打印不同的日志
-            if ("error".equalsIgnoreCase(eventType)) {
-                log.error("🚨 设备上报错误 - deviceId: {}, code: {}, message: {}", deviceId, code, message);
+            if (DeviceMqttConstants.MSG_TYPE_ERROR.equalsIgnoreCase(eventType)) {
+                log.error("设备上报错误 - deviceId: {}, code: {}, message: {}", deviceId, code, message);
             } else {
                 log.info("设备上报事件 - deviceId: {}, event: {}", deviceId, eventName);
             }

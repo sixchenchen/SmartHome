@@ -7,6 +7,8 @@ import com.womi.businessmodule.service.device.DeviceWhitelistService;
 import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.constants.RegexConstants;
+import com.womi.commonmodule.enums.DeviceOnlineStatus;
+import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.MqttErrorCode;
 import com.womi.commonmodule.enums.DeviceOfflineReason;
 import com.womi.commonmodule.utils.MacUtils;
@@ -53,7 +55,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
             return DeviceRegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID,
                     MqttErrorCode.INVALID_DEVICE_ID.getMessage());
         }
-        request.setDeviceId(cleanMac); // 👈 核心魔法：覆盖原对象
+        request.setDeviceId(cleanMac); // 核心魔法：覆盖原对象
 
         String deviceId = request.getDeviceId(); // 后续全用这个，其实与 cleanMac 等价
 
@@ -191,7 +193,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     }
 
     private void saveFirstTimeDevice(DeviceRegisterRequest request, MqttCredential credential) {
-        // 👈 不需要再 normalize 了，直接用
         String deviceId = request.getDeviceId();
         LocalDateTime now = LocalDateTime.now();
         DeviceInfo device = new DeviceInfo();
@@ -199,18 +200,18 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         device.setProduct(request.getProduct());
         device.setFirmware(request.getFirmware());
         device.setPubkey(request.getPubkey());
-        device.setOnline(DeviceConstants.DEVICE_STATUS_OFFLINE);
+        device.setOnline(DeviceOnlineStatus.OFFLINE.getCode());
         device.setOfflineReason(null);
         device.setCreateTime(now);
         device.setUpdateTime(now);
         deviceInfoService.save(device);
 
         mqttAuthService.saveOrUpdateDeviceAuth(
-                deviceId, // 👈 直接用
+                deviceId,
                 credential.getUsername(),
                 credential.getPasswordHash(),
                 credential.getSalt(),
-                DeviceConstants.MQTT_STATUS_ENABLE
+                EnableStatus.ENABLED.getCode()
         );
     }
 
@@ -222,11 +223,11 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         deviceInfoService.updateById(existing);
 
         mqttAuthService.saveOrUpdateDeviceAuth(
-                request.getDeviceId(), // 👈 直接用
+                request.getDeviceId(),
                 credential.getUsername(),
                 credential.getPasswordHash(),
                 credential.getSalt(),
-                DeviceConstants.MQTT_STATUS_ENABLE
+                EnableStatus.ENABLED.getCode()
         );
     }
 
@@ -236,13 +237,12 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         existing.setUpdateTime(LocalDateTime.now());
         deviceInfoService.updateById(existing);
 
-        // 👈 彻底修复：这里原来用的是未清洗的 request.getDeviceId()，现在安全了
         mqttAuthService.saveOrUpdateDeviceAuth(
                 request.getDeviceId(),
                 credential.getUsername(),
                 credential.getPasswordHash(),
                 credential.getSalt(),
-                DeviceConstants.MQTT_STATUS_ENABLE
+                EnableStatus.ENABLED.getCode()
         );
     }
 

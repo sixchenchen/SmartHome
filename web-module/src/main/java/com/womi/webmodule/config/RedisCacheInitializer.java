@@ -3,7 +3,10 @@ package com.womi.webmodule.config;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.womi.businessmodule.mapper.device.DeviceBindingMapper;
 import com.womi.businessmodule.model.device.DeviceBinding;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
+import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.RedisConstants;
+import com.womi.commonmodule.enums.BindStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -18,7 +21,6 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class RedisCacheInitializer implements ApplicationRunner {
-
     private final DeviceBindingMapper bindingMapper;
     private final StringRedisTemplate redisTemplate;
 
@@ -32,7 +34,7 @@ public class RedisCacheInitializer implements ApplicationRunner {
         // 2. 从数据库查出所有有效绑定的 MAC
         List<DeviceBinding> activeBindings = bindingMapper.selectList(
                 new LambdaQueryWrapper<DeviceBinding>()
-                        .eq(DeviceBinding::getBindStatus, 1)
+                        .eq(DeviceBinding::getBindStatus, BindStatus.BOUND.getCode())
         );
 
         if (!activeBindings.isEmpty()) {
