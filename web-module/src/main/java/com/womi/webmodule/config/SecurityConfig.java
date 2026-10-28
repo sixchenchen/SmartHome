@@ -7,6 +7,8 @@ import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
@@ -56,27 +58,32 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, Environment env) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))  // 无状态
-                .authorizeHttpRequests(auth -> auth
-                        // 登录、注册、刷新 Token 完全匿名访问
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/error").permitAll()
-                        .requestMatchers(
+                .authorizeHttpRequests(auth -> {
+
+                    // 1. 所有环境都放行的白名单
+                    auth.requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
+                            .requestMatchers("/ws/**").permitAll()
+                            .requestMatchers("/error", "/favicon.ico").permitAll();
+
+                    // 2. 判断环境：如果不是 prod，才允许访问 Swagger 文档
+                    if (!env.acceptsProfiles(Profiles.of("prod"))) {
+                        auth.requestMatchers(
                                 "/doc.html",
                                 "/webjars/**",
                                 "/v3/api-docs/**",
-                                "/swagger-resources/**",
-                                "/favicon.ico"
-                        ).permitAll()
-                        .anyRequest().authenticated()                  // 其余全部需要认证
-                )
+                                "/swagger-resources/**"
+                        ).permitAll();
+                    }
+
+                    // 3. 其余所有请求必须认证
+                    auth.anyRequest().authenticated();
+                })
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)   // 401 JSON
                         .accessDeniedHandler(accessDeniedHandler)             // 403 JSON

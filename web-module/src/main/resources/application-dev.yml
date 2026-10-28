@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/smart_device?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&useUnicode=true
-    username: root
-    password: 123456
+    username: ${DEV_DB_USER:root}
+    password: ${DEV_DB_PASS:123456}
 
   data:
     redis:
@@ -10,57 +10,29 @@ spring:
       port: 6379
       password:
       database: 0
-
 mqtt:
   runtime:
     host: 127.0.0.1
     port: 8883
     client-id: java-backend-runtime
-    username: java-backend
-    password: "123456"
+    username: ${DEV_MQTT_USER:java-backend}
+    password: ${DEV_MQTT_PASS:123456}
     ca-cert: certs/iot-ca.crt
     client-cert: certs/java-client.p12
-    client-cert-password: "123456"
-    topics:
-      - device/+/presence
-      - device/+/heartbeat
-      - device/+/state
-      - device/+/ack
-      - device/+/event
-      - device/+/sensor
-      - device/+/ota_progress
-    qos:
-      - 1
-      - 0
-      - 1
-      - 1
-      - 1
-      - 0
-      - 0
-    default-qos: 1
-    keep-alive-interval: 60
-    connection-timeout: 30
-    automatic-reconnect: true
-    clean-session: true
-
+    client-cert-password: ${DEV_CERT_PASS:123456}
   provision:
     host: 127.0.0.1
     port: 8884
-    username: java-backend-provision
     client-id: java-backend-provision
+    username: java-backend-provision
     ca-cert: certs/iot-ca.crt
     client-cert: certs/java-client.p12
     client-cert-password: "123456"
-    topics:
-      - /provision/device/+/register
-    qos:
-      - 1
-    default-qos: 1
-    keep-alive-interval: 60
-    connection-timeout: 30
-    automatic-reconnect: true
-    clean-session: true
-
+cors:
+  # 开发环境允许的来源
+  allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:5500
 firmware:
+  upload-dir: D:/data/firmware/
+  base-url: http://localhost:8000/firmware/
 
 

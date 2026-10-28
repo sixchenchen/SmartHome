@@ -122,7 +122,7 @@ public class DeviceSensorDataServiceImpl implements DeviceSensorDataService {
 
             alertRecordService.save(alert);
             webSocketPushService.pushAlert(deviceId, alert);
-            log.warn("🚨 触发告警 - deviceId: {}, 原因: {}", deviceId, msg);
+            log.warn("触发告警 - deviceId: {}, 原因: {}", deviceId, msg);
         }
     }
 }

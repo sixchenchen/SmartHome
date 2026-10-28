@@ -40,21 +40,31 @@ public class UserAuthController {
     private final UserDetailsServiceImpl userDetailsService;
 
     @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest, @RequestHeader(value = "X-Device-Type", required = false) String deviceType) {
+    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request,
+                                            HttpServletRequest httpRequest,
+                                            @RequestHeader(value = "X-Device-Type", required = false) String deviceType) {
         String username = request.getUsername();
+        //  提取真实客户端 IP
+        String ip = getClientIp(httpRequest);
+
         try {
-            loginAttemptService.checkNotLocked(username);
+            // 传入 IP 进行校验
+            loginAttemptService.checkNotLocked(ip, username);
+
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, request.getPassword()));
 
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // 直接调用 Service 处理双 Token 和日志
+            // 登录成功，清理该 IP 的失败计数
+            loginAttemptService.recordSuccess(ip, username);
+
             return ApiResponse.success(authService.processLoginSuccess(userDetails, httpRequest, deviceType));
 
         } catch (BadCredentialsException e) {
-            loginAttemptService.recordFailure(username);
+            // 传入 IP 记录失败
+            loginAttemptService.recordFailure(ip, username);
             authService.recordLoginFailure(username, httpRequest, "用户名或密码错误");
             throw e;
         } catch (BusinessException e) {
@@ -80,7 +90,7 @@ public class UserAuthController {
     @PostMapping("/refresh")
     public ApiResponse<LoginResponse> refresh(@RequestBody RefreshRequest request) {
         // 1. 验证 RefreshToken
-        SysRefreshToken tokenEntity = refreshTokenService.verifyRefreshToken(request.getRefreshToken());
+        SysRefreshToken tokenEntity = refreshTokenService.consumeRefreshToken(request.getRefreshToken());
         if (tokenEntity == null) {
             throw new BusinessException(4010, "RefreshToken 无效或已过期，请重新登录");
         }
@@ -122,6 +132,24 @@ public class UserAuthController {
         return ApiResponse.success(null);
     }
 
-
+    /**
+     * 兼容 Nginx 反代的真实 IP 提取
+     */
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+            // 多次反向代理后会有多个IP，第一个为真实IP
+            int index = ip.indexOf(',');
+            if (index != -1) {
+                return ip.substring(0, index).trim();
+            }
+            return ip.trim();
+        }
+        ip = request.getHeader("X-Real-IP");
+        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+            return ip.trim();
+        }
+        return request.getRemoteAddr();
+    }
 
 }

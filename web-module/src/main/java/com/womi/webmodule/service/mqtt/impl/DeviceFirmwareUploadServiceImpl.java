@@ -60,6 +60,11 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
             throw new BusinessException(ErrorCode.FILE_FORMAT_ERROR, ErrorInfoConstants.FILE_FORMAT_MUST_BIN);
         }
 
+        if (!version.matches("^[0-9A-Za-z._-]+$")) {
+            log.warn("固件上传拦截：非法的版本号格式 - version: {}", version);
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "版本号格式错误，只能包含字母、数字、下划线和点");
+        }
+
         // 版本已存在直接拒绝
         DeviceFirmware exist = firmwareService.getByVersion(version, product);
         if (exist != null) {
@@ -71,11 +76,13 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
         try {
             String timestamp = DateTimeUtils.nowCompact();
             String fileName = String.format(firmwareProperties.getFileNamePattern(), version, timestamp);
-
-            Path dirPath = Paths.get(firmwareProperties.getUploadDir());
+            Path dirPath = Paths.get(firmwareProperties.getUploadDir()).toAbsolutePath().normalize();
             Files.createDirectories(dirPath);
             targetPath = dirPath.resolve(fileName);
-
+            if (!targetPath.startsWith(dirPath)) {
+                log.error("固件上传安全拦截：检测到路径穿越攻击！ - 期望目录: {}, 实际路径: {}", dirPath, targetPath);
+                throw new BusinessException(ErrorCode.PARAM_ERROR, "非法的文件路径");
+            }
             // 流式写入 + 算 MD5
             String md5 = computeAndSave(file, targetPath);
             String sha256 = computeSha256(targetPath);

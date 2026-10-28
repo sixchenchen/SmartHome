@@ -163,7 +163,7 @@ public class AuthService {
     }
 
     /**
-     * 记录登录失败（P1-4）
+     * 记录登录失败
      */
     public void recordLoginFailure(String username, HttpServletRequest request, String reason) {
         String ip = extractClientIp(request);
@@ -188,10 +188,8 @@ public class AuthService {
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
         String refreshToken = refreshTokenService.createRefreshToken(user.getId(), deviceType);
 
-        // 3. 清理历史记录 & 写登录日志
-        loginAttemptService.recordSuccess(username); // 清 Redis 锁
+        // 3. 写登录日志
         recordLoginSuccess(username, request);
-
         return buildLoginResponse(userDetails, user, accessToken, refreshToken);
     }
 

@@ -1,6 +1,10 @@
 package com.womi.webmodule.config;
 
+import com.womi.webmodule.interceptor.WebSocketAuthInterceptor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -8,21 +12,31 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @Configuration
 @EnableWebSocketMessageBroker
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+
+    @Value("${cors.allowed-origins}")
+    private String[] allowedOrigins;
+    private final WebSocketAuthInterceptor webSocketAuthInterceptor;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        // 客户端订阅地址的前缀（前端监听 /topic 开头的主题）
         config.enableSimpleBroker("/topic", "/queue");
-        // 客户端发送消息的地址前缀（目前我们主要是后端推送，前端暂不需要发）
         config.setApplicationDestinationPrefixes("/app");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // 注册连接点，前端通过 ws://localhost:8080/ws 连接
+        // 前端域名
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*") // 允许跨域
-                .withSockJS(); // 开启 SockJS 降级支持
+                .setAllowedOriginPatterns(allowedOrigins)
+                .withSockJS();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        // 注册拦截器
+        registration.interceptors(webSocketAuthInterceptor);
     }
 }

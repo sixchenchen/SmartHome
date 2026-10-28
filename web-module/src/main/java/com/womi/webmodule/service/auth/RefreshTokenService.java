@@ -7,6 +7,7 @@ import com.womi.businessmodule.model.sys.SysRefreshToken;
 import com.womi.commonmodule.constants.UserConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
@@ -57,6 +58,39 @@ public class RefreshTokenService {
             return null; // 无效或已过期
         }
         return entity;
+    }
+
+    /**
+     * 原子核销 RefreshToken（防并发双花）
+     * @return 核销成功返回实体，失败（已用、过期或不存在）返回 null
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public SysRefreshToken consumeRefreshToken(String rawToken) {
+        if (!StringUtils.hasText(rawToken)) {
+            return null;
+        }
+        String hash = hashToken(rawToken);
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. 原子更新：直接去数据库里抢占这个 Token
+        int rows = refreshTokenMapper.update(null, new LambdaUpdateWrapper<SysRefreshToken>()
+                .set(SysRefreshToken::getRevoked, 1)
+                .set(SysRefreshToken::getUpdateTime, now)
+                .eq(SysRefreshToken::getTokenHash, hash)
+                .eq(SysRefreshToken::getRevoked, 0)           // 只能更新未作废的
+                .gt(SysRefreshToken::getExpiresAt, now)       // 必须未过期
+        );
+
+        // 2. 如果 rows == 0，说明这个 Token 无效、过期，或者被另一个并发请求抢先用掉了
+        if (rows == 0) {
+            return null;
+        }
+
+        // 3. 抢占成功，查出记录并返回（供生成新 Token 使用）
+        return refreshTokenMapper.selectOne(
+                new LambdaQueryWrapper<SysRefreshToken>()
+                        .eq(SysRefreshToken::getTokenHash, hash)
+        );
     }
 
     /**

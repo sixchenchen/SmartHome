@@ -21,11 +21,10 @@ public class JwtTokenUtil {
 
     private final SecretKey key;
     private final long expirationMs;
-
     public JwtTokenUtil(@Value("${my.jwt.secret}") String secret,
                         @Value("${my.jwt.expiration-ms:86400000}") long expirationMs) {
         if (secret == null || secret.isBlank()) {
-            throw new IllegalStateException(ErrorInfoConstants.JWT_SECRET_NOT_CONFIG);
+            throw new BusinessException(ErrorInfoConstants.JWT_SECRET_NOT_CONFIG);
         }
         byte[] keyBytes;
         keyBytes = Decoders.BASE64.decode(secret);

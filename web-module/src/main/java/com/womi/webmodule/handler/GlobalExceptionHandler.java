@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.nio.file.AccessDeniedException;
 
@@ -92,6 +93,7 @@ public class GlobalExceptionHandler {
         // 返回 SYSTEM_ERROR 而不是 BUSINESS_ERROR —— 因为这不是"业务规则不允许"
         return ApiResponse.error(ErrorCode.SYSTEM_ERROR.getCode(), ErrorCode.SYSTEM_ERROR.getMessage());
     }
+
     /**
      * @Valid 校验失败（RequestBody）
      */
@@ -141,6 +143,18 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleMaxUploadSize(MaxUploadSizeExceededException e) {
         log.warn("文件超过大小限制: {}", e.getMessage());
         return ApiResponse.error(ErrorCode.FILE_TOO_LARGE.getCode(), ErrorCode.FILE_TOO_LARGE.getMessage());
+    }
+
+    /**
+     * 处理静态资源找不到的异常（如 favicon.ico 等）
+     * 避免被兜底的 Exception 捕获，减少无用的 ERROR 日志
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND) // 返回 404 状态码
+    public ApiResponse<Void> handleNoResourceFound(NoResourceFoundException e, HttpServletRequest request) {
+        // 使用 debug 或 warn 级别，不要用 error
+        log.debug("静态资源未找到 - uri: {}", request.getRequestURI());
+        return ApiResponse.error(404, "资源不存在");
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.womi.webmodule.mqtt.core;
 
+import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.properties.MqttProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -88,6 +90,13 @@ public class MqttConfig {
     @Bean("runtimeInbound")
     public MessageProducer runtimeInbound() {
         MqttProperties.Broker broker = mqttProperties.getRuntime();
+        if (CollectionUtils.isEmpty(broker.getTopics())) {
+            throw new BusinessException("[RUNTIME] MQTT 订阅主题清单为空！请检查配置文件。系统拒绝启动。");
+        }
+        if (broker.getTopics().size() != broker.getQos().size()) {
+            throw new BusinessException("[RUNTIME] MQTT topics 与 qos 的数量不一致！请检查配置文件。");
+        }
+
         String[] topics = broker.getTopics().toArray(new String[0]);
         int[] qos = broker.getQos().stream().mapToInt(Integer::intValue).toArray();
 
@@ -141,6 +150,10 @@ public class MqttConfig {
     @Bean("provisionInbound")
     public MessageProducer provisionInbound() {
         MqttProperties.Broker broker = mqttProperties.getProvision();
+        if (CollectionUtils.isEmpty(broker.getTopics())) {
+            throw new BusinessException("[PROVISION] MQTT 订阅主题清单为空！请检查配置文件。系统拒绝启动。");
+        }
+
         String[] topics = broker.getTopics().toArray(new String[0]);
         int[] qos = broker.getQos().stream().mapToInt(Integer::intValue).toArray();
 

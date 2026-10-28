@@ -1,15 +1,12 @@
 spring:
   datasource:
-    url: jdbc:mysql://生产数据库IP:3306/smart_device?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&useUnicode=true
-    username: ${DB_USERNAME}      # 从环境变量读，不写死
+    url: jdbc:mysql://${DB_HOST}:3306/smart_device?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf-8&useUnicode=true
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-
   data:
     redis:
       host: ${REDIS_HOST}
-      port: 6379
       password: ${REDIS_PASSWORD}
-      database: 0
 
 mqtt:
   runtime:
@@ -25,13 +22,26 @@ mqtt:
     username: ${MQTT_PROVISION_USERNAME}
     password: ${MQTT_PROVISION_PASSWORD}
     ca-cert: certs/cert.pem
+
 firmware:
   upload-dir: /data/firmware/
-  base-url: https://ota.yourdomain.com/firmware/
+  base-url: https://ota.yourdomain.com/firmware/ # TODO 服务器地址
+
+cors:
+  allowed-origins: https://www.yourdomain.com,https://admin.yourdomain.com
 
 logging:
   level:
+    root: info
     com.womi: info
-    com.womi.business.mapper: info
+    com.womi.businessmodule.mapper: warn # 生产环境 SQL 只打印警告和报错
+    org.springframework: warn
   file:
     name: /var/log/womi/webmodule.log
+knife4j:
+  enable: false # 生产关闭 Knife4j
+springdoc:
+  api-docs:
+    enabled: false # OpenAPI 元数据
+  swagger-ui:
+    enabled: false

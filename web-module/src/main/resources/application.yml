@@ -3,7 +3,7 @@ server:
 
 spring:
   profiles:
-    active: dev   # 默认激活 dev，生产用命令行覆盖
+    default: dev
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -25,7 +25,6 @@ spring:
       filters: stat,wall,slf4j
       use-global-data-source-stat: true
       connection-properties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
-
   data:
     redis:
       timeout: 5000ms
@@ -35,7 +34,6 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: 3000ms
-
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
@@ -43,7 +41,6 @@ spring:
       write-dates-as-timestamps: false
       indent-output: true
     default-property-inclusion: non_null
-
   servlet:
     multipart:
       max-file-size: ${firmware.max-size:16MB}
@@ -62,16 +59,66 @@ mybatis-plus:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 
+
+mqtt:
+  runtime:
+    host: 127.0.0.1
+    port: 8883
+    client-id: java-backend-runtime
+    username: java-backend
+    password: "123456"
+    ca-cert: certs/iot-ca.crt
+    client-cert: certs/java-client.p12
+    client-cert-password: "123456"
+    topics:
+      - device/+/presence
+      - device/+/heartbeat
+      - device/+/state
+      - device/+/ack
+      - device/+/event
+      - device/+/sensor
+      - device/+/ota_progress
+    qos:
+      - 1
+      - 0
+      - 1
+      - 1
+      - 1
+      - 0
+      - 0
+    default-qos: 1
+    keep-alive-interval: 60
+    connection-timeout: 30
+    automatic-reconnect: true
+    clean-session: true
+
+  provision:
+    host: 127.0.0.1
+    port: 8884
+    username: java-backend-provision
+    client-id: java-backend-provision
+    ca-cert: certs/iot-ca.crt
+    client-cert: certs/java-client.p12
+    client-cert-password: "123456"
+    topics:
+      - /provision/device/+/register
+    qos:
+      - 1
+    default-qos: 1
+    keep-alive-interval: 60
+    connection-timeout: 30
+    automatic-reconnect: true
+    clean-session: true
+
 firmware:
   file-name-pattern: "firmware_%s_%s.bin"
   max-size: 16MB
   max-request-size: 20MB
-  upload-dir: D:/data/firmware/
-  base-url: http://localhost:8000/firmware/
+
 my:
   jwt:
     # 设置jwt签名加密时使用的秘钥
-    secret: dGhpc2lzYXZlcnlzZWNyZXRrZXlmb3Jqd3R0b2tlbnVzZTEyMzQ1Ng==
+    secret: ${JWT_SECRET:dGhpc2lzYXZlcnlzZWNyZXRrZXlmb3Jqd3R0b2tlbnVzZTEyMzQ1Ng==}
     # 设置jwt过期时间
     expiration-ms: 86400000
 knife4j:
@@ -79,8 +126,8 @@ knife4j:
   setting:
     language: zh_cn
 
-logging:
-  level:
-    com.womi: debug
-    com.womi.business.mapper: debug
+#logging:
+#  level:
+#    com.womi: debug
+#    com.womi.business.mapper: debug
 #    org.eclipse.paho: DEBUG

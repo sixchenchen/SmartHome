@@ -2,19 +2,27 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <title>WebSocket 实时测试</title>
+    <title>WebSocket 安全实时测试</title>
     <!-- 使用 BootCDN，极其稳定，全局变量为 SockJS 和 Stomp -->
     <script src="https://cdn.bootcdn.net/ajax/libs/sockjs-client/1.5.0/sockjs.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </head>
 <body>
     <h2>设备实时监控台</h2>
-    <div id="status" style="font-weight: bold; color: orange;">正在连接服务器...</div>
+    
+    <div style="margin-bottom: 10px;">
+        <label>JWT Token：</label>
+        <input type="text" id="tokenInput" style="width: 400px;" placeholder="请粘贴你登录后获取的 Bearer Token">
+        <button onclick="connectWs()">连接并订阅</button>
+    </div>
+
+    <div id="status" style="font-weight: bold; color: orange;">等待连接...</div>
     <div id="log" style="border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; background: #f9f9f9; margin-top: 10px;"></div>
 
     <script>
         const logDiv = document.getElementById('log');
         const statusDiv = document.getElementById('status');
+        let stompClient = null;
 
         function log(msg, color = 'black') {
             const p = document.createElement('div');
@@ -23,39 +31,68 @@
             logDiv.prepend(p);
         }
 
-        // 1. 建立连接
-        const socket = new SockJS('http://127.0.0.1:8080/ws');
-        const stompClient = Stomp.over(socket);
-        
-        // 关闭控制台频繁打印的 ping/pong 日志
-        stompClient.debug = null; 
+        function connectWs() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if (!token) {
+                alert("请先填入 Token！");
+                return;
+            }
 
-        stompClient.connect({}, function (frame) {
-            statusDiv.innerText = "✅ WebSocket 连接成功!";
-            statusDiv.style.color = "green";
-            log('连接成功!', 'green');
+            if (stompClient) {
+                stompClient.disconnect();
+            }
 
-            const deviceId = 'B4BFE90CDBA1'; // 替换为你测试的设备ID
+            statusDiv.innerText = "正在连接服务器...";
+            statusDiv.style.color = "orange";
 
-            // 2. 订阅状态变化
-            stompClient.subscribe('/topic/device/' + deviceId + '/state', function (response) {
-                log('🔔 状态变化: ' + response.body, 'blue');
+            // 1. 建立连接
+            const socket = new SockJS('http://127.0.0.1:8080/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null; 
+
+            // 👈 2. 将 Token 放入 STOMP Header 中
+            const connectHeaders = {
+                'Authorization': 'Bearer ' + token
+            };
+
+            stompClient.connect(connectHeaders, function (frame) {
+                statusDiv.innerText = "✅ WebSocket 安全连接成功!";
+                statusDiv.style.color = "green";
+                log('鉴权通过并连接成功!', 'green');
+
+                const deviceId = 'B4BFE90CDBA1';
+
+                try {
+                    // 3. 订阅状态变化
+                    stompClient.subscribe('/topic/device/' + deviceId + '/state', function (response) {
+                        log('🔔 状态变化: ' + response.body, 'blue');
+                    }, function(error) {
+                        log('❌ 状态订阅被拒绝: ' + error, 'red');
+                    });
+
+                    // 4. 订阅传感器数据
+                    stompClient.subscribe('/topic/device/' + deviceId + '/sensor', function (response) {
+                        log('📈 传感器数据: ' + response.body, 'purple');
+                    }, function(error) {
+                        log('❌ 传感器订阅被拒绝: ' + error, 'red');
+                    });
+
+                    // 5. 订阅告警信息
+                    stompClient.subscribe('/topic/device/' + deviceId + '/alert', function (response) {
+                        log('🚨 告警: ' + response.body, 'red');
+                    }, function(error) {
+                        log('❌ 告警订阅被拒绝: ' + error, 'red');
+                    });
+                } catch(e) {
+                    log("订阅异常: " + e, "red");
+                }
+
+            }, function (error) {
+                statusDiv.innerText = "❌ 连接失败: " + error;
+                statusDiv.style.color = "red";
+ 		log('连接失败详情: ' + JSON.stringify(error.headers || error), 'red'); 
             });
-
-            // 3. 订阅传感器数据
-            stompClient.subscribe('/topic/device/' + deviceId + '/sensor', function (response) {
-                log('📈 传感器数据: ' + response.body, 'purple');
-            });
-
-            // 4. 订阅告警信息
-            stompClient.subscribe('/topic/device/' + deviceId + '/alert', function (response) {
-                log('🚨 告警: ' + response.body, 'red');
-            });
-        }, function (error) {
-            statusDiv.innerText = "❌ 连接失败，请检查后端是否启动";
-            statusDiv.style.color = "red";
-            log('连接失败: ' + error, 'red');
-        });
+        }
     </script>
 </body>
 </html>
