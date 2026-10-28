@@ -28,8 +28,17 @@ public final class ScheduleConstants {
     public static final int BATCH_SIZE = 50;
     // 重试超时阈值（秒）
     public static final int RETRY_TIMEOUT_SECONDS = 5;
-    // 历史指令清理保留天数
-    public static final int CLEAN_RETENTION_DAYS = 30;
     // 每日清理历史指令
     public static final String CLEAN_HISTORY_CRON = "0 0 2 * * ?";
+    // ==================== 历史数据清理 ====================
+    // 传感器历史数据保留数7天
+    public static final int SENSOR_RECORD_RETENTION_DAYS = 7;
+    //心跳历史数据保留天数3天
+    public static final int HEARTBEAT_RECORD_RETENTION_DAYS = 3;
+    // 历史指令清理保留天数30天
+    public static final int CLEAN_RETENTION_DAYS = 30;
+    // 每天凌晨 3 点执行
+    public static final String CLEAN_RECORD_CRON = "0 0 3 * * ?";
+    // 状态轨迹数据保留30天
+    public static final int STATE_RECORD_RETENTION_DAYS = 30;
 }

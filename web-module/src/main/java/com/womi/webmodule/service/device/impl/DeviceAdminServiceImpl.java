@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -62,8 +64,10 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
         }
 
         // 2. 插入 device_info
+        String bindCode = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         DeviceInfo device = new DeviceInfo();
         device.setDeviceId(cleanMac);
+        device.setBindCode(bindCode);
         device.setDeviceName(StringUtils.hasText(request.getDeviceName()) ? request.getDeviceName() : cleanMac);
         device.setProduct(request.getProduct());
         device.setLocation(request.getLocation());

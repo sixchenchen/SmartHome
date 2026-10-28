@@ -1,5 +1,6 @@
 package com.womi.businessmodule.service.device.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.womi.businessmodule.mapper.device.DeviceHeartbeatRecordMapper;
 import com.womi.businessmodule.model.device.DeviceHeartbeatRecord;
@@ -31,8 +32,11 @@ public class DeviceHeartbeatRecordServiceImpl
     @Transactional(rollbackFor = Exception.class)
     public int cleanHistory(int retentionDays) {
         LocalDateTime before = LocalDateTime.now().minusDays(retentionDays);
-        int deleted = baseMapper.deleteBefore(before);
-        if (deleted > 0) log.info("清理心跳历史 - 共 {} 条", deleted);
+        int deleted = baseMapper.delete(new LambdaQueryWrapper<DeviceHeartbeatRecord>()
+                .lt(DeviceHeartbeatRecord::getTimestamp, before));
+        if (deleted > 0) {
+            log.info("清理心跳历史数据 - 共 {} 条", deleted);
+        }
         return deleted;
     }
 }

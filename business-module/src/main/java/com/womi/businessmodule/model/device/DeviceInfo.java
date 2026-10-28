@@ -32,6 +32,9 @@ public class DeviceInfo {
 
     private String location;
 
+    @TableField("bind_code")
+    private String bindCode;
+
     private Integer groupId;
 
     private Integer online;

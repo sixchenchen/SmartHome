@@ -49,7 +49,9 @@ public class DeviceStateRecordServiceImpl
         LocalDateTime before = LocalDateTime.now().minusDays(retentionDays);
         int deleted = baseMapper.delete(new LambdaQueryWrapper<DeviceStateRecord>()
                 .lt(DeviceStateRecord::getTimestamp, before));
-        if (deleted > 0) log.info("清理状态历史 - 共 {} 条", deleted);
+        if (deleted > 0) {
+            log.info("清理状态历史 - 共 {} 条", deleted);
+        }
         return deleted;
     }
 }

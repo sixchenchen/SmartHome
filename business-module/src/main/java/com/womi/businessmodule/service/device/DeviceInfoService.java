@@ -22,7 +22,7 @@ public interface DeviceInfoService extends IService<DeviceInfo> {
     /**
      * 标记设备上线
      */
-    void markOnline(String deviceId, String product, String firmware, Map<String, Object> capabilities);
+    void markOnline(String deviceId, String product, String firmware, Map<String, Object> capabilities, Map<String, Object> currentState);
 
     /**
      * 标记设备离线
@@ -81,7 +81,6 @@ public interface DeviceInfoService extends IService<DeviceInfo> {
     /**
      * 更新当前设备状态
      * @param deviceId 设备ID
-     * @param currentState 设备当前状态
      */
-    void updateCurrentState(String deviceId, String currentState);
+    void updateSpecificState(String deviceId, String target, Integer channel, Integer state);
 }

@@ -8,3 +8,7 @@
 
 设备注册后服务器怎么知道设备有什么传感器和设备呢
 如设备A他具有3个LED等，8个传感器，设备B有2个LED等，1个温度传感器，这个服务器怎么同步到数据库中去呢，然后用户控制设备的时候数据库中的数据也要实时更新状态
+
+往前端延伸方案二：WebSocket 实时推送（高端体验）在你的 DeviceAckMessageHandler 或 DeviceStateMessageHandler 中，当设备回复成功时，后端主动通过 WebSocket 给前端发送一条消息：“设备A的LED已经成功打开了”
+
+处理设备状态和传感器上报（IoT 的数据核心）在设备的订阅主题里，你有 device/+/state 和 device/+/sensor。设备开灯后，可能主动往 state 发一条 {"led": 1}，表示状态确实变了。传感器（如温湿度、光感）会往 sensor 发数据，你需要在 device_sensor_record 里落库，供前端画曲线图

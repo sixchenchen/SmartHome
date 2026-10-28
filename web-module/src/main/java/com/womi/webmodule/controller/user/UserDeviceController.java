@@ -1,6 +1,7 @@
 package com.womi.webmodule.controller.user;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.DeviceBindRequest;
 import com.womi.businessmodule.dto.DeviceControlRequest;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.commonmodule.response.ApiResponse;
@@ -19,18 +20,12 @@ public class UserDeviceController {
 
     private final DeviceUserService deviceUserService;
 
-
-    @Data
-    public static class BindRequest {
-        private String deviceId;
-    }
-
     /**
      * 绑定设备
      */
     @PostMapping("/bind")
-    public ApiResponse<Void> bindDevice(@RequestBody BindRequest request) {
-        deviceUserService.bindDevice(getCurrentUserId(), request.getDeviceId());
+    public ApiResponse<Void> bindDevice(@RequestBody DeviceBindRequest request) {
+        deviceUserService.bindDevice(getCurrentUserId(), request.getDeviceId(), request.getBindCode());
         return ApiResponse.success(null);
     }
 
@@ -38,7 +33,7 @@ public class UserDeviceController {
      * 解绑设备
      */
     @PostMapping("/unbind")
-    public ApiResponse<Void> unbindDevice(@RequestBody BindRequest request) {
+    public ApiResponse<Void> unbindDevice(@RequestBody DeviceBindRequest request) {
         deviceUserService.unbindDevice(getCurrentUserId(), request.getDeviceId());
         return ApiResponse.success(null);
     }

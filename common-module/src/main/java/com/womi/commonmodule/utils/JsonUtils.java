@@ -3,11 +3,15 @@ package com.womi.commonmodule.utils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -80,7 +84,17 @@ public class JsonUtils {
             return new HashMap<>();
         }
     }
-
+    public List<Map<String, Object>> nodeToListMap(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return new ArrayList<>();
+        }
+        try {
+            return objectMapper.convertValue(node, new TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            log.error("JsonNode转List<Map>失败: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
     public <T> T nodeToObject(JsonNode node, Class<T> clazz) {
         if (node == null || node.isMissingNode() || node.isNull()) {
             return null;

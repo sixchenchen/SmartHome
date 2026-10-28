@@ -99,9 +99,10 @@ public class DeviceSensorRecordServiceImpl
     @Transactional(rollbackFor = Exception.class)
     public int cleanHistory(int retentionDays) {
         LocalDateTime before = LocalDateTime.now().minusDays(retentionDays);
-        int deleted = baseMapper.deleteBefore(before);
+        int deleted = baseMapper.delete(new LambdaQueryWrapper<DeviceSensorRecord>()
+                .lt(DeviceSensorRecord::getTimestamp, before));
         if (deleted > 0) {
-            log.info("清理传感器历史 - 共 {} 条", deleted);
+            log.info("清理传感器历史数据 - 共 {} 条", deleted);
         }
         return deleted;
     }

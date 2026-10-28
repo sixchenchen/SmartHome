@@ -2,6 +2,7 @@ package com.womi.webmodule.mqtt.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.womi.businessmodule.service.device.DeviceInfoService;
+import com.womi.businessmodule.service.device.DeviceSlaveDataService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.enums.DeviceOfflineReason;
 import com.womi.commonmodule.utils.JsonUtils;
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 /*
@@ -35,6 +37,7 @@ public class DevicePresenceMessageHandler implements MqttMessageHandler {
 
     private final JsonUtils jsonUtils;
     private final DeviceInfoService deviceInfoService;
+    private final DeviceSlaveDataService deviceSlaveDataService;
 
     @Override
     public boolean supports(String topic) {
@@ -76,9 +79,23 @@ public class DevicePresenceMessageHandler implements MqttMessageHandler {
         String product = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_PRODUCT);
         String firmware = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_FIRMWARE);
         Map<String, Object> capabilities = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_CAPABILITIES));
-        deviceInfoService.markOnline(deviceId, product, firmware, capabilities.isEmpty() ? null : capabilities);
+        Map<String, Object> currentState = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_STATE));
+
+        // 3. 更新主表
+        if (capabilities.isEmpty()) capabilities = null;
+        if (currentState.isEmpty()) currentState = null;
+
+        deviceInfoService.markOnline(deviceId, product, firmware, capabilities, currentState);
         deviceInfoService.reconcileOtaOnOnline(deviceId, firmware);
-        log.info("设备上线 - deviceId: {}, product: {}, firmware: {}", deviceId, product, firmware);
+
+        // 4. 同步从机数据
+        JsonNode slavesNode = dataNode.path(DeviceMqttConstants.FIELD_SLAVES);
+        if (slavesNode.isArray()) {
+            List<Map<String, Object>> slavesList = jsonUtils.nodeToListMap(slavesNode);
+            deviceSlaveDataService.syncSlaveData(deviceId, slavesList);
+        }
+
+        log.info("设备上线 - deviceId: {}, firmware: {}, capabilities: {}", deviceId, firmware, capabilities);
     }
 
     private void handleOffline(String deviceId, JsonNode dataNode) {

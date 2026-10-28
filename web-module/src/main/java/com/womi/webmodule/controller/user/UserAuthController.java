@@ -1,6 +1,5 @@
 package com.womi.webmodule.controller.user;
 
-import com.womi.businessmodule.dto.DeviceControlRequest;
 import com.womi.businessmodule.dto.LoginRequest;
 import com.womi.businessmodule.dto.UserRegisterRequest;
 import com.womi.businessmodule.mapper.sys.SysUserMapper;
@@ -14,7 +13,6 @@ import com.womi.commonmodule.response.ApiResponse;
 import com.womi.commonmodule.utils.JwtTokenUtil;
 import com.womi.webmodule.service.auth.*;
 import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
-import com.womi.webmodule.service.device.DeviceUserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.Data;
@@ -30,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-public class UserController {
+public class UserAuthController {
 
     private final AuthenticationManager authenticationManager;
     private final SysUserMapper sysUserMapper;

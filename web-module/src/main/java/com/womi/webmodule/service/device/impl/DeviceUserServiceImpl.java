@@ -40,7 +40,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void bindDevice(Long userId, String deviceId) {
+    public void bindDevice(Long userId, String deviceId,String bindCode) {
         String cleanMac = MacUtils.normalize(deviceId);
         // 1. 校验设备是否存在
         DeviceInfo device = deviceInfoMapper.selectOne(
@@ -49,7 +49,10 @@ public class DeviceUserServiceImpl implements DeviceUserService {
             throw new BusinessException(400, "设备不存在，请检查MAC地址是否正确");
         }
 
-        // 2. 校验设备是否已被绑定 (依靠 active_device_id 唯一索引保证)
+        // 2. 校验设备是否已被绑定
+        if (bindCode == null || !bindCode.trim().equalsIgnoreCase(device.getBindCode())) {
+            throw new BusinessException(403, "设备绑定码错误，请扫描设备机身上的二维码");
+        }
         // 先查一下给用户友好的提示
         DeviceBinding existingBinding = deviceBindingMapper.selectOne(
                 new LambdaQueryWrapper<DeviceBinding>().eq(DeviceBinding::getActiveDeviceId, cleanMac));
@@ -71,7 +74,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         try {
             deviceBindingMapper.insert(binding);
         } catch (DuplicateKeyException e) {
-            // 👈 解决并发问题：如果两个用户同时点绑定，数据库唯一索引会拦住其中一个
+            // 解决并发问题：如果两个用户同时点绑定，数据库唯一索引会拦住其中一个
             throw new BusinessException(400, "该设备已被绑定，请刷新重试");
         }
         redisTemplate.opsForSet().add(RedisConstants.BOUND_DEVICES_KEY, cleanMac);

@@ -68,6 +68,7 @@ firmware:
   max-request-size: 20MB
   upload-dir: D:/data/firmware/
   base-url: http://localhost:8000/firmware/
+my:
   jwt:
     # 设置jwt签名加密时使用的秘钥
     secret: dGhpc2lzYXZlcnlzZWNyZXRrZXlmb3Jqd3R0b2tlbnVzZTEyMzQ1Ng==

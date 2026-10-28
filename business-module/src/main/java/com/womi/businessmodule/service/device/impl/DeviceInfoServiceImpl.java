@@ -9,20 +9,25 @@ import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceOtaStateConstants;
 import com.womi.commonmodule.enums.DeviceOfflineReason;
+import com.womi.commonmodule.utils.JsonUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
+@RequiredArgsConstructor
 @Slf4j
 @Service
 public class DeviceInfoServiceImpl
         extends ServiceImpl<DeviceInfoMapper, DeviceInfo>
         implements DeviceInfoService {
+
+    private final JsonUtils jsonUtils;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -47,19 +52,27 @@ public class DeviceInfoServiceImpl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void markOnline(String deviceId, String product, String firmware, Map<String, Object> capabilities) {
-        DeviceInfo info = getOrCreateDevice(deviceId);
-        LocalDateTime now = LocalDateTime.now();
-        info.setOnline(DeviceConstants.DEVICE_STATUS_ONLINE);
-        info.setOfflineReason(null);
-        info.setLastOnlineTime(now);
-        info.setLastHeartbeatTime(now);
-        if (product != null) info.setProduct(product);
-        if (firmware != null) info.setFirmware(firmware);
-        if (capabilities != null && !capabilities.isEmpty()) {
-            info.setCapabilities(capabilities);
+    public void markOnline(String deviceId, String product, String firmware, Map<String, Object> capabilities, Map<String, Object> currentState) {
+        DeviceInfo device = getByDeviceId(deviceId);
+        if (device == null) {
+            log.warn("设备上线失败，设备不存在 - deviceId: {}", deviceId);
+            return;
         }
-        updateById(info);
+
+        // 1. 直接给实体对象赋值
+        device.setOnline(DeviceConstants.DEVICE_STATUS_ONLINE);
+        device.setLastOnlineTime(LocalDateTime.now());
+        device.setLastHeartbeatTime(LocalDateTime.now());
+        device.setProduct(product);
+        device.setOfflineReason(null);
+
+        if (capabilities != null) device.setCapabilities(capabilities);
+        if (currentState != null) device.setCurrentState(currentState);
+        if (firmware != null) device.setFirmware(firmware);
+
+        // 2. 调用 updateById，完美触发 TypeHandler
+        updateById(device);
+
         log.info("设备上线 - deviceId: {}", deviceId);
     }
 
@@ -179,8 +192,7 @@ public class DeviceInfoServiceImpl
         String version = reportedFirmware.trim();
         if (DeviceOtaStateConstants.SUCCESS.equals(otaState) && !version.equals(otaVersion.trim())) {
             baseMapper.updateOtaStateByDeviceId(deviceId, DeviceOtaStateConstants.FAILED, null, null);
-            log.warn("OTA 版本校验不通过，判定升级回滚 - deviceId: {}, running: {}, target: {}",
-                    deviceId, version, otaVersion);
+            log.warn("OTA 版本校验不通过，判定升级回滚 - deviceId: {}, running: {}, target: {}", deviceId, version, otaVersion);
         }
     }
 
@@ -194,14 +206,30 @@ public class DeviceInfoServiceImpl
     }
 
     @Override
-    public void updateCurrentState(String deviceId, String currentState) {
-        boolean updated = update(new LambdaUpdateWrapper<DeviceInfo>()
-                .set(DeviceInfo::getCurrentState, currentState)
-                .set(DeviceInfo::getUpdateTime, java.time.LocalDateTime.now())
-                .eq(DeviceInfo::getDeviceId, deviceId));
+    @Transactional(rollbackFor = Exception.class)
+    public void updateSpecificState(String deviceId, String target, Integer channel, Integer state) {
+        DeviceInfo device = getByDeviceId(deviceId);
+        if (device == null) return;
 
-        if (!updated) {
-            log.warn("更新设备状态失败，设备可能不存在 - deviceId: {}", deviceId);
+        // 1. 获取现有的 Map 并创建副本
+        Map<String, Object> stateMap = device.getCurrentState();
+        if (stateMap == null) {
+            stateMap = new HashMap<>();
+        } else {
+            stateMap = new HashMap<>(stateMap);
         }
+
+        // 2. 组装键名
+        String key = target;
+        if (channel != null && channel > 0) {
+            key = target + "_" + channel;
+        }
+
+        // 3. 更新 Map 并赋值给实体
+        stateMap.put(key, state);
+        device.setCurrentState(stateMap);
+
+        // 4. 调用 updateById（不要传 String，直接传 Map）
+        updateById(device);
     }
 }

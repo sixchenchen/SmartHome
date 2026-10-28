@@ -6,7 +6,7 @@ import com.womi.businessmodule.model.device.DeviceInfo;
 
 public interface DeviceUserService {
     /** 绑定设备 */
-    void bindDevice(Long userId, String deviceId);
+    void bindDevice(Long userId, String deviceId,String bindCode);
 
     /** 解绑设备 */
     void unbindDevice(Long userId, String deviceId);

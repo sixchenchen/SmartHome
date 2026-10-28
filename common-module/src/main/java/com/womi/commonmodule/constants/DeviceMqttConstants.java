@@ -179,6 +179,8 @@ public final class DeviceMqttConstants {
     public static final String FIELD_WILL = "will";
     public static final String FIELD_PUBKEY = "pubkey";
     public static final String FIELD_SIGNATURE = "signature";
+    public static final String FIELD_SLAVES = "slaves";
+    public static final String FIELD_SLAVE = "slave";
 
     // ---------- 消息类型（payload.type） ----------
     public static final String MSG_TYPE_ONLINE = "online";

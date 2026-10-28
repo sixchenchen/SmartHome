@@ -66,6 +66,7 @@ public class SecurityConfig {
                         // 登录、注册、刷新 Token 完全匿名访问
                         .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(
                                 "/doc.html",

@@ -1,5 +1,6 @@
 package com.womi.businessmodule.service.device.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.womi.businessmodule.mapper.device.DeviceSlaveDataMapper;
 import com.womi.businessmodule.model.device.DeviceSensorRecord;
@@ -137,6 +138,21 @@ public class DeviceSlaveDataServiceImpl
     }
 
     @Override
+    public void updateSlaveValue(String deviceId, Integer address, Integer channel, String slaveType, Double value, LocalDateTime timestamp) {
+        boolean updated = update(new LambdaUpdateWrapper<DeviceSlaveData>()
+                .set(DeviceSlaveData::getValue, value)
+                .set(DeviceSlaveData::getTimestamp, timestamp)
+                .eq(DeviceSlaveData::getDeviceId, deviceId)
+                .eq(DeviceSlaveData::getAddress, address)
+                .eq(DeviceSlaveData::getSlaveType, slaveType));
+
+        if (!updated) {
+            log.warn("更新从机实时值失败，未找到对应从机 - deviceId: {}, address: {}", deviceId, address);
+        }
+    }
+
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public int clearByDeviceId(String deviceId) {
         int deleted = baseMapper.deleteByDeviceId(deviceId);
@@ -154,13 +170,21 @@ public class DeviceSlaveDataServiceImpl
     private Integer toInt(Object o) {
         if (o == null) return null;
         if (o instanceof Number) return ((Number) o).intValue();
-        try { return Integer.parseInt(o.toString()); } catch (Exception e) { return null; }
+        try {
+            return Integer.parseInt(o.toString());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private Double toDouble(Object o) {
         if (o == null) return null;
         if (o instanceof Number) return ((Number) o).doubleValue();
-        try { return Double.parseDouble(o.toString()); } catch (Exception e) { return null; }
+        try {
+            return Double.parseDouble(o.toString());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String toString(Object o) {

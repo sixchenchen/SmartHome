@@ -114,19 +114,4 @@ public class DeviceCommandScheduler {
             log.error("标记过期 OTA 指令失败", e);
         }
     }
-
-    /**
-     * 每天凌晨 2 点清理 30 天前的历史指令
-     */
-    @Scheduled(cron = ScheduleConstants.CLEAN_HISTORY_CRON)
-    public void cleanHistory() {
-        try {
-            int count = deviceCommandService.cleanHistory(ScheduleConstants.CLEAN_RETENTION_DAYS);
-            if (count > 0) {
-                log.info("清理历史指令 - 共 {} 条", count);
-            }
-        } catch (Exception e) {
-            log.error("清理历史指令失败", e);
-        }
-    }
 }
