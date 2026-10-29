@@ -7,6 +7,7 @@ import com.womi.commonmodule.enums.DeviceOfflineReason;
 import com.womi.commonmodule.constants.ScheduleConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,8 @@ public class DeviceOfflineScheduler {
     /**
      * 每 30 秒扫描一次心跳超时设备
      */
+    @SchedulerLock(name = "DeviceOfflineScheduler_scanHeartbeatTimeout",
+            lockAtMostFor = "1m", lockAtLeastFor = "10s")
     @Scheduled(fixedDelay = ScheduleConstants.HEARTBEAT_SCAN_FIXED_DELAY)
     public void scanHeartbeatTimeout() {
         try {

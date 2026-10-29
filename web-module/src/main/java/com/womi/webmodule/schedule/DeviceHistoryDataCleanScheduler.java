@@ -7,6 +7,7 @@ import com.womi.businessmodule.service.device.DeviceStateRecordService;
 import com.womi.commonmodule.constants.ScheduleConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +28,8 @@ public class DeviceHistoryDataCleanScheduler {
      * 每天凌晨 3 点清理 7 天前的传感器数据
      */
     @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
+    @SchedulerLock(name = "CleanScheduler_cleanSensorHistory", lockAtMostFor = "30m")
+    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
     public void cleanSensorHistory() {
         try {
             log.info("开始清理过期传感器历史数据...");
@@ -45,6 +48,8 @@ public class DeviceHistoryDataCleanScheduler {
      * 每天凌晨 3 点清理 3 天前的心跳数据
      */
     @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
+    @SchedulerLock(name = "CleanScheduler_cleanHeartbeatHistory", lockAtMostFor = "30m")
+    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
     public void cleanHeartbeatHistory() {
         try {
             log.info("开始清理过期心跳历史数据...");
@@ -62,6 +67,8 @@ public class DeviceHistoryDataCleanScheduler {
     /**
      * 每天凌晨 2 点清理 30 天前的历史指令
      */
+    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
+    @SchedulerLock(name = "CleanScheduler_cleanStateHistory", lockAtMostFor = "30m")
     @Scheduled(cron = ScheduleConstants.CLEAN_HISTORY_CRON)
     public void cleanCommandHistory() {
         try {

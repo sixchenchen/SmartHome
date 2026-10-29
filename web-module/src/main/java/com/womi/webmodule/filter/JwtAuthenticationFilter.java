@@ -1,10 +1,10 @@
 package com.womi.webmodule.filter;
 
+import com.womi.businessmodule.model.sys.SysUser;
 import com.womi.commonmodule.utils.JwtTokenUtil;
-import com.womi.webmodule.service.auth.TokenBlacklistService;
-import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
+import com.womi.webmodule.security.SecurityUser;
+import com.womi.webmodule.service.auth.impl.TokenBlacklistServiceImpl;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,14 +12,17 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -27,13 +30,12 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenUtil jwtTokenUtil;
-    private final UserDetailsServiceImpl userDetailsService;
-    private final TokenBlacklistService tokenBlacklistService;
+    private final TokenBlacklistServiceImpl tokenBlacklistServiceImpl;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
         String header = request.getHeader("Authorization");
         if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -42,30 +44,54 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = header.substring(7);
         try {
-            String jti = jwtTokenUtil.extractJti(token); // 提取 jti
-
-            // 检查黑名单
-            if (jti != null && tokenBlacklistService.isBlacklisted(jti)) {
-                filterChain.doFilter(request, response); // 已登出，放行让 Security 拦截 (返回401)
+            // 只解析一次！获取完整的 Claims 对象
+            Claims claims = jwtTokenUtil.parseClaims(token);
+            if (claims == null || claims.getExpiration().before(new java.util.Date())) {
+                filterChain.doFilter(request, response);
                 return;
             }
-            String username = jwtTokenUtil.extractUsername(token);
-            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                if (jwtTokenUtil.validateToken(token, userDetails)) {
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+
+            // 1. 从 Claims 中提取 jti，校验黑名单
+            String jti = claims.getId();
+            if (jti != null && tokenBlacklistServiceImpl.isBlacklisted(jti)) {
+                filterChain.doFilter(request, response);
+                return;
             }
-        } catch (ExpiredJwtException e) {
-            log.debug("Token 已过期: {}", request.getRequestURI());
-        } catch (JwtException | IllegalArgumentException e) {
-            log.warn("Token 无效: {} ({})", e.getMessage(), request.getRequestURI());
+
+            // 2. 从 Claims 中提取用户名和 userId
+            String username = claims.getSubject();
+            Long userId = claims.get("userId", Long.class);
+
+            // 3. 从 Claims 中提取权限列表
+            @SuppressWarnings("unchecked")
+            List<String> authorityStrs = (List<String>) claims.get("authorities");
+            if (authorityStrs == null) authorityStrs = Collections.emptyList();
+
+            // 如果上下文里还没有认证信息，才去构建
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                // 组装轻量级实体
+                SysUser lightUser = new SysUser();
+                lightUser.setId(userId);
+                lightUser.setUsername(username);
+
+                List<SimpleGrantedAuthority> authorities = authorityStrs.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+
+                SecurityUser securityUser = new SecurityUser(lightUser, authorities);
+
+                // 注入 SecurityContext
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(securityUser, null, authorities);
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        } catch (Exception e) {
+            // 解析失败 / Token 过期 / 签名不匹配，直接放行，交给后续的 ExceptionTranslationFilter 返回 401
+            log.debug("JWT 校验失败: {}", e.getMessage());
         }
+
         filterChain.doFilter(request, response);
     }
 }

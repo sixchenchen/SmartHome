@@ -11,8 +11,7 @@ import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.response.ApiResponse;
 import com.womi.commonmodule.utils.JwtTokenUtil;
-import com.womi.webmodule.service.auth.*;
-import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
+import com.womi.webmodule.service.auth.impl.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.Data;
@@ -33,10 +32,10 @@ public class UserAuthController {
     private final AuthenticationManager authenticationManager;
     private final SysUserMapper sysUserMapper;
     private final JwtTokenUtil jwtTokenUtil;
-    private final AuthService authService;
-    private final LoginAttemptService loginAttemptService;
-    private final RefreshTokenService refreshTokenService;
-    private final TokenBlacklistService tokenBlacklistService;
+    private final AuthServiceImpl authServiceImpl;
+    private final LoginAttemptServiceImpl loginAttemptServiceImpl;
+    private final RefreshTokenServiceImpl refreshTokenServiceImpl;
+    private final TokenBlacklistServiceImpl tokenBlacklistServiceImpl;
     private final UserDetailsServiceImpl userDetailsService;
 
     @PostMapping("/login")
@@ -49,7 +48,7 @@ public class UserAuthController {
 
         try {
             // 传入 IP 进行校验
-            loginAttemptService.checkNotLocked(ip, username);
+            loginAttemptServiceImpl.checkNotLocked(ip, username);
 
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, request.getPassword()));
@@ -58,18 +57,18 @@ public class UserAuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             // 登录成功，清理该 IP 的失败计数
-            loginAttemptService.recordSuccess(ip, username);
+            loginAttemptServiceImpl.recordSuccess(ip, username);
 
-            return ApiResponse.success(authService.processLoginSuccess(userDetails, httpRequest, deviceType));
+            return ApiResponse.success(authServiceImpl.processLoginSuccess(userDetails, httpRequest, deviceType));
 
         } catch (BadCredentialsException e) {
             // 传入 IP 记录失败
-            loginAttemptService.recordFailure(ip, username);
-            authService.recordLoginFailure(username, httpRequest, "用户名或密码错误");
+            loginAttemptServiceImpl.recordFailure(ip, username);
+            authServiceImpl.recordLoginFailure(username, httpRequest, "用户名或密码错误");
             throw e;
         } catch (BusinessException e) {
             if (e.getCode() == 4013) { // 锁定 code
-                authService.recordLoginFailure(username, httpRequest, "账号已锁定");
+                authServiceImpl.recordLoginFailure(username, httpRequest, "账号已锁定");
             }
             throw e;
         }
@@ -77,7 +76,7 @@ public class UserAuthController {
 
     @PostMapping("/register")
     public ApiResponse<UserRegisterResponse> register(@RequestBody @Valid UserRegisterRequest request) {
-        var user = authService.register(request);
+        var user = authServiceImpl.register(request);
         return ApiResponse.success(new UserRegisterResponse(user.getId(), user.getUsername(), user.getNickname()));
     }
 
@@ -90,13 +89,13 @@ public class UserAuthController {
     @PostMapping("/refresh")
     public ApiResponse<LoginResponse> refresh(@RequestBody RefreshRequest request) {
         // 1. 验证 RefreshToken
-        SysRefreshToken tokenEntity = refreshTokenService.consumeRefreshToken(request.getRefreshToken());
+        SysRefreshToken tokenEntity = refreshTokenServiceImpl.consumeRefreshToken(request.getRefreshToken());
         if (tokenEntity == null) {
             throw new BusinessException(4010, "RefreshToken 无效或已过期，请重新登录");
         }
 
         // 2. 旋转刷新：旧的立马作废（防止重放攻击）
-        refreshTokenService.revokeToken(request.getRefreshToken());
+        refreshTokenServiceImpl.revokeToken(request.getRefreshToken());
 
         // 3. 查出用户
         SysUser user = sysUserMapper.selectById(tokenEntity.getUserId());
@@ -107,7 +106,7 @@ public class UserAuthController {
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
 
         // 4. 生成全新的双 Token，并复用处理登录成功的逻辑
-        return ApiResponse.success(authService.processRefreshSuccess(userDetails, user, tokenEntity.getDeviceType()));
+        return ApiResponse.success(authServiceImpl.processRefreshSuccess(userDetails, user, tokenEntity.getDeviceType()));
     }
 
     // ==================== P1-3: 登出 ====================
@@ -119,14 +118,14 @@ public class UserAuthController {
             String token = bearerToken.substring(7);
             try {
                 String jti = jwtTokenUtil.extractJti(token);
-                tokenBlacklistService.blacklistToken(jti, jwtTokenUtil.extractExpiration(token));
+                tokenBlacklistServiceImpl.blacklistToken(jti, jwtTokenUtil.extractExpiration(token));
             } catch (Exception ignored) {
             } // 就算 token 过期了，登出接口也不应该报错
         }
 
         // 2. 撤销 RefreshToken
         if (request != null && request.getRefreshToken() != null) {
-            refreshTokenService.revokeToken(request.getRefreshToken());
+            refreshTokenServiceImpl.revokeToken(request.getRefreshToken());
         }
 
         return ApiResponse.success(null);

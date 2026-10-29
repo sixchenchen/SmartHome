@@ -10,8 +10,9 @@ import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
-import com.womi.commonmodule.constants.DeviceConstants;
+import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.RedisConstants;
+import com.womi.commonmodule.constants.ScheduleConstants;
 import com.womi.commonmodule.enums.BindStatus;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.DeviceOnlineStatus;
@@ -24,6 +25,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,10 +43,11 @@ public class DeviceUserServiceImpl implements DeviceUserService {
     private final StringRedisTemplate redisTemplate;
     private final DeviceCommandService deviceCommandService;
     private final CommandSender commandSender;
+    private final DeviceInfoService deviceInfoService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void bindDevice(Long userId, String deviceId,String bindCode) {
+    public void bindDevice(Long userId, String deviceId, String bindCode) {
         String cleanMac = MacUtils.normalize(deviceId);
         // 1. 校验设备是否存在
         DeviceInfo device = deviceInfoMapper.selectOne(
@@ -71,7 +75,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         DeviceBinding binding = new DeviceBinding();
         binding.setDeviceId(cleanMac);
         binding.setUserId(userId);
-        binding.setBindStatus( BindStatus.BOUND.getCode());
+        binding.setBindStatus(BindStatus.BOUND.getCode());
         binding.setBindTime(LocalDateTime.now());
 
         try {
@@ -101,7 +105,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
 
         // 2. 更新为解绑状态
         // 更新后，数据库的 active_device_id 会自动变为 NULL，解除唯一锁定
-        binding.setBindStatus( BindStatus.UNBOUND.getCode());
+        binding.setBindStatus(BindStatus.UNBOUND.getCode());
         binding.setUnbindTime(LocalDateTime.now());
         deviceBindingMapper.updateById(binding);
         redisTemplate.opsForSet().remove(RedisConstants.BOUND_DEVICES_KEY, cleanMac);
@@ -114,7 +118,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         List<DeviceBinding> bindings = deviceBindingMapper.selectList(
                 new LambdaQueryWrapper<DeviceBinding>()
                         .eq(DeviceBinding::getUserId, userId)
-                        .eq(DeviceBinding::getBindStatus,  BindStatus.BOUND.getCode()));
+                        .eq(DeviceBinding::getBindStatus, BindStatus.BOUND.getCode()));
 
         Page<DeviceInfo> page = new Page<>(pageNum, pageSize);
 
@@ -154,8 +158,13 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         }
 
         // ==================== 场景 4：校验在线状态 ====================
-        if (device.getOnline() != DeviceOnlineStatus.ONLINE.getCode()) {
+        if (!Integer.valueOf(DeviceOnlineStatus.ONLINE.getCode()).equals(device.getOnline())) {
             throw new BusinessException(400, "设备当前离线，请检查电源后重试");
+        }
+        // ==================== 场景 4：校验真实在线状态（防 LWT 延迟黑洞） ====================
+        int timeoutSeconds = ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS; // 假设你是 90 秒或 60 秒
+        if (!deviceInfoService.isDeviceActuallyOnline(device, timeoutSeconds)) {
+            throw new BusinessException(400, "设备已离线或网络异常，请检查电源后重试");
         }
 
         // ==================== 组装并下发指令 ====================
@@ -181,14 +190,30 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         deviceCommandService.save(cmd);
 
         // 立即通过 MQTT 下发
-        try {
-            commandSender.send(cmd);
-            deviceCommandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
-            deviceCommandService.incrementRetryCount(cmd.getId());
-            log.info("用户控制指令下发成功 - userId: {}, deviceId: {}, commandId: {}", userId, cleanMac, cmd.getCommandId());
-        } catch (Exception e) {
-            log.error("用户控制指令下发失败 - commandId: {}", cmd.getCommandId(), e);
-            throw new BusinessException(500, "指令下发失败，请稍后重试");
+        executeAfterCommit(() -> {
+            try {
+                commandSender.send(cmd);
+                deviceCommandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
+                deviceCommandService.incrementRetryCount(cmd.getId());
+                log.info("用户控制指令下发成功 - userId: {}, deviceId: {}, commandId: {}", userId, cleanMac, cmd.getCommandId());
+            } catch (Exception e) {
+                // 因为事务已经提交，这里无法回滚，只能记录日志让定时任务重试
+                log.error("用户控制指令下发失败，等待定时任务兜底 - commandId: {}", cmd.getCommandId(), e);
+            }
+        });
+    }
+
+
+    private void executeAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
         }
     }
 }

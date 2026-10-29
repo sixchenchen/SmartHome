@@ -1,4 +1,4 @@
-package com.womi.webmodule.service.auth;
+package com.womi.webmodule.security;
 
 import com.womi.businessmodule.model.sys.SysUser;
 import org.springframework.security.core.GrantedAuthority;

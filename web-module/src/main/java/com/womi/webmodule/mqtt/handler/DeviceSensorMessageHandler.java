@@ -1,8 +1,6 @@
 package com.womi.webmodule.mqtt.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.womi.businessmodule.service.device.DeviceAlertRecordService;
-import com.womi.businessmodule.service.device.DeviceSensorThresholdService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;
@@ -12,14 +10,30 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/*
-  传感器上报处理器
-  topic: device/{mac}/sensor
-  payload:
-  {
 
-  }
-*/
+/**
+ * 传感器数据上报处理器 (Sensor)
+ * <p>Topic: device/{mac}/sensor</p>
+ * <p>Payload:
+ * <pre>
+ * {
+ *   "device": "B4BFE90CDBA1",
+ *   "type": "sensor_batch",
+ *   "timestamp": 1710000000000,
+ *   "data": [
+ *     {
+ *       "source": "slave",
+ *       "address": 1,
+ *       "sensor_key": "temp",
+ *       "sensor_type": "temperature",
+ *       "value": 25.5,
+ *       "unit": "℃"
+ *     }
+ *   ]
+ * }
+ * </pre>
+ * </p>
+ */
 
 @Slf4j
 @Component

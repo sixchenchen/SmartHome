@@ -1,9 +1,6 @@
 package com.womi.webmodule.mqtt.handler;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.womi.businessmodule.mapper.device.DeviceBindingMapper;
-import com.womi.businessmodule.model.device.DeviceBinding;
 import com.womi.businessmodule.service.device.DeviceHeartbeatRecordService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;

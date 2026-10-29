@@ -1,6 +1,7 @@
 package com.womi.businessmodule.service.device.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.womi.businessmodule.mapper.device.DeviceCommandMapper;
 import com.womi.businessmodule.model.device.DeviceCommand;
@@ -32,12 +33,6 @@ public class DeviceCommandServiceImpl
         extends ServiceImpl<DeviceCommandMapper, DeviceCommand>
         implements DeviceCommandService {
 
-    /** 终态集合：进入后不再变化 */
-    private static final List<Integer> FINAL_STATUSES = List.of(
-            DeviceCommandStatus.SUCCESS.getCode(),
-            DeviceCommandStatus.FAILED.getCode(),
-            DeviceCommandStatus.TIMEOUT.getCode(),
-            DeviceCommandStatus.CANCELLED.getCode());
 
     private final DeviceInfoService deviceInfoService;
 
@@ -91,7 +86,7 @@ public class DeviceCommandServiceImpl
                 .status(status)
                 .errorMsg(errorMsg)
                 .sendTime(status == DeviceCommandStatus.SENT.getCode() ? now : null)
-                .ackTime(FINAL_STATUSES.contains(status) ? now : null)
+                .ackTime(DeviceCommandConstants.FINISHED_STATUSES.contains(status) ? now : null)
                 .build();
 
         updateById(update);
@@ -180,7 +175,7 @@ public class DeviceCommandServiceImpl
         }
 
         // ---------- 情况 3：终态 → 忽略 ----------
-        log.debug("ACK 状态非 SENT/ACCEPTED，忽略 - commandId: {}, status: {}",command.getCommandId(), current);
+        log.debug("ACK 状态非 SENT/ACCEPTED，忽略 - commandId: {}, status: {}", command.getCommandId(), current);
         return null;
     }
 
@@ -212,6 +207,7 @@ public class DeviceCommandServiceImpl
             log.error("OTA 最终 ACK 同步固件版本失败 - deviceId: {}, toVersion: {}", deviceId, toVersionObj, e);
         }
     }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int markOtaExpiredCommands() {
@@ -232,7 +228,9 @@ public class DeviceCommandServiceImpl
         return count;
     }
 
-    /** 清理 device_info 的 OTA 状态（只在进行中时才清，定向更新避免整行覆盖） */
+    /**
+     * 清理 device_info 的 OTA 状态（只在进行中时才清，定向更新避免整行覆盖）
+     */
     private void clearOtaState(String deviceId) {
         DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
         if (device == null) return;
@@ -267,9 +265,9 @@ public class DeviceCommandServiceImpl
     /**
      * ACK 决策结果
      *
-     * @param newStatus      新的状态码
-     * @param errorMsg       错误信息（成功时为 null）
-     * @param isOtaFinalAck  是否为"OTA 最终 ACK"（用于触发 firmware 更新）
+     * @param newStatus     新的状态码
+     * @param errorMsg      错误信息（成功时为 null）
+     * @param isOtaFinalAck 是否为"OTA 最终 ACK"（用于触发 firmware 更新）
      */
     private record AckDecision(Integer newStatus, String errorMsg, boolean isOtaFinalAck) {
     }
@@ -318,13 +316,22 @@ public class DeviceCommandServiceImpl
         if (cmd == null) {
             return false;
         }
-        // 只有中间态才能取消
-        DeviceCommandStatus status = DeviceCommandStatus.fromCode(cmd.getStatus());
-        if (status == null || status.isFinished()) {
-            log.warn("指令已进入终态，无法取消 - id: {}, status: {}", id, cmd.getStatus());
+
+        Integer status = cmd.getStatus();
+        // 1. 终态直接拒绝
+        if (DeviceCommandConstants.FINISHED_STATUSES.contains(status)) {
+            log.warn("指令已进入终态，无法取消 - id: {}, status: {}", id, status);
             return false;
         }
 
+        // OTA 指令已受理 (ACCEPTED)，正在设备端执行，绝对不允许取消
+        if (DeviceCommandStatus.ACCEPTED.getCode() == status
+                && DeviceMqttConstants.TARGET_OTA.equals(cmd.getTarget())) {
+            log.warn("OTA 指令已被设备受理并开始执行，无法取消 - id: {}, commandId: {}", id, cmd.getCommandId());
+            throw new BusinessException(ErrorCode.BUSINESS_ERROR, "OTA 升级已开始，无法中途取消");
+        }
+
+        // 3. 普通指令或其他情况，允许取消
         cmd.setStatus(DeviceCommandStatus.CANCELLED.getCode());
         cmd.setErrorMsg(DeviceCommandConstants.ERR_CANCELLED_BY_USER);
         cmd.setOperator(operator);
@@ -334,13 +341,10 @@ public class DeviceCommandServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int markExpiredCommands() {
-        List<DeviceCommand> expired = baseMapper.selectExpiredCommands(LocalDateTime.now());
-        if (expired.isEmpty()) {
-            return 0;
+        int updated = baseMapper.markExpiredCommands();
+        if (updated > 0) {
+            log.warn("标记超时指令 - 共 {} 条", updated);
         }
-        List<Long> ids = expired.stream().map(DeviceCommand::getId).toList();
-        int updated = baseMapper.batchUpdateStatus(ids, DeviceCommandStatus.TIMEOUT.getCode());
-        log.warn("标记超时指令 - 共 {} 条", updated);
         return updated;
     }
 
@@ -350,7 +354,7 @@ public class DeviceCommandServiceImpl
         LocalDateTime before = LocalDateTime.now().minusDays(retentionDays);
         int deleted = baseMapper.delete(new LambdaQueryWrapper<DeviceCommand>()
                 .lt(DeviceCommand::getUpdateTime, before)
-                .in(DeviceCommand::getStatus, FINAL_STATUSES));
+                .in(DeviceCommand::getStatus, DeviceCommandConstants.FINISHED_STATUSES));
         if (deleted > 0) {
             log.info("清理历史指令 - 共 {} 条", deleted);
         }
@@ -361,9 +365,14 @@ public class DeviceCommandServiceImpl
 
     @Override
     public CommandStatsVO statsByDevice(String deviceId) {
-        List<DeviceCommand> commands = list(new LambdaQueryWrapper<DeviceCommand>()
-                .eq(DeviceCommand::getDeviceId, deviceId)
-                .select(DeviceCommand::getStatus));
+        // 👈 核心改造：使用 QueryWrapper 直接执行数据库聚合查询
+        QueryWrapper<DeviceCommand> queryWrapper = new QueryWrapper<DeviceCommand>()
+                .select("status", "COUNT(*) AS total")
+                .eq("device_id", deviceId)
+                .groupBy("status");
+
+        // 返回值是一个 List<Map>，里面只有 status 和 total 两个键
+        List<Map<String, Object>> maps = baseMapper.selectMaps(queryWrapper);
 
         CommandStatsVO vo = new CommandStatsVO();
         vo.setPending(0L);
@@ -372,22 +381,33 @@ public class DeviceCommandServiceImpl
         vo.setFailed(0L);
         vo.setTimeout(0L);
         vo.setCancelled(0L);
+        vo.setTotal(0L);
 
-        for (DeviceCommand cmd : commands) {
-            DeviceCommandStatus status = DeviceCommandStatus.fromCode(cmd.getStatus());
-            if (status == null) continue;
-            switch (status) {
-                case PENDING   -> vo.setPending(vo.getPending() + 1);
-                case SENT      -> vo.setSent(vo.getSent() + 1);
-                case SUCCESS   -> vo.setSuccess(vo.getSuccess() + 1);
-                case FAILED    -> vo.setFailed(vo.getFailed() + 1);
-                case TIMEOUT   -> vo.setTimeout(vo.getTimeout() + 1);
-                case CANCELLED -> vo.setCancelled(vo.getCancelled() + 1);
-                case ACCEPTED  -> { /* ACCEPTED 暂不计入统计 */ }
+        // 遍历数据库返回的统计结果
+        for (Map<String, Object> map : maps) {
+            // MyBatis 返回的数值类型可能是 Integer 或 Long，统一用 Number 安全转换
+            Integer statusCode = ((Number) map.get("status")).intValue();
+            Long count = ((Number) map.get("total")).longValue();
+
+            DeviceCommandStatus status = DeviceCommandStatus.fromCode(statusCode);
+            if (status == null) {
+                vo.setTotal(vo.getTotal() + count);
+                continue;
             }
+
+            switch (status) {
+                case PENDING   -> vo.setPending(vo.getPending() + count);
+                case SENT      -> vo.setSent(vo.getSent() + count);
+                case SUCCESS   -> vo.setSuccess(vo.getSuccess() + count);
+                case FAILED    -> vo.setFailed(vo.getFailed() + count);
+                case TIMEOUT   -> vo.setTimeout(vo.getTimeout() + count);
+                case CANCELLED -> vo.setCancelled(vo.getCancelled() + count);
+                case ACCEPTED  -> vo.setSent(vo.getSent() + count); // 业务约定：已接收归入下发中
+            }
+            // 累加总数
+            vo.setTotal(vo.getTotal() + count);
         }
 
-        vo.setTotal((long) commands.size());
         return vo;
     }
 }

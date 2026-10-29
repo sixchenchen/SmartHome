@@ -1,11 +1,11 @@
 package com.womi.webmodule.mqtt.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.womi.businessmodule.dto.DeviceRegisterRequest;
+import com.womi.businessmodule.vo.DeviceRegisterResponse;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.enums.MqttErrorCode;
 import com.womi.commonmodule.utils.JsonUtils;
-import com.womi.businessmodule.dto.DeviceRegisterRequest;
-import com.womi.businessmodule.vo.DeviceRegisterResponse;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import com.womi.webmodule.service.mqtt.DeviceRegisterService;

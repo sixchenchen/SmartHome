@@ -11,7 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /*
   事件处理器
@@ -52,44 +54,7 @@ public class DeviceEventMessageHandler implements MqttMessageHandler {
 
             JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
 
-            // 提取 data 节点中的事件信息
-            String eventType = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TYPE); // error 或 event
-            String eventName = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_EVENT);
-            String code = jsonUtils.getString(dataNode, DeviceMqttConstants.FILED_CODE);
-            String message = jsonUtils.getString(dataNode, DeviceMqttConstants.FILED_MESSAGE);
-            String context = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_CONTEXT);
-            String target = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TARGET);
-            Integer channel = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_CHANNEL);
-            String triggerSource = jsonUtils.getString(dataNode, DeviceMqttConstants.TRIGGER_SOURCE);
-
-            // 组装实体
-            DeviceEventRecord record = new DeviceEventRecord();
-            record.setDeviceId(deviceId);
-            // 如果 data.type 没传，默认按 event 存
-            record.setType(eventType != null ? eventType :DeviceMqttConstants.MSG_TYPE_EVENT);
-            record.setEvent(eventName);
-            record.setCode(code);
-            record.setMessage(message);
-            record.setContext(context);
-            record.setTarget(target);
-            record.setChannel(channel);
-            record.setTriggerSource(triggerSource);
-
-            // 将完整的原始 data 报文作为一个 JSON 存入库中，方便日后排查问题
-            record.setPayload(jsonUtils.nodeToMap(dataNode));
-
-            record.setTimestamp(LocalDateTime.now());
-            record.setCreateTime(LocalDateTime.now());
-
-            // 落库
-            eventRecordService.save(record);
-
-            // 根据级别打印不同的日志
-            if (DeviceMqttConstants.MSG_TYPE_ERROR.equalsIgnoreCase(eventType)) {
-                log.error("设备上报错误 - deviceId: {}, code: {}, message: {}", deviceId, code, message);
-            } else {
-                log.info("设备上报事件 - deviceId: {}, event: {}", deviceId, eventName);
-            }
+            eventRecordService.processDeviceEvent(deviceId, dataNode);
 
         } catch (Exception e) {
             log.error("处理设备事件消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);

@@ -54,25 +54,25 @@ public class DeviceInfoServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void markOnline(String deviceId, String product, String firmware, Map<String, Object> capabilities, Map<String, Object> currentState) {
-        DeviceInfo device = getByDeviceId(deviceId);
-        if (device == null) {
-            log.warn("设备上线失败，设备不存在 - deviceId: {}", deviceId);
-            return;
-        }
+        // 1. 构造要定向更新的实体（非空字段才会被更新）
+        DeviceInfo updateEntity = new DeviceInfo();
+        updateEntity.setOnline(DeviceOnlineStatus.ONLINE.getCode());
+        updateEntity.setLastOnlineTime(LocalDateTime.now());
+        updateEntity.setLastHeartbeatTime(LocalDateTime.now());
+        updateEntity.setProduct(product);
 
-        // 1. 直接给实体对象赋值
-        device.setOnline(DeviceOnlineStatus.ONLINE.getCode());
-        device.setLastOnlineTime(LocalDateTime.now());
-        device.setLastHeartbeatTime(LocalDateTime.now());
-        device.setProduct(product);
-        device.setOfflineReason(null);
+        if (capabilities != null) updateEntity.setCapabilities(capabilities);
+        if (currentState != null) updateEntity.setCurrentState(currentState);
+        if (firmware != null) updateEntity.setFirmware(firmware);
 
-        if (capabilities != null) device.setCapabilities(capabilities);
-        if (currentState != null) device.setCurrentState(currentState);
-        if (firmware != null) device.setFirmware(firmware);
+        // 2. 构造 Wrapper（用于定位设备，并处理需要置为 NULL 的字段）
+        LambdaUpdateWrapper<DeviceInfo> wrapper = new LambdaUpdateWrapper<DeviceInfo>()
+                .eq(DeviceInfo::getDeviceId, deviceId)
+                .set(DeviceInfo::getOfflineReason, null); // 上线时清空离线原因
 
-        // 2. 调用 updateById，完美触发 TypeHandler
-        updateById(device);
+        // 3. 核心：使用 update(entity, wrapper)
+        // 这会完美触发 JacksonTypeHandler，且只更新 entity 中非空的字段，绝不覆盖 last_payload 等其他数据！
+        update(updateEntity, wrapper);
 
         log.info("设备上线 - deviceId: {}", deviceId);
     }
@@ -209,28 +209,35 @@ public class DeviceInfoServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateSpecificState(String deviceId, String target, Integer channel, Integer state) {
-        DeviceInfo device = getByDeviceId(deviceId);
-        if (device == null) return;
-
-        // 1. 获取现有的 Map 并创建副本
-        Map<String, Object> stateMap = device.getCurrentState();
-        if (stateMap == null) {
-            stateMap = new HashMap<>();
-        } else {
-            stateMap = new HashMap<>(stateMap);
-        }
-
-        // 2. 组装键名
+        // 1. 组装键名：例如 target="led", channel=1 -> "led_1"
         String key = target;
         if (channel != null && channel > 0) {
             key = target + "_" + channel;
         }
 
-        // 3. 更新 Map 并赋值给实体
-        stateMap.put(key, state);
-        device.setCurrentState(stateMap);
+        // 2. 使用 setSql 直接调用 MySQL 的 JSON_SET 函数，实现原子更新，彻底杜绝并发覆盖
+        // 生成的 SQL: current_state = JSON_SET(IFNULL(current_state, '{}'), '$."led_1"', 1)
+        update(new LambdaUpdateWrapper<DeviceInfo>()
+                .setSql("current_state = JSON_SET(IFNULL(current_state, '{}'), '$.\"" + key + "\"', " + state + ")")
+                .set(DeviceInfo::getUpdateTime, LocalDateTime.now())
+                .eq(DeviceInfo::getDeviceId, deviceId));
+    }
 
-        // 4. 调用 updateById（不要传 String，直接传 Map）
-        updateById(device);
+    @Override
+    public boolean isDeviceActuallyOnline(DeviceInfo device, int timeoutSeconds) {
+        if (device == null) {
+            return false;
+        }
+        // 1. 基础状态必须为在线
+        if (!Integer.valueOf(DeviceOnlineStatus.ONLINE.getCode()).equals(device.getOnline())) {
+            return false;
+        }
+        // 2. 必须有最后心跳时间
+        if (device.getLastHeartbeatTime() == null) {
+            return false;
+        }
+        // 3. 心跳时间必须在允许的时间窗口内（防 LWT 延迟）
+        LocalDateTime threshold = LocalDateTime.now().minusSeconds(timeoutSeconds);
+        return device.getLastHeartbeatTime().isAfter(threshold);
     }
 }

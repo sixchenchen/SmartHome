@@ -76,7 +76,7 @@ public class MqttConfig {
         return factory;
     }
 
-    // ==================== 运行时 Broker（1883） ====================
+    // ==================== 运行时 Broker（8883） ====================
     @Bean("runtimeClientFactory")
     public MqttPahoClientFactory runtimeClientFactory() {
         return createClientFactory(mqttProperties.getRuntime(), "RUNTIME");
@@ -136,7 +136,7 @@ public class MqttConfig {
         return handler;
     }
 
-    // ==================== 注册 Broker（1884） ====================
+    // ==================== 注册 Broker（8884） ====================
     @Bean("provisionClientFactory")
     public MqttPahoClientFactory provisionClientFactory() {
         return createClientFactory(mqttProperties.getProvision(), "PROVISION");

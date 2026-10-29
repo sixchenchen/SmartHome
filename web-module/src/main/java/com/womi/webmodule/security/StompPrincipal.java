@@ -1,4 +1,4 @@
-package com.womi.webmodule.config;
+package com.womi.webmodule.security;
 
 import lombok.Getter;
 import java.security.Principal;

@@ -1,9 +1,6 @@
 package com.womi.webmodule.mqtt.handler;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.womi.businessmodule.model.device.DeviceInfo;
-import com.womi.businessmodule.model.device.DeviceStateRecord;
 import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.businessmodule.service.device.DeviceStateRecordService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
@@ -19,22 +16,20 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/*
-  OTA 进度上报处理器
-  topic: device/{mac}/ota_progress
-  payload:
-  {
-    "device": "B4BFE90CDBA1",
-    "type": "ota_progress",
-    "commandId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "timestamp": 1710000000000,
-    "data": {
-      "otaState": "downloading",
-      "progress": 45,
-      "version": "1.0.30"
-    }
-  }
-*/
+/**
+ * 设备外设状态变更处理器
+ * Topic: device/{mac}/state
+ * {
+ *   "device": "B4BFE90CDBA1",
+ *   "type": "state",
+ *   "timestamp": 1710000000000,
+ *   "data": {
+ *     "target": "led",
+ *     "channel": 1,
+ *     "state": 1
+ *   }
+ * }
+ */
 
 
 @Slf4j

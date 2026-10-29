@@ -8,7 +8,7 @@ import com.womi.businessmodule.model.sys.SysUser;
 import com.womi.businessmodule.model.sys.SysRole;
 import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.enums.EnableStatus;
-import com.womi.webmodule.service.auth.SecurityUser;
+import com.womi.webmodule.security.SecurityUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

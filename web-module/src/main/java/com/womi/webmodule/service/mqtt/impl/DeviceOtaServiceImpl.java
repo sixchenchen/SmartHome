@@ -1,6 +1,9 @@
 package com.womi.webmodule.service.mqtt.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.womi.businessmodule.dto.DeviceOtaParam;
+import com.womi.businessmodule.dto.SendCommandRequest;
 import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.model.device.DeviceFirmware;
 import com.womi.businessmodule.model.device.DeviceInfo;
@@ -8,8 +11,9 @@ import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceFirmwareService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
+import com.womi.businessmodule.vo.DeviceOtaProgressVO;
+import com.womi.businessmodule.vo.DeviceOtaStartResponse;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
-import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.constants.FirmwareConstants;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
@@ -18,17 +22,14 @@ import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.DeviceOtaStateUtils;
-import com.womi.businessmodule.dto.SendCommandRequest;
-import com.womi.businessmodule.dto.DeviceOtaParam;
-import com.womi.businessmodule.vo.DeviceOtaProgressVO;
-import com.womi.businessmodule.vo.DeviceOtaStartResponse;
-import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.service.mqtt.DeviceControlService;
 import com.womi.webmodule.service.mqtt.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -141,10 +142,14 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
      * 清理僵死 OTA 状态
      */
     private void cleanStaleOtaState(DeviceInfo device) {
-        device.setOtaState(null);
-        device.setOtaProgress(null);
-        device.setOtaUpdateTime(null);
-        deviceInfoService.updateById(device);
+        // 改用定向更新，只清空 OTA 相关的三个字段
+        deviceInfoService.update(new LambdaUpdateWrapper<DeviceInfo>()
+                .set(DeviceInfo::getOtaState, null)
+                .set(DeviceInfo::getOtaProgress, null)
+                .set(DeviceInfo::getOtaUpdateTime, null)
+                .set(DeviceInfo::getUpdateTime, LocalDateTime.now())
+                .eq(DeviceInfo::getDeviceId, device.getDeviceId()));
+
         log.info("已清理僵死 OTA 状态 - deviceId: {}", device.getDeviceId());
     }
 
@@ -243,11 +248,13 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         }
         return id;
     }
+
     /**
      * 管理员批量下发 OTA 升级
-     * @param firmwareId 固件ID
+     *
+     * @param firmwareId    固件ID
      * @param targetProduct 目标产品型号（如果为空，代表全量）
-     * @param operator 操作人
+     * @param operator      操作人
      * @return 本次涉及升级的指令数量
      */
     @Override
@@ -265,7 +272,8 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         // 2. 筛选目标设备 (必须在线的，且当前版本不等于目标版本的)
         LambdaQueryWrapper<DeviceInfo> wrapper = new LambdaQueryWrapper<DeviceInfo>()
                 .eq(DeviceInfo::getOnline, DeviceOnlineStatus.ONLINE.getCode()) // 条件 A: 必须在线
-                .ne(DeviceInfo::getFirmware, firmware.getVersion()); // 条件 B: 版本不一致
+                .and(w -> w.isNull(DeviceInfo::getFirmware)
+                        .or().ne(DeviceInfo::getFirmware, firmware.getVersion()));
 
         if (StringUtils.hasText(targetProduct)) {
             wrapper.eq(DeviceInfo::getProduct, targetProduct); // 条件 C: 产品匹配
@@ -341,26 +349,32 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         }
 
         // 6. 批量落库
-        deviceCommandService.saveBatch(commands);
-
-        log.info("[OTA-Dispatch] 成功生成 {} 条 OTA 升级指令，等待定时任务下发", commands.size());
-        // 落库后立即发送 MQTT 并更新状态
-        for (DeviceCommand cmd : commands) {
-            try {
-                // 调用发送器把消息发出去
-                commandSender.send(cmd);
-
-                // 发送成功，把状态从 0(PENDING) 改为 1(SENT)
-                deviceCommandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
-                // 增加一次重试计数（代表已经发了一次）
-                deviceCommandService.incrementRetryCount(cmd.getId());
-
-                log.info("[OTA-Dispatch] OTA 指令立即下发成功 - commandId: {}", cmd.getCommandId());
-            } catch (Exception e) {
-                // 发送失败不用管，状态依然是 0(PENDING)，后面要靠定时任务兜底
-                log.error("[OTA-Dispatch] OTA 指令立即下发失败 - commandId: {}", cmd.getCommandId(), e);
+        executeAfterCommit(() -> {
+            for (DeviceCommand cmd : commands) {
+                try {
+                    commandSender.send(cmd);
+                    deviceCommandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
+                    deviceCommandService.incrementRetryCount(cmd.getId());
+                    log.info("[OTA-Dispatch] OTA 指令立即下发成功 - commandId: {}", cmd.getCommandId());
+                } catch (Exception e) {
+                    log.error("[OTA-Dispatch] OTA 指令立即下发失败，等待定时任务兜底 - commandId: {}", cmd.getCommandId(), e);
+                }
             }
-        }
+        });
+
         return commands.size();
+    }
+
+    private void executeAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 }

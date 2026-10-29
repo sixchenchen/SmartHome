@@ -37,6 +37,7 @@
         <redis.version>3.4.4</redis.version>
         <jjwt.version>0.12.6</jjwt.version>
         <knife4j.version>4.4.0</knife4j.version>
+        <shedlock.version>5.10.0</shedlock.version>
     </properties>
 
     <dependencyManagement>
@@ -127,6 +128,19 @@
                 <groupId>com.github.xiaoymin</groupId>
                 <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
                 <version>${knife4j.version}</version>
+            </dependency>
+
+            <!-- ShedLock 核心包 -->
+            <dependency>
+                <groupId>net.javacrumbs.shedlock</groupId>
+                <artifactId>shedlock-spring</artifactId>
+                <version>${shedlock.version}</version>
+            </dependency>
+            <!-- ShedLock 基于 Redis 的锁提供者 -->
+            <dependency>
+                <groupId>net.javacrumbs.shedlock</groupId>
+                <artifactId>shedlock-provider-redis-spring</artifactId>
+                <version>${shedlock.version}</version>
             </dependency>
 
         </dependencies>

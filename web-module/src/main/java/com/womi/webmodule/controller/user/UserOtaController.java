@@ -2,7 +2,7 @@ package com.womi.webmodule.controller.user;
 
 import com.womi.businessmodule.vo.OtaCheckResponse;
 import com.womi.commonmodule.response.ApiResponse;
-import com.womi.webmodule.service.auth.SecurityUser;
+import com.womi.webmodule.security.SecurityUser;
 import com.womi.webmodule.service.mqtt.UserOtaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;

@@ -3,10 +3,12 @@ package com.womi.webmodule.schedule;
 import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.constants.ScheduleConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +27,9 @@ public class DeviceCommandScheduler {
     /**
      * 兜底扫描：立即下发失败的命令PENDING，每 2 秒扫一次
      */
+    @SchedulerLock(name = "DeviceCommandScheduler_dispatchPending",
+            lockAtMostFor = "10s", lockAtLeastFor = "2s")
+    @Scheduled(fixedDelay = ScheduleConstants.DISPATCH_FIXED_DELAY)
     @Scheduled(fixedDelay = ScheduleConstants.DISPATCH_FIXED_DELAY)
     public void dispatchPending() {
         List<DeviceCommand> pending = deviceCommandService.listStalePending(
@@ -38,13 +43,17 @@ public class DeviceCommandScheduler {
 
         for (DeviceCommand command : pending) {
             try {
-                // 重试次数超上限 → 标记失败
-                if (command.getRetryCount() >= ScheduleConstants.MAX_RETRY) {
+                // 读取指令自身的 maxRetry，如果为空，兜底用默认值
+                int maxRetry = command.getMaxRetry() != null ? command.getMaxRetry() : DeviceCommandConstants.DEFAULT_MAX_RETRY;
+
+                if (command.getRetryCount() >= maxRetry) {
+                    // 动态填充错误信息中的重试次数
+                    String errorMsg = String.format(DeviceCommandConstants.ERR_FALLBACK_RETRY_EXCEEDED, maxRetry);
                     deviceCommandService.updateStatus(
                             command.getId(),
                             DeviceCommandStatus.FAILED.getCode(),
-                            ERR_TIMEOUT_RETRY_EXCEEDED);
-                    log.warn("指令重试次数超限，标记失败 - commandId: {}", command.getCommandId());
+                            errorMsg);
+                    log.warn("指令重试次数超限，标记失败 - commandId: {}, maxRetry: {}", command.getCommandId(), maxRetry);
                     continue;
                 }
 
@@ -67,6 +76,8 @@ public class DeviceCommandScheduler {
     /**
      * 超时重试：已 SENT 但 30 秒内没 ACK 的指令，每 5 秒扫一次
      */
+    @SchedulerLock(name = "DeviceCommandScheduler_retryTimeout",
+            lockAtMostFor = "15s", lockAtLeastFor = "2s")
     @Scheduled(fixedDelay = ScheduleConstants.RETRY_FIXED_DELAY)
     public void retryTimeout() {
         List<DeviceCommand> retryable = deviceCommandService.listRetryable(
@@ -91,6 +102,8 @@ public class DeviceCommandScheduler {
     /**
      * 标记过期指令：PENDING/SENT 但已超过 expire_time，每 60 秒一次
      */
+    @SchedulerLock(name = "DeviceCommandScheduler_markExpired",
+            lockAtMostFor = "1m", lockAtLeastFor = "5s")
     @Scheduled(fixedDelay = ScheduleConstants.MARK_EXPIRED_FIXED_DELAY)
     public void markExpired() {
         try {
@@ -103,6 +116,8 @@ public class DeviceCommandScheduler {
         }
     }
 
+    @SchedulerLock(name = "DeviceCommandScheduler_markOtaExpired",
+            lockAtMostFor = "1m", lockAtLeastFor = "5s")
     @Scheduled(fixedDelay = ScheduleConstants.OTA_EXPIRED_FIXED_DELAY)
     public void markOtaExpired() {
         try {

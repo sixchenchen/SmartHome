@@ -182,7 +182,7 @@ public final class DeviceMqttConstants {
     public static final String FIELD_SLAVES = "slaves";
     public static final String FIELD_SLAVE = "slave";
     public static final String FILED_MESSAGE = "message";
-    public static final String FILED_CODE = "code";
+    public static final String FIELD_CODE = "code";
     public static final String TRIGGER_SOURCE = "trigger_source";
     public static final String FIELD_SENSOR_KEY = "sensor_key";
     public static final String SOURCE = "source";

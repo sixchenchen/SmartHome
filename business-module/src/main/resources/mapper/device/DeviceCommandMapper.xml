@@ -72,6 +72,7 @@
         FROM device_command
         WHERE status IN (0, 1, 6)
         AND expire_time &lt; #{now}
+        AND target != 'ota'
     </select>
 
     <update id="markAsSent">

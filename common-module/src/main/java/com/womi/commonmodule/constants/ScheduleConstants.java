@@ -18,8 +18,6 @@ public final class ScheduleConstants {
     public static final long RETRY_FIXED_DELAY = 3000L;
     // 最小等待时间
     public static final int DISPATCH_MIN_WAIT_SECONDS = 2;
-    // 最大重试次数
-    public static final int MAX_RETRY = 3;
     // 过期指令标记间隔
     public static final long MARK_EXPIRED_FIXED_DELAY = 30000L;
     // OTA过期间隔

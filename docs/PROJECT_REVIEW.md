@@ -318,7 +318,7 @@
 
 1. **Controller 路径风格不统一**：`/api/user/**`、`/api/admin/**`、`/api/auth/**` 与 `/device/command`、`/ota` 混用，且没有统一 `context-path`。
 2. **DTO 归属混乱**：`business-module/dto` 中同时存在 `SendCommandRequest`、`DeviceOtaStartRequest`、`DeviceOtaParam`，而 `web-module` 又有自己的 `dto` 包（`SendCommandRequest` 等），存在同名/近义类型并存。
-3. **AuthService 命名与分层不一致**：其余服务是 `XxxService` + `impl/XxxServiceImpl`，而 `AuthService` 直接是 `@Service` 类。
+3. **AuthService 命名与分层不一致**：其余服务是 `XxxService` + `impl/XxxServiceImpl`，而 `AuthServiceImpl` 直接是 `@Service` 类。
 4. **业务逻辑泄漏到 MQTT Handler**：`DeviceEventMessageHandler` 直接组装实体并 `save()`，未经过 Service，后续换存储或加校验要改多处。
 5. **Mapper 存在死方法与死 SQL**：
    - `DeviceCommandMapper.markAsSent / markAsSuccess / markAsFailed / markAsTimeout / selectPendingCommands / markExpiredCommands(update)` 无调用方；

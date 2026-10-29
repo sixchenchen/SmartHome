@@ -15,19 +15,26 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 
-/*
-  设备离线处理器
-  topic: device/{mac}/offline  device/{mac}/will
-  payload:
-   {
-    "device": "B4BFE90CDBA1",
-    "type": "offline",
-    "timestamp": 1710000000000,
-    "data": {
-      "product": "SmartHome-v1",
-      "reason": "shutdown"
-    }
-  }
+/**
+ * 设备上下线处理器 (Presence)
+ * <p>Topic: device/{mac}/presence</p>
+ * <p>Payload:
+ * <pre>
+ * {
+ *   "device": "B4BFE90CDBA1",
+ *   "type": "online", // 或 offline
+ *   "timestamp": 1710000000000,
+ *   "data": {
+ *     "product": "SmartHome-v1",
+ *     "firmware": "1.0.29",
+ *     "capabilities": {"led": 3},
+ *     "state": {"led_1": 0},
+ *     "slaves": [...],
+ *     "reason": "shutdown" // type=offline 时可用
+ *   }
+ * }
+ * </pre>
+ * </p>
  */
 @Slf4j
 @Component

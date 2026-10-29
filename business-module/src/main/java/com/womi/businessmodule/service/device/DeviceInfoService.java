@@ -83,4 +83,11 @@ public interface DeviceInfoService extends IService<DeviceInfo> {
      * @param deviceId 设备ID
      */
     void updateSpecificState(String deviceId, String target, Integer channel, Integer state);
+
+    /**
+     * 判断设备是否真实在线（结合 online 字段与最后心跳时间）
+     * @param device 设备实体
+     * @param timeoutSeconds 心跳超时判定秒数
+     */
+    boolean isDeviceActuallyOnline(DeviceInfo device, int timeoutSeconds);
 }

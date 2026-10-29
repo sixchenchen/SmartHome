@@ -76,4 +76,6 @@ public interface DeviceCommandMapper extends BaseMapper<DeviceCommand> {
 
     /** 批量标记 OTA 指令过期 */
     int markOtaExpiredCommands();
+
+    int markExpiredCommands();
 }

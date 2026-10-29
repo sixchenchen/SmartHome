@@ -2,6 +2,7 @@ package com.womi.commonmodule.constants;
 
 import com.womi.commonmodule.enums.DeviceCommandStatus;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -11,17 +12,16 @@ public final class DeviceCommandConstants {
     // ==================== 状态集合 ====================
 
     /** 终态：不再变化，无需重试 */
-    public static final List<Integer> FINISHED_STATUSES = List.of(
-            DeviceCommandStatus.SUCCESS.getCode(),
-            DeviceCommandStatus.FAILED.getCode(),
-            DeviceCommandStatus.TIMEOUT.getCode(),
-            DeviceCommandStatus.CANCELLED.getCode()
-    );
+    public static final List<Integer> FINISHED_STATUSES = Arrays.stream(DeviceCommandStatus.values())
+            .filter(DeviceCommandStatus::isFinished)
+            .map(DeviceCommandStatus::getCode)
+            .toList();
 
     /** 中间态：可能继续流转 */
     public static final List<Integer> PENDING_STATUSES = List.of(
             DeviceCommandStatus.PENDING.getCode(),
-            DeviceCommandStatus.SENT.getCode()
+            DeviceCommandStatus.SENT.getCode(),
+            DeviceCommandStatus.ACCEPTED.getCode() // 视业务而定，如果有需要可以加上
     );
 
     // ==================== 默认参数 ====================

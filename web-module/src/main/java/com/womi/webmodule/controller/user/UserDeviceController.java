@@ -5,7 +5,7 @@ import com.womi.businessmodule.dto.DeviceBindRequest;
 import com.womi.businessmodule.dto.DeviceControlRequest;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.commonmodule.response.ApiResponse;
-import com.womi.webmodule.service.auth.SecurityUser;
+import com.womi.webmodule.security.SecurityUser;
 import com.womi.webmodule.service.device.DeviceUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

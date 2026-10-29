@@ -5,21 +5,22 @@ import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
-import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.constants.ScheduleConstants;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
-import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
+import com.womi.commonmodule.utils.MacUtils;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import com.womi.webmodule.service.mqtt.DeviceControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.util.StringUtils;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,16 +43,28 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     public DeviceCommand sendCommand(String deviceId, String action, String target,
                                      Integer channel, Map<String, Object> params,
                                      String operator, int expireSeconds) {
-        checkDeviceOnline(deviceId);
 
-        // 1. 入库（PENDING）
+        // 1. 统一清洗 MAC 地址
+        String cleanMac = MacUtils.normalize(deviceId);
+        if (!StringUtils.hasText(cleanMac)) {
+            throw new BusinessException(ErrorCode.PARAM_ERROR, "无效的设备ID");
+        }
+
+        // 2. 查出设备实体，并校验真实在线状态
+        DeviceInfo device = deviceInfoService.getByDeviceId(cleanMac);
+        if (device == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
+        }
+        checkDeviceOnline(device);
+
+        // 3. 入库（PENDING）
         DeviceCommand command = deviceCommandService.prepareCommand(
-                deviceId, action, target, channel, params,
+                cleanMac, action, target, channel, params,
                 operator, DeviceCommandConstants.SOURCE_WEB,
                 expireSeconds > 0 ? expireSeconds : DEFAULT_EXPIRE_SECONDS);
 
-        // 2. 立即下发
-        trySendImmediately(command);
+        // 4. 立即下发
+        executeAfterCommit(() -> trySendImmediately(command));
         return command;
     }
 
@@ -131,11 +144,9 @@ public class DeviceControlServiceImpl implements DeviceControlService {
                 channel, params, operator, DEFAULT_EXPIRE_SECONDS);
     }
 
-
     // ==================== 配置 ====================
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public DeviceCommand sendConfig(String deviceId, Map<String, Object> config,
                                     Integer configVersion, String operator) {
 
@@ -153,36 +164,26 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     }
 
     /**
-     * 校验设备在线：
-     * 1) 设备必须存在
-     * 2) online 字段必须为 1
-     * 3) 心跳未超时（防止 LWT 延迟导致误判在线）
+     * 校验设备真实在线
      */
-    private void checkDeviceOnline(String deviceId) {
-        if (deviceId == null || deviceId.isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_ERROR);
-        }
-
-        DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
-        if (device == null) {
-            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
-        }
-
-        // 在线标志
-        if (device.getOnline() == null
-                || device.getOnline() != DeviceOnlineStatus.ONLINE.getCode()) {
-            log.warn("指令拒绝：设备不在线 - deviceId: {}, online: {}", deviceId, device.getOnline());
+    private void checkDeviceOnline(DeviceInfo device) {
+        if (!deviceInfoService.isDeviceActuallyOnline(device, ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS)) {
             throw new BusinessException(ErrorCode.DEVICE_OFFLINE);
         }
-
-        // 心跳兜底：防止 LWT 还没触发，online=1 但实际已断
-        LocalDateTime last = device.getLastHeartbeatTime();
-        if (last != null) {
-            long gap = Duration.between(last, LocalDateTime.now()).getSeconds();
-            if (gap > DeviceConstants.HEARTBEAT_OFFLINE_SECONDS) {
-                log.warn("指令拒绝：心跳超时 - deviceId: {}, gap: {}s", deviceId, gap);
-                throw new BusinessException(ErrorCode.DEVICE_OFFLINE, "设备心跳超时 " + gap + "s，视为离线");
-            }
+    }
+    /**
+     * 事务提交后执行（如果当前没有事务，则立即执行）
+     */
+    private void executeAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
         }
     }
 }
