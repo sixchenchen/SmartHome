@@ -50,39 +50,24 @@ public class DeviceStateMessageHandler implements MqttMessageHandler {
     @Override
     public void handle(String topic, String payload, Integer qos) {
         try {
-            // 1. 从 topic 提取 deviceId
             String deviceId = extractDeviceId(topic);
-            if (deviceId == null) {
-                log.warn("无法提取设备ID - Topic: {}", topic);
-                return;
-            }
-
-            // 2. 解析 payload
             JsonNode json = jsonUtils.parse(payload);
-            if (json == null) return;
-
-            // 3. 进入 data 节点，提取具体状态信息
             JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
-            String target = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TARGET); // 如 led
-            Integer channel = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_CHANNEL); // 如 1
-            Integer state = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_STATE);     // 如 1
+
+            String target = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TARGET);
+            Integer channel = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_CHANNEL);
+            Integer state = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_STATE);
 
             if (target == null || state == null) {
-                log.warn("状态上报缺少必要字段 - deviceId: {}", deviceId);
-                return;
+                throw new IllegalArgumentException("状态上报缺少 target 或 state");
             }
 
-            // 4. 调用 Service 层更新主表的 current_state (精准更新某一路)
             deviceInfoService.updateSpecificState(deviceId, target, channel, state);
 
-            // 5. 记录状态变更时序轨迹
             Map<String, Object> paramsMap = new HashMap<>();
             paramsMap.put(DeviceMqttConstants.FIELD_STATE, state);
             stateRecordService.recordState(deviceId, target, channel, paramsMap, LocalDateTime.now());
 
-            log.info("设备状态变更落库 - deviceId: {}, target: {}, channel: {}, state: {}",
-                    deviceId, target, channel, state);
-            // 推送给前端
             Map<String, Object> pushData = new HashMap<>();
             pushData.put("target", target);
             pushData.put("channel", channel);

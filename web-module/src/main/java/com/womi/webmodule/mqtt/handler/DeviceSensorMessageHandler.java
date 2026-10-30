@@ -53,17 +53,13 @@ public class DeviceSensorMessageHandler implements MqttMessageHandler {
     public void handle(String topic, String payload, Integer qos) {
         try {
             String deviceId = extractDeviceId(topic);
-            if (deviceId == null) return;
-
             JsonNode json = jsonUtils.parse(payload);
-            if (json == null) return;
-
-            // 提取 data 数组节点
             JsonNode dataArray = json.path(DeviceMqttConstants.FIELD_DATA);
+
             if (!dataArray.isArray()) {
-                log.warn("传感器数据格式错误，data 节点不是数组 - deviceId: {}", deviceId);
-                return;
+                throw new IllegalArgumentException("传感器数据格式错误，data 节点不是数组");
             }
+
             deviceSensorDataService.processSensorData(deviceId, dataArray);
 
         } catch (Exception e) {

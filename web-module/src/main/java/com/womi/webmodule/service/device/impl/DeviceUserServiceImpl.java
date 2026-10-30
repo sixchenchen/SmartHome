@@ -11,11 +11,13 @@ import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.ScheduleConstants;
 import com.womi.commonmodule.enums.BindStatus;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.DeviceOnlineStatus;
+import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
 import com.womi.webmodule.service.device.DeviceUserService;
@@ -53,21 +55,21 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         DeviceInfo device = deviceInfoMapper.selectOne(
                 new LambdaQueryWrapper<DeviceInfo>().eq(DeviceInfo::getDeviceId, cleanMac));
         if (device == null) {
-            throw new BusinessException(400, "设备不存在，请检查MAC地址是否正确");
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, ErrorCode.DEVICE_NOT_FOUND.getMessage());
         }
 
         // 2. 校验设备是否已被绑定
         if (bindCode == null || !bindCode.trim().equalsIgnoreCase(device.getBindCode())) {
-            throw new BusinessException(403, "设备绑定码错误，请扫描设备机身上的二维码");
+            throw new BusinessException(ErrorCode.DEVICE_BINDING_CODE_ERROR, ErrorCode.DEVICE_BINDING_CODE_ERROR.getMessage());
         }
         // 先查一下给用户友好的提示
         DeviceBinding existingBinding = deviceBindingMapper.selectOne(
                 new LambdaQueryWrapper<DeviceBinding>().eq(DeviceBinding::getActiveDeviceId, cleanMac));
         if (existingBinding != null) {
             if (existingBinding.getUserId().equals(userId)) {
-                throw new BusinessException(400, "您已经绑定了该设备");
+                throw new BusinessException(ErrorCode.DEVICE_ALREADY_BOUND_SELF, "您已经绑定了该设备");
             } else {
-                throw new BusinessException(400, "该设备已被其他用户绑定");
+                throw new BusinessException(ErrorCode.DEVICE_ALREADY_BOUND_OTHER, "该设备已被其他用户绑定");
             }
         }
 
@@ -82,7 +84,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
             deviceBindingMapper.insert(binding);
         } catch (DuplicateKeyException e) {
             // 解决并发问题：如果两个用户同时点绑定，数据库唯一索引会拦住其中一个
-            throw new BusinessException(400, "该设备已被绑定，请刷新重试");
+            throw new BusinessException(ErrorCode.DEVICE_ALREADY_BOUND_OTHER, "该设备已被绑定，请刷新重试");
         }
         redisTemplate.opsForSet().add(RedisConstants.BOUND_DEVICES_KEY, cleanMac);
         log.info("用户绑定设备成功: userId={}, deviceId={}", userId, cleanMac);
@@ -100,7 +102,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
                         .eq(DeviceBinding::getUserId, userId));
 
         if (binding == null) {
-            throw new BusinessException(400, "您尚未绑定该设备，或已被解绑");
+            throw new BusinessException(ErrorCode.DEVICE_NOT_BOUND, "您尚未绑定该设备，或已被解绑");
         }
 
         // 2. 更新为解绑状态
@@ -145,7 +147,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
                 new LambdaQueryWrapper<DeviceInfo>().eq(DeviceInfo::getDeviceId, cleanMac));
 
         if (device == null) {
-            throw new BusinessException(400, "设备不存在");
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, ErrorCode.DEVICE_NOT_FOUND.getMessage());
         }
 
         DeviceBinding binding = deviceBindingMapper.selectOne(
@@ -154,17 +156,17 @@ public class DeviceUserServiceImpl implements DeviceUserService {
                         .eq(DeviceBinding::getUserId, userId));
 
         if (binding == null) {
-            throw new BusinessException(403, "您未绑定该设备，无权操作");
+            throw new BusinessException(ErrorCode.DEVICE_NO_PERMISSION, "您未绑定该设备，无权操作");
         }
 
         // ==================== 场景 4：校验在线状态 ====================
         if (!Integer.valueOf(DeviceOnlineStatus.ONLINE.getCode()).equals(device.getOnline())) {
-            throw new BusinessException(400, "设备当前离线，请检查电源后重试");
+            throw new BusinessException(ErrorCode.DEVICE_OFFLINE, "设备当前离线，请检查电源后重试");
         }
         // ==================== 场景 4：校验真实在线状态（防 LWT 延迟黑洞） ====================
         int timeoutSeconds = ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS; // 假设你是 90 秒或 60 秒
         if (!deviceInfoService.isDeviceActuallyOnline(device, timeoutSeconds)) {
-            throw new BusinessException(400, "设备已离线或网络异常，请检查电源后重试");
+            throw new BusinessException(ErrorCode.DEVICE_NETWORK_ERROR, "设备已离线或网络异常，请检查电源后重试");
         }
 
         // ==================== 组装并下发指令 ====================
@@ -176,14 +178,14 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         cmd.setTarget(request.getTarget());
         cmd.setChannel(request.getChannel());
         cmd.setParams(request.getParams());
-        cmd.setQos(1); // 控制指令建议 QoS 1
-        cmd.setRetain(0);
+        cmd.setQos(DeviceCommandConstants.DEFAULT_QOS); // 控制指令建议 QoS 1
+        cmd.setRetain(DeviceCommandConstants.DEFAULT_RETAIN);
         cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
-        cmd.setRetryCount(0);
-        cmd.setMaxRetry(3);
+        cmd.setRetryCount(DeviceCommandConstants.DEFAULT_RETRY_COUNT);
+        cmd.setMaxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY);
         cmd.setOperator("user_" + userId);
-        cmd.setSource("APP");
-        cmd.setExpireTime(now.plusSeconds(30)); // 控制指令过期时间设短一点，30秒
+        cmd.setSource(DeviceCommandConstants.SOURCE_WEB);
+        cmd.setExpireTime(now.plusSeconds(DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS)); // 控制指令过期时间设短一点，30秒
         cmd.setCreateTime(now);
         cmd.setUpdateTime(now);
 

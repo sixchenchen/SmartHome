@@ -47,7 +47,7 @@ public class DeviceCommandServiceImpl
             throw new BusinessException(ErrorCode.PARAM_EMPTY);
         }
 
-        String commandId = UUID.randomUUID().toString();
+        String commandId = UUID.randomUUID().toString().replace("-", "");
         LocalDateTime now = LocalDateTime.now();
         int actualExpire = expireSeconds > 0
                 ? expireSeconds : DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS;
@@ -62,7 +62,7 @@ public class DeviceCommandServiceImpl
                 .qos(DeviceCommandConstants.DEFAULT_QOS)
                 .retain(DeviceCommandConstants.DEFAULT_RETAIN)
                 .status(DeviceCommandStatus.PENDING.getCode())
-                .retryCount(0)
+                .retryCount(DeviceCommandConstants.DEFAULT_RETRY_COUNT)
                 .maxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY)
                 .operator(operator != null ? operator : DeviceCommandConstants.DEFAULT_OPERATOR)
                 .source(source != null ? source : DeviceCommandConstants.SOURCE_WEB)

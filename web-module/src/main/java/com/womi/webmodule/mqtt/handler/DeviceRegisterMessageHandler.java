@@ -53,34 +53,17 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
     @Override
     public void handle(String topic, String payload, Integer qos) {
         try {
-            // 1. 提取 deviceId
             String deviceId = extractProvisionDeviceId(topic);
-            if (deviceId == null) {
-                log.warn("无法提取设备ID - Topic: {}", topic);
-                return;
-            }
-            // 2. 解析 payload
             JsonNode json = jsonUtils.parse(payload);
-            if (json == null) {
-                log.warn("payload 解析失败 - Topic: {}", topic);
-                sendResponse(deviceId, DeviceRegisterResponse.error(MqttErrorCode.INVALID_PAYLOAD));
-                return;
-            }
 
             String payloadDevice = jsonUtils.getString(json, DeviceMqttConstants.FIELD_DEVICE);
             if (payloadDevice != null && !payloadDevice.equals(deviceId)) {
-                log.warn("注册 device 与 topic 不一致 - topic: {}, payload: {}", topic, payloadDevice);
-                sendResponse(deviceId, DeviceRegisterResponse.error(MqttErrorCode.INVALID_DEVICE_ID));
-                return;
+                throw new IllegalArgumentException("注册 device 与 topic 不一致");
             }
-            // 3. 提取字段 → 组装 RegisterRequest
-            DeviceRegisterRequest request = buildRequest(deviceId, json);
-            // 4. 调业务层（含验签、防重放、分配凭据）
-            DeviceRegisterResponse response = deviceRegisterService.register(request);
-            // 5. 发送响应
-            sendResponse(deviceId, response);
-            log.info("设备注册处理完成 - deviceId: {}, success: {}",deviceId, response.isSuccess());
 
+            DeviceRegisterRequest request = buildRequest(deviceId, json);
+            DeviceRegisterResponse response = deviceRegisterService.register(request);
+            sendResponse(deviceId, response);
         } catch (Exception e) {
             log.error("处理注册请求失败 - topic: {}, error: {}", topic, e.getMessage(), e);
         }

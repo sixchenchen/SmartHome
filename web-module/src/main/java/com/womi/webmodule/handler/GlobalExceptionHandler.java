@@ -154,7 +154,7 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleNoResourceFound(NoResourceFoundException e, HttpServletRequest request) {
         // 使用 debug 或 warn 级别，不要用 error
         log.debug("静态资源未找到 - uri: {}", request.getRequestURI());
-        return ApiResponse.error(404, "资源不存在");
+        return ApiResponse.error(ErrorCode.NOT_RESOURCE.getCode(), ErrorCode.NOT_RESOURCE.getMessage());
     }
 
     /**

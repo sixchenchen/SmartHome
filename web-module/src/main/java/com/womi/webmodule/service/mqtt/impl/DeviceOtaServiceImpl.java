@@ -328,14 +328,14 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             cmd.setTarget(DeviceMqttConstants.TARGET_OTA);
             cmd.setChannel(null);
             cmd.setParams(otaParam.toMap());
-            cmd.setQos(1);
-            cmd.setRetain(0);
+            cmd.setQos(DeviceCommandConstants.DEFAULT_QOS);
+            cmd.setRetain(DeviceCommandConstants.DEFAULT_RETAIN);
             cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
-            cmd.setRetryCount(0);
-            cmd.setMaxRetry(3);
+            cmd.setRetryCount(DeviceCommandConstants.DEFAULT_RETRY_COUNT);
+            cmd.setMaxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY);
             cmd.setOperator(operator != null ? operator : DeviceCommandConstants.DEFAULT_OPERATOR);
             cmd.setSource(DeviceCommandConstants.SOURCE_WEB);
-            cmd.setExpireTime(now.plusMinutes(30));
+            cmd.setExpireTime(now.plusSeconds(DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS));
             cmd.setCreateTime(now);
             cmd.setUpdateTime(now);
 

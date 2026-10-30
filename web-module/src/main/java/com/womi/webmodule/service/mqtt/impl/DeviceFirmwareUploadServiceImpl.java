@@ -5,6 +5,7 @@ import com.womi.businessmodule.service.device.DeviceFirmwareService;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.ErrorInfoConstants;
 import com.womi.commonmodule.constants.FirmwareConstants;
+import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.properties.FirmwareProperties;
@@ -188,7 +189,7 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
      * 计算 SHA256
      */
     private String computeSha256(Path path) throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        MessageDigest digest = MessageDigest.getInstance(UserConstants.HASH_ALGORITHM_SHA256);
         try (InputStream in = Files.newInputStream(path)) {
             byte[] buffer = new byte[FirmwareConstants.UPLOAD_BUFFER_SIZE];
             int n;

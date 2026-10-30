@@ -50,13 +50,13 @@
             stompClient = Stomp.over(socket);
             stompClient.debug = null; 
 
-            // 👈 2. 将 Token 放入 STOMP Header 中
+            //  2. 将 Token 放入 STOMP Header 中
             const connectHeaders = {
                 'Authorization': 'Bearer ' + token
             };
 
             stompClient.connect(connectHeaders, function (frame) {
-                statusDiv.innerText = "✅ WebSocket 安全连接成功!";
+                statusDiv.innerText = " WebSocket 安全连接成功!";
                 statusDiv.style.color = "green";
                 log('鉴权通过并连接成功!', 'green');
 
@@ -65,30 +65,30 @@
                 try {
                     // 3. 订阅状态变化
                     stompClient.subscribe('/topic/device/' + deviceId + '/state', function (response) {
-                        log('🔔 状态变化: ' + response.body, 'blue');
+                        log(' 状态变化: ' + response.body, 'blue');
                     }, function(error) {
-                        log('❌ 状态订阅被拒绝: ' + error, 'red');
+                        log(' 状态订阅被拒绝: ' + error, 'red');
                     });
 
                     // 4. 订阅传感器数据
                     stompClient.subscribe('/topic/device/' + deviceId + '/sensor', function (response) {
-                        log('📈 传感器数据: ' + response.body, 'purple');
+                        log(' 传感器数据: ' + response.body, 'purple');
                     }, function(error) {
-                        log('❌ 传感器订阅被拒绝: ' + error, 'red');
+                        log(' 传感器订阅被拒绝: ' + error, 'red');
                     });
 
                     // 5. 订阅告警信息
                     stompClient.subscribe('/topic/device/' + deviceId + '/alert', function (response) {
-                        log('🚨 告警: ' + response.body, 'red');
+                        log(' 告警: ' + response.body, 'red');
                     }, function(error) {
-                        log('❌ 告警订阅被拒绝: ' + error, 'red');
+                        log(' 告警订阅被拒绝: ' + error, 'red');
                     });
                 } catch(e) {
                     log("订阅异常: " + e, "red");
                 }
 
             }, function (error) {
-                statusDiv.innerText = "❌ 连接失败: " + error;
+                statusDiv.innerText = " 连接失败: " + error;
                 statusDiv.style.color = "red";
  		log('连接失败详情: ' + JSON.stringify(error.headers || error), 'red'); 
             });

@@ -55,28 +55,33 @@ public class DevicePresenceMessageHandler implements MqttMessageHandler {
     public void handle(String topic, String payload, Integer qos) {
         try {
             String deviceId = extractDeviceId(topic);
-            if (deviceId == null) {
-                log.warn("无法提取 deviceId - topic: {}", topic);
-                return;
-            }
-
             JsonNode json = jsonUtils.parse(payload);
-            if (json == null) {
-                log.warn("presence payload 解析失败 - topic: {}", topic);
-                return;
-            }
-
             String type = jsonUtils.getString(json, DeviceMqttConstants.FIELD_TYPE);
             JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
 
             if (DeviceMqttConstants.MSG_TYPE_ONLINE.equals(type)) {
-                handleOnline(deviceId, dataNode);
-            } else if (DeviceMqttConstants.MSG_TYPE_OFFLINE.equals(type)) {
-                handleOffline(deviceId, dataNode);
-            } else {
-                log.warn("未知 presence type - deviceId: {}, type: {}", deviceId, type);
-            }
+                String product = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_PRODUCT);
+                String firmware = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_FIRMWARE);
+                Map<String, Object> capabilities = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_CAPABILITIES));
+                Map<String, Object> currentState = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_STATE));
 
+                deviceInfoService.markOnline(deviceId, product, firmware,
+                        capabilities.isEmpty() ? null : capabilities,
+                        currentState.isEmpty() ? null : currentState);
+                deviceInfoService.reconcileOtaOnOnline(deviceId, firmware);
+
+                JsonNode slavesNode = dataNode.path(DeviceMqttConstants.FIELD_SLAVES);
+                if (slavesNode.isArray()) {
+                    List<Map<String, Object>> slavesList = jsonUtils.nodeToListMap(slavesNode);
+                    deviceSlaveDataService.syncSlaveData(deviceId, slavesList);
+                }
+            } else if (DeviceMqttConstants.MSG_TYPE_OFFLINE.equals(type)) {
+                String reason = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_REASON);
+                if (reason == null || reason.isBlank()) reason = DeviceOfflineReason.MQTT_LWT.getCode();
+                deviceInfoService.markOffline(deviceId, DeviceOfflineReason.fromCode(reason));
+            } else {
+                throw new IllegalArgumentException("未知 presence type: " + type);
+            }
         } catch (Exception e) {
             log.error("处理 presence 消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
         }

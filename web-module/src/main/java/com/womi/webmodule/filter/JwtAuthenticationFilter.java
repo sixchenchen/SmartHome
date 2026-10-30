@@ -1,6 +1,7 @@
 package com.womi.webmodule.filter;
 
 import com.womi.businessmodule.model.sys.SysUser;
+import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.utils.JwtTokenUtil;
 import com.womi.webmodule.security.SecurityUser;
 import com.womi.webmodule.service.auth.impl.TokenBlacklistServiceImpl;
@@ -36,13 +37,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
-        if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
+        String header = request.getHeader(UserConstants.AUTHORIZATION_HEAD);
+        if (!StringUtils.hasText(header) || !header.startsWith(UserConstants.BEARER)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = header.substring(7);
+        String token = header.substring(UserConstants.TOKEN_BEGIN_INDEX);
         try {
             // 只解析一次！获取完整的 Claims 对象
             Claims claims = jwtTokenUtil.parseClaims(token);

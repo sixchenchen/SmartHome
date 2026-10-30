@@ -1,7 +1,7 @@
 package com.womi.commonmodule.response;
 
 
-import com.womi.commonmodule.constants.HttpStatusConstants;
+import com.womi.commonmodule.constants.HttpConstants;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,11 +19,11 @@ public class ApiResponse<T> {
     private String timestamp;
 
     public static <T> ApiResponse<T> success(T data) {
-        return new ApiResponse<>(HttpStatusConstants.SUCCESS_CODE, HttpStatusConstants.SUCCESS_MESSAGE, data, getCurrentTimestamp());
+        return new ApiResponse<>(HttpConstants.SUCCESS_CODE, HttpConstants.SUCCESS_MESSAGE, data, getCurrentTimestamp());
     }
 
     public static <T> ApiResponse<T> success(String message, T data) {
-        return new ApiResponse<>(HttpStatusConstants.SUCCESS_CODE, message, data, getCurrentTimestamp()
+        return new ApiResponse<>(HttpConstants.SUCCESS_CODE, message, data, getCurrentTimestamp()
         );
     }
 

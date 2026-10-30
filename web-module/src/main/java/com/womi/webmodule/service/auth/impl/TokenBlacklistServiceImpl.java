@@ -1,5 +1,6 @@
 package com.womi.webmodule.service.auth.impl;
 
+import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.UserConstants;
 import com.womi.webmodule.service.auth.LoginAttemptService;
 import com.womi.webmodule.service.auth.TokenBlacklistService;
@@ -25,8 +26,8 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
         if (ttlMillis > 0) {
             // 将 jti 存入 Redis，过期时间与 Token 的剩余寿命一致，过期后自动清理
             redisTemplate.opsForValue().set(
-                    UserConstants.REDIS_TOKEN_BLACKLIST_PREFIX + jti,
-                    UserConstants.REDIS_BLACKLIST_VALUE,
+                    RedisConstants.REDIS_TOKEN_BLACKLIST_PREFIX + jti,
+                    RedisConstants.REDIS_BLACKLIST_VALUE,
                     Duration.ofMillis(ttlMillis)
             );
         }
@@ -36,6 +37,6 @@ public class TokenBlacklistServiceImpl implements TokenBlacklistService {
      * 检查 Token 是否在黑名单中
      */
     public boolean isBlacklisted(String jti) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(UserConstants.REDIS_TOKEN_BLACKLIST_PREFIX + jti));
+        return Boolean.TRUE.equals(redisTemplate.hasKey(RedisConstants.REDIS_TOKEN_BLACKLIST_PREFIX + jti));
     }
 }

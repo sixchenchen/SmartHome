@@ -110,7 +110,7 @@ WM_LAOHUA
 | web-module | Spring Web、Spring Integration （Paho）、Redis、Druid |
 
 **通用常量收敛于 `common-module/.../constants/`**：
-`DeviceConstants`（主题/字段/header）、`DeviceCommandConstants`、`DeviceConstants`、`DeviceFirmwareConstants`、`FileConstants`、`HttpStatusConstants`、`RegexConstants`、`ErrorInfoConstants`、`DeviceOtaStateConstants`。
+`DeviceConstants`（主题/字段/header）、`DeviceCommandConstants`、`DeviceConstants`、`DeviceFirmwareConstants`、`FileConstants`、`HttpConstants`、`RegexConstants`、`ErrorInfoConstants`、`DeviceOtaStateConstants`。
 
 **枚举**：`DeviceCommandStatus`、`DeviceOfflineReason`、`ErrorCode`、`ErrorCode`。
 

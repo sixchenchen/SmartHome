@@ -3,9 +3,10 @@ package com.womi.webmodule.interceptor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.womi.businessmodule.model.device.DeviceBinding;
 import com.womi.businessmodule.service.device.DeviceBindingService;
+import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.utils.JwtTokenUtil;
-import com.womi.webmodule.security.StompPrincipal;
 import com.womi.webmodule.security.SecurityUser;
+import com.womi.webmodule.security.StompPrincipal;
 import com.womi.webmodule.service.auth.impl.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +38,11 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
         if (accessor != null) {
             // ==================== 1. 握手连接鉴权 (CONNECT) ====================
             if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                String authHeader = accessor.getFirstNativeHeader("Authorization");
+                String authHeader = accessor.getFirstNativeHeader(UserConstants.AUTHORIZATION_HEAD);
                 log.info("尝试建立 WebSocket 连接, 携带的 Header: {}", authHeader);
 
-                if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                    String token = authHeader.substring(7).trim();
+                if (authHeader != null && authHeader.startsWith(UserConstants.BEARER)) {
+                    String token = authHeader.substring(UserConstants.TOKEN_BEGIN_INDEX).trim();
                     try {
                         String username = jwtTokenUtil.extractUsername(token);
                         UserDetails userDetails = userDetailsService.loadUserByUsername(username);

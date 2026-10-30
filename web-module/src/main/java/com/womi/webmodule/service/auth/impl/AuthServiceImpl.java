@@ -92,7 +92,6 @@ public class AuthServiceImpl {
         log.info("用户注册成功: id={}, username={}", user.getId(), user.getUsername());
         return user;
     }
-
     /**
      * 登录成功后：更新 last_login_time，保存 IP / UA
      */

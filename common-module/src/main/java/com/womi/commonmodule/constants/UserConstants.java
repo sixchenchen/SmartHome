@@ -29,16 +29,15 @@ public final class UserConstants {
     public static final long LOGIN_LOCK_MINUTES = 15;            // 锁定时长(分钟)
     public static final long SECONDS_PER_MINUTE = 60;            // 1分钟对应的秒数
 
-
-
     // ==================== RefreshToken 相关 ====================
     public static final long REFRESH_TOKEN_EXPIRE_DAYS = 7; // 刷新令牌有效天数
     public static final Integer REVOKED_YES = 1;             // 已撤销
     public static final Integer REVOKED_NO = 0;              // 未撤销
     public static final String HASH_ALGORITHM_SHA256 = "SHA-256"; // 哈希算法
+    public static final int KEY_LENGTH = 32;
+    public static final int TOKEN_BEGIN_INDEX = 7;
+    public static final String  AUTHORIZATION_HEAD = "Authorization";
+    public static final String BEARER = "Bearer ";
 
-    // ==================== 缓存相关 ====================
-    public static final String REDIS_TOKEN_BLACKLIST_PREFIX = "token:blacklist:";
-    public static final String REDIS_BLACKLIST_VALUE = "1";  // 黑名单占位值
 
 }

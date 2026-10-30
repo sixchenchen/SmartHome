@@ -167,7 +167,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     }
 
     private boolean verifySignature(String pubkey, DeviceRegisterRequest request) {
-        // 👈 此时 request.getDeviceId() 已经是清洗过的无冒号格式
         String signData = request.getDeviceId() + "|" + request.getTimestamp() + "|" + request.getNonce();
         return SignatureVerifierUtils.verify(pubkey, signData, request.getSignature());
     }
@@ -216,7 +215,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     }
 
     private void saveReregister(DeviceInfo existing, DeviceRegisterRequest request, MqttCredential credential) {
-        // 👈 不需要再 normalize 了，直接用
         existing.setProduct(request.getProduct());
         existing.setFirmware(request.getFirmware());
         existing.setUpdateTime(LocalDateTime.now());

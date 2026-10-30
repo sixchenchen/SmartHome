@@ -1,7 +1,7 @@
 package com.womi.commonmodule.utils;
 
 import com.womi.commonmodule.constants.ErrorInfoConstants;
-import com.womi.commonmodule.constants.JWTConstants;
+import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.exception.BusinessException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -29,7 +29,7 @@ public class JwtTokenUtil {
         }
         byte[] keyBytes;
         keyBytes = Decoders.BASE64.decode(secret);
-        if (keyBytes.length < JWTConstants.KEY_LENGTH) {
+        if (keyBytes.length < UserConstants.KEY_LENGTH) {
             throw new BusinessException(ErrorInfoConstants.JWT_SECRET_TOO_SHORT);
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);

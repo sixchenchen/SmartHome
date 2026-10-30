@@ -6,6 +6,8 @@ package com.womi.commonmodule.constants;
 
 public final class DeviceConstants {
 
+    public static final int DEVICE_OFFLINE = 0;
+    public static final int DEVICE_ONLINE = 1;
     /**
      * pubkey 最大长度
      */

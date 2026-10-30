@@ -37,6 +37,8 @@ public final class DeviceCommandConstants {
 
     /** 默认最大重试次数 */
     public static final int DEFAULT_MAX_RETRY = 3;
+    /** 默认尝试过次数 */
+    public static final int DEFAULT_RETRY_COUNT = 0;
 
     /** 默认 QoS */
     public static final int DEFAULT_QOS = 1;

@@ -47,32 +47,18 @@ public class DeviceHeartbeatMessageHandler implements MqttMessageHandler {
     @Override
     public void handle(String topic, String payload, Integer qos) {
         try {
-            // 1. 提取 deviceId
             String deviceId = extractDeviceId(topic);
-            if (deviceId == null) {
-                log.warn("无法提取设备ID - Topic: {}", topic);
-                return;
-            }
-
-            // 2. 解析 payload
             JsonNode json = jsonUtils.parse(payload);
-            if (json == null) {
-                log.warn("payload 解析失败 - Topic: {}", topic);
-                return;
-            }
             JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
             Long uptime = jsonUtils.getLong(dataNode, DeviceMqttConstants.FIELD_UPTIME);
-            // 3. 更新设备心跳（同时把设备标记为在线）
-            deviceInfoService.updateHeartbeat(deviceId, uptime, payload);
-            // 4. 写心跳历史
-            Boolean isBound = redisTemplate.opsForSet().isMember(RedisConstants.BOUND_DEVICES_KEY, deviceId);
 
+            // 1. 更新主表 (必须做)
+            deviceInfoService.updateHeartbeat(deviceId, uptime, payload);
+
+            // 2. 校验绑定关系，决定是否写明细
+            Boolean isBound = redisTemplate.opsForSet().isMember(RedisConstants.BOUND_DEVICES_KEY, deviceId);
             if (Boolean.TRUE.equals(isBound)) {
-                // 5. 只有被绑定的设备，才记录心跳明细
                 heartbeatRecordService.recordHeartbeat(deviceId, uptime, payload);
-                log.debug("心跳处理完成（已绑定） - deviceId: {}", deviceId);
-            } else {
-                log.debug("未绑定设备心跳，仅更新主表状态 - deviceId: {}", deviceId);
             }
         } catch (Exception e) {
             log.error("处理心跳消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);

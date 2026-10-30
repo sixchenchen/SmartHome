@@ -15,6 +15,7 @@ import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.RegexConstants;
 import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.enums.EnableStatus;
+import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
 import com.womi.webmodule.service.device.DeviceAdminService;
@@ -56,14 +57,14 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
     public void createDevice(DeviceCreateRequest request) {
         String cleanMac = MacUtils.normalize(request.getDeviceId());
         if (cleanMac == null || !cleanMac.matches(RegexConstants.MAC)) {
-            throw new BusinessException(400, "MAC地址格式不正确");
+            throw new BusinessException(ErrorCode.MAC_FORMAT_ERROR, "MAC地址格式不正确");
         }
         // 1. 校验 MAC 地址是否已存在
         Long count = deviceInfoMapper.selectCount(
                 new LambdaQueryWrapper<DeviceInfo>().eq(DeviceInfo::getDeviceId, cleanMac)
         );
         if (count > 0) {
-            throw new BusinessException(400, "设备MAC地址已存在");
+            throw new BusinessException(ErrorCode.DEVICE_ALREADY_EXIST, ErrorCode.DEVICE_ALREADY_EXIST.getMessage());
         }
 
         // 2. 插入 device_info

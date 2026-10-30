@@ -7,6 +7,8 @@ import com.womi.businessmodule.model.sys.SysRefreshToken;
 import com.womi.businessmodule.model.sys.SysUser;
 import com.womi.businessmodule.vo.LoginResponse;
 import com.womi.businessmodule.vo.UserRegisterResponse;
+import com.womi.commonmodule.constants.HttpConstants;
+import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.response.ApiResponse;
@@ -41,7 +43,7 @@ public class UserAuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request,
                                             HttpServletRequest httpRequest,
-                                            @RequestHeader(value = "X-Device-Type", required = false) String deviceType) {
+                                            @RequestHeader(value = HttpConstants.DEVICE_TYPE_HEAD, required = false) String deviceType) {
         String username = request.getUsername();
         //  提取真实客户端 IP
         String ip = getClientIp(httpRequest);
@@ -64,11 +66,12 @@ public class UserAuthController {
         } catch (BadCredentialsException e) {
             // 传入 IP 记录失败
             loginAttemptServiceImpl.recordFailure(ip, username);
-            authServiceImpl.recordLoginFailure(username, httpRequest, "用户名或密码错误");
+            authServiceImpl.recordLoginFailure(username, httpRequest, ErrorCode.AUTH_FAILED.getMessage());
             throw e;
         } catch (BusinessException e) {
-            if (e.getCode() == 4013) { // 锁定 code
-                authServiceImpl.recordLoginFailure(username, httpRequest, "账号已锁定");
+            if (e.getCode() == ErrorCode.ACCOUNT_LOCKED.getCode()) { // 锁定 code
+                authServiceImpl.recordLoginFailure(username, httpRequest,  ErrorCode.ACCOUNT_LOCKED.getMessage());
+
             }
             throw e;
         }
@@ -91,7 +94,7 @@ public class UserAuthController {
         // 1. 验证 RefreshToken
         SysRefreshToken tokenEntity = refreshTokenServiceImpl.consumeRefreshToken(request.getRefreshToken());
         if (tokenEntity == null) {
-            throw new BusinessException(4010, "RefreshToken 无效或已过期，请重新登录");
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, ErrorCode.REFRESH_TOKEN_INVALID.getMessage());
         }
 
         // 2. 旋转刷新：旧的立马作废（防止重放攻击）
@@ -100,7 +103,7 @@ public class UserAuthController {
         // 3. 查出用户
         SysUser user = sysUserMapper.selectById(tokenEntity.getUserId());
         if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND, "用户不存在");
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND, ErrorCode.USER_NOT_FOUND.getMessage());
         }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
@@ -112,10 +115,10 @@ public class UserAuthController {
     // ==================== P1-3: 登出 ====================
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@RequestBody(required = false) RefreshRequest request,
-                                    @RequestHeader(value = "Authorization", required = false) String bearerToken) {
+                                    @RequestHeader(value = UserConstants.AUTHORIZATION_HEAD, required = false) String bearerToken) {
         // 1. 将 AccessToken 加入黑名单
-        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
-            String token = bearerToken.substring(7);
+        if (bearerToken != null && bearerToken.startsWith(UserConstants.BEARER)) {
+            String token = bearerToken.substring(UserConstants.TOKEN_BEGIN_INDEX);
             try {
                 String jti = jwtTokenUtil.extractJti(token);
                 tokenBlacklistServiceImpl.blacklistToken(jti, jwtTokenUtil.extractExpiration(token));
@@ -135,8 +138,8 @@ public class UserAuthController {
      * 兼容 Nginx 反代的真实 IP 提取
      */
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+        String ip = request.getHeader(HttpConstants.FORWARDED_FOR);
+        if (ip != null && !ip.isEmpty() && !HttpConstants.UNKNOWN.equalsIgnoreCase(ip)) {
             // 多次反向代理后会有多个IP，第一个为真实IP
             int index = ip.indexOf(',');
             if (index != -1) {
@@ -144,8 +147,8 @@ public class UserAuthController {
             }
             return ip.trim();
         }
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isEmpty() && !"unknown".equalsIgnoreCase(ip)) {
+        ip = request.getHeader(HttpConstants.REAL_IP);
+        if (ip != null && !ip.isEmpty() && !HttpConstants.UNKNOWN.equalsIgnoreCase(ip)) {
             return ip.trim();
         }
         return request.getRemoteAddr();

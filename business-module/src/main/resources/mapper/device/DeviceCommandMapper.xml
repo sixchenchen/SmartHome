@@ -119,16 +119,6 @@
         </foreach>
     </update>
 
-    <select id="selectStalePending" resultMap="BaseResultMap">
-        SELECT *
-        FROM device_command
-        WHERE status = 0
-          AND create_time &lt; DATE_SUB(NOW(), INTERVAL #{minWaitSeconds} SECOND)
-          AND (expire_time IS NULL OR expire_time &gt; NOW())
-        ORDER BY create_time ASC
-        LIMIT #{batchSize}
-    </select>
-
     <update id="batchUpdateStatus">
         UPDATE device_command
         SET status = #{status},

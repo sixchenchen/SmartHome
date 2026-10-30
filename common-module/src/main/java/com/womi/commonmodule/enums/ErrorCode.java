@@ -19,14 +19,16 @@ package com.womi.commonmodule.enums;
 public enum ErrorCode {
 
     // ==================== 通用 ====================
-    SUCCESS(200, "success"),
     FAIL(401, "fail"),
+    NOT_RESOURCE(404,"资源不存在"),
 
     // ==================== 认证（401x） ====================
     AUTH_FAILED(4010, "用户名或密码错误"),
     ACCOUNT_DISABLED(4011, "账号已禁用，请联系管理员"),
     ACCOUNT_LOCKED(4013, "账号已锁定"),
     TOKEN_INVALID(4014,"未登录或 token 已过期"),
+    USER_NOT_FOUND(4015, "用户不存在"),
+
     // ==================== 参数（1xxx） ====================
     PARAM_ERROR(1000, "参数错误"),
     PARAM_MISSING(1001, "缺少必要参数"),
@@ -34,8 +36,6 @@ public enum ErrorCode {
     PARAM_EMPTY(1003, "参数不能为空"),
     PASSWORD_EMPTY(1010, "密码不能为空"),
     PASSWORD_TOO_SHORT(1011, "密码长度不能少于6位"),
-    NETWORK_ERROR(5003, "网络异常"),
-    USER_NOT_FOUND(1012, "用户不存在"),
 
     // ==================== 业务 ====================
     BUSINESS_ERROR(2000, "业务异常"),
@@ -46,6 +46,7 @@ public enum ErrorCode {
     FILE_FORMAT_ERROR(4002, "文件格式错误"),
     FILE_UPLOAD_FAILED(4003, "文件上传失败"),
     FILE_NOT_FOUND(4004, "文件不存在"),
+    REFRESH_TOKEN_INVALID(4012, "RefreshToken 无效或已过期，请重新登录"),
 
     // ==================== 固件（4100-4109） ====================
     FIRMWARE_EXIST(4100, "固件版本已存在"),
@@ -58,21 +59,30 @@ public enum ErrorCode {
     FIRMWARE_COMPUTE_FILE_HASH(4107, "计算文件哈希失败"),
     // ==================== 设备（4200-4209） ====================
     DEVICE_NOT_FOUND(4200, "设备不存在"),
-    DEVICE_OFFLINE(4201, "设备离线"),
+    DEVICE_OFFLINE(4201, "设备当前为离线状态，请检查电源后重试"),
     DEVICE_ID_EMPTY(4202, "设备ID为空"),
     DEVICE_ID_FORMAT_ERROR(4203, "设备ID格式错误"),
     MAC_FORMAT_ERROR(4204, "MAC 格式错误"),
+    DEVICE_BINDING_CODE_ERROR(4205, "设备绑定码错误，请扫描设备机身上的二维码"),
+    DEVICE_ALREADY_BOUND_SELF(4206, "您已经绑定了该设备"),
+    DEVICE_ALREADY_BOUND_OTHER(4207, "该设备已被其他用户绑定"),
+    DEVICE_BOUND_CONFLICT(4208, "该设备已被绑定，请刷新重试"),
+    DEVICE_NOT_BOUND(4209, "您尚未绑定该设备，或已被解绑"),
+    DEVICE_NO_PERMISSION(4210, "您未绑定该设备，无权操作"),
+    DEVICE_NETWORK_ERROR(4211, "设备心跳超时或网络异常，请稍后重试"),
+    DEVICE_ALREADY_EXIST(4212,"设备MAC地址已存在"),
+
 
     // ==================== OTA（4300-4309） ====================
     OTA_START_FAILED(4300, "OTA 触发失败"),
     OTA_IN_PROGRESS(4301, "OTA 正在进行中"),
     OTA_VERSION_INCOMPATIBLE(4302, "OTA 版本不兼容"),
-
+    OTA_ALREADY_LATEST(4303, "当前已是最新版本，无需升级"),
     // ==================== 系统（5xxx） ====================
     SYSTEM_ERROR(5000, "系统异常"),
     DB_ERROR(5001, "数据库异常"),
-    CONFIG_ERROR(5002, "系统配置缺失");
-
+    CONFIG_ERROR(5002, "系统配置缺失"),
+    NETWORK_ERROR(5003, "网络异常");
     private final int code;
     private final String message;
 

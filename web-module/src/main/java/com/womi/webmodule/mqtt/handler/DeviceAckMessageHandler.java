@@ -43,52 +43,22 @@ public class DeviceAckMessageHandler implements MqttMessageHandler {
     @Override
     public void handle(String topic, String payload, Integer qos) {
         try {
-            // 1. 提取 deviceId
             String deviceId = extractDeviceId(topic);
-            if (deviceId == null) {
-                log.warn("无法提取设备ID - Topic: {}", topic);
-                return;
-            }
-
-            // 2. 解析 payload
             JsonNode json = jsonUtils.parse(payload);
-            if (json == null) {
-                log.warn("ACK payload 解析失败 - Topic: {}", topic);
-                return;
-            }
 
-            // 3. 提取 commandId
             String commandId = jsonUtils.getString(json, DeviceMqttConstants.FIELD_COMMAND_ID);
             if (commandId == null || commandId.isBlank()) {
-                log.warn("ACK 缺少 commandId - deviceId: {}", deviceId);
-                return;
+                throw new IllegalArgumentException("ACK 缺少 commandId");
             }
 
-            // 4. 提取 success（缺失时按失败处理）
             Boolean success = jsonUtils.getBoolean(json, DeviceMqttConstants.FIELD_SUCCESS);
-            if (success == null) {
-                log.warn("ACK 缺少 success 字段，按失败处理 - commandId: {}", commandId);
-                success = false;
-            }
+            if (success == null) success = false; // 默认按失败处理
 
-            // 5. 提取 msg
             String msg = jsonUtils.getString(json, DeviceMqttConstants.FIELD_MESSAGE);
+            Map<String, Object> data = jsonUtils.nodeToMap(json.path(DeviceMqttConstants.FIELD_DATA));
 
-            // 6. 提取 data 节点 → Map
-            JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
-            Map<String, Object> data = jsonUtils.nodeToMap(dataNode);
-
-            // 7. 校验 device 与 topic 是否一致（仅告警，以 topic 为准）
-            String payloadDevice = jsonUtils.getString(json, DeviceMqttConstants.FIELD_DEVICE);
-            if (payloadDevice != null && !payloadDevice.equals(deviceId)) {
-                log.warn("ACK device 与 topic 不一致 - topic: {}, payload.device: {}", topic, payloadDevice);
-            }
-
-            // 8. 调 Service 处理
+            // 调用 Service
             deviceCommandService.handleAck(commandId, success, data, msg);
-
-            log.info("设备 ACK 已处理 - commandId: {}, deviceId: {}, success: {}", commandId, deviceId, success);
-
         } catch (Exception e) {
             log.error("处理 ACK 消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
         }
