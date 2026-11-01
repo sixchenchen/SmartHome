@@ -12,7 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,14 +22,14 @@ import java.util.Map;
  * 设备外设状态变更处理器
  * Topic: device/{mac}/state
  * {
- *   "device": "B4BFE90CDBA1",
- *   "type": "state",
- *   "timestamp": 1710000000000,
- *   "data": {
- *     "target": "led",
- *     "channel": 1,
- *     "state": 1
- *   }
+ * "device": "B4BFE90CDBA1",
+ * "type": "state",
+ * "timestamp": 1710000000000,
+ * "data": {
+ * "target": "led",
+ * "channel": 1,
+ * "state": 1
+ * }
  * }
  */
 
@@ -42,6 +44,7 @@ public class DeviceStateMessageHandler implements MqttMessageHandler {
     private final DeviceInfoService deviceInfoService;
     private final DeviceStateRecordService stateRecordService;
     private final WebSocketPushService webSocketPushService;
+
     @Override
     public boolean supports(String topic) {
         return topic != null && topic.matches(DeviceMqttConstants.STATE_TOPIC_PATTERN);
@@ -49,29 +52,31 @@ public class DeviceStateMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
+        String deviceId = extractDeviceId(topic);
+        JsonNode json = jsonUtils.parse(payload);
+        JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
 
-            String deviceId = extractDeviceId(topic);
-            JsonNode json = jsonUtils.parse(payload);
-            JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
+        String target = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TARGET);
+        Integer channel = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_CHANNEL);
+        Integer state = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_STATE);
 
-            String target = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TARGET);
-            Integer channel = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_CHANNEL);
-            Integer state = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_STATE);
+        if (target == null || state == null) {
+            throw new IllegalArgumentException("状态上报缺少 target 或 state");
+        }
 
-            if (target == null || state == null) {
-                throw new IllegalArgumentException("状态上报缺少 target 或 state");
-            }
+        deviceInfoService.updateSpecificState(deviceId, target, channel, state);
 
-            deviceInfoService.updateSpecificState(deviceId, target, channel, state);
-
-            Map<String, Object> paramsMap = new HashMap<>();
-            paramsMap.put(DeviceMqttConstants.FIELD_STATE, state);
-            stateRecordService.recordState(deviceId, target, channel, paramsMap, LocalDateTime.now());
-
-            Map<String, Object> pushData = new HashMap<>();
-            pushData.put("target", target);
-            pushData.put("channel", channel);
-            pushData.put("state", state);
-            webSocketPushService.pushDeviceState(deviceId, pushData);
+        Map<String, Object> paramsMap = new HashMap<>();
+        paramsMap.put(DeviceMqttConstants.FIELD_STATE, state);
+        Long msgTimestamp = jsonUtils.getLong(json, DeviceMqttConstants.FIELD_TIMESTAMP);
+        LocalDateTime eventTime = (msgTimestamp != null && msgTimestamp > 0)
+                ? LocalDateTime.ofInstant(Instant.ofEpochMilli(msgTimestamp), ZoneId.systemDefault())
+                : LocalDateTime.now();
+        stateRecordService.recordState(deviceId, target, channel, paramsMap, eventTime);
+        Map<String, Object> pushData = new HashMap<>();
+        pushData.put("target", target);
+        pushData.put("channel", channel);
+        pushData.put("state", state);
+        webSocketPushService.pushDeviceState(deviceId, pushData);
     }
 }

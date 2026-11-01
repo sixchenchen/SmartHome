@@ -21,7 +21,7 @@ mqtt:
     client-id: wm-laohua-provision-prod
     username: ${MQTT_PROVISION_USERNAME}
     password: ${MQTT_PROVISION_PASSWORD}
-    ca-cert: certs/cert.pem
+    ca-cert: certs/iot-ca.crt
 
 firmware:
   upload-dir: /data/firmware/

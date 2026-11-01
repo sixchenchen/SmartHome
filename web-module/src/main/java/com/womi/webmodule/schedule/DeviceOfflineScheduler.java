@@ -59,20 +59,28 @@ public class DeviceOfflineScheduler {
     /**
      * 处理单个超时设备
      */
+    /**
+     * 处理单个超时设备
+     */
     private void handleTimeoutDevice(DeviceInfo device) {
         String deviceId = device.getDeviceId();
         LocalDateTime lastHeartbeat = device.getLastHeartbeatTime();
+        boolean markedOffline = deviceInfoService.markOfflineIfTimeout(
+                deviceId,
+                DeviceOfflineReason.HEARTBEAT_TIMEOUT.getCode(),
+                lastHeartbeat);
 
-        log.warn("设备心跳超时 - deviceId: {}, lastHeartbeat: {}, 超时: {}秒",
-                deviceId, lastHeartbeat, ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS);
+        if (markedOffline) {
+            // 只有真正成功标记离线的，才记录日志并清理从机数据
+            log.warn("设备心跳超时标记离线 - deviceId: {}, lastHeartbeat: {}", deviceId, lastHeartbeat);
 
-        // 1. 标记设备离线
-        deviceInfoService.markOffline(deviceId, DeviceOfflineReason.HEARTBEAT_TIMEOUT);
-
-        // 2. 清空该设备所有从机数据（主机离线，从机也视为离线）
-        int cleared = deviceSlaveDataService.clearByDeviceId(deviceId);
-        if (cleared > 0) {
-            log.info("清空离线设备的从机数据 - deviceId: {}, 数量: {}", deviceId, cleared);
+            int cleared = deviceSlaveDataService.clearByDeviceId(deviceId);
+            if (cleared > 0) {
+                log.info("清空离线设备的从机数据 - deviceId: {}, 数量: {}", deviceId, cleared);
+            }
+        } else {
+            // 影响行数为 0：说明在扫描和更新期间，设备发来了心跳续命了！
+            log.info("设备已被心跳抢占，放弃标记离线 - deviceId: {}", deviceId);
         }
     }
 }

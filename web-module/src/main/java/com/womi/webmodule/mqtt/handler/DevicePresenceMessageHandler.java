@@ -17,9 +17,8 @@ import java.util.Map;
 
 /**
  * 设备上下线处理器 (Presence)
- * <p>Topic: device/{mac}/presence</p>
- * <p>Payload:
- * <pre>
+ * Topic: device/{mac}/presence
+ * Payload:
  * {
  *   "device": "B4BFE90CDBA1",
  *   "type": "online", // 或 offline
@@ -33,8 +32,6 @@ import java.util.Map;
  *     "reason": "shutdown" // type=offline 时可用
  *   }
  * }
- * </pre>
- * </p>
  */
 @Slf4j
 @Component
@@ -53,69 +50,41 @@ public class DevicePresenceMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
-            String deviceId = extractDeviceId(topic);
-            JsonNode json = jsonUtils.parse(payload);
-            String type = jsonUtils.getString(json, DeviceMqttConstants.FIELD_TYPE);
-            JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
+        String deviceId = extractDeviceId(topic);
+        JsonNode json = jsonUtils.parse(payload);
+        String type = jsonUtils.getString(json, DeviceMqttConstants.FIELD_TYPE);
+        JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
 
-            if (DeviceMqttConstants.MSG_TYPE_ONLINE.equals(type)) {
-                String product = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_PRODUCT);
-                String firmware = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_FIRMWARE);
-                Map<String, Object> capabilities = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_CAPABILITIES));
-                Map<String, Object> currentState = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_STATE));
+        if (DeviceMqttConstants.MSG_TYPE_ONLINE.equals(type)) {
+            // 处理上线逻辑（直接调用 Service）
+            String product = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_PRODUCT);
+            String firmware = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_FIRMWARE);
+            Map<String, Object> capabilities = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_CAPABILITIES));
+            Map<String, Object> currentState = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_STATE));
 
-                deviceInfoService.markOnline(deviceId, product, firmware,
-                        capabilities.isEmpty() ? null : capabilities,
-                        currentState.isEmpty() ? null : currentState);
-                deviceInfoService.reconcileOtaOnOnline(deviceId, firmware);
+            deviceInfoService.markOnline(deviceId, product, firmware,
+                    capabilities.isEmpty() ? null : capabilities,
+                    currentState.isEmpty() ? null : currentState);
+            deviceInfoService.reconcileOtaOnOnline(deviceId, firmware);
 
-                JsonNode slavesNode = dataNode.path(DeviceMqttConstants.FIELD_SLAVES);
-                if (slavesNode.isArray()) {
-                    List<Map<String, Object>> slavesList = jsonUtils.nodeToListMap(slavesNode);
-                    deviceSlaveDataService.syncSlaveData(deviceId, slavesList);
-                }
-            } else if (DeviceMqttConstants.MSG_TYPE_OFFLINE.equals(type)) {
-                String reason = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_REASON);
-                if (reason == null || reason.isBlank()) reason = DeviceOfflineReason.MQTT_LWT.getCode();
-                deviceInfoService.markOffline(deviceId, DeviceOfflineReason.fromCode(reason));
-            } else {
-                throw new IllegalArgumentException("未知 presence type: " + type);
+            JsonNode slavesNode = dataNode.path(DeviceMqttConstants.FIELD_SLAVES);
+            if (slavesNode.isArray()) {
+                List<Map<String, Object>> slavesList = jsonUtils.nodeToListMap(slavesNode);
+                deviceSlaveDataService.syncSlaveData(deviceId, slavesList);
             }
-        } catch (Exception e) {
-            log.error("处理 presence 消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
+            log.info("设备上线 - deviceId: {}, firmware: {}", deviceId, firmware);
+
+        } else if (DeviceMqttConstants.MSG_TYPE_OFFLINE.equals(type)) {
+            // 处理离线逻辑（直接调用 Service）
+            String reason = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_REASON);
+            if (reason == null || reason.isBlank()) {
+                reason = DeviceOfflineReason.MQTT_LWT.getCode();
+            }
+            deviceInfoService.markOffline(deviceId, DeviceOfflineReason.fromCode(reason));
+            log.info("设备离线 - deviceId: {}, reason: {}", deviceId, reason);
+
+        } else {
+            throw new IllegalArgumentException("未知 presence type: " + type);
         }
-    }
-
-    private void handleOnline(String deviceId, JsonNode dataNode) {
-        String product = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_PRODUCT);
-        String firmware = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_FIRMWARE);
-        Map<String, Object> capabilities = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_CAPABILITIES));
-        Map<String, Object> currentState = jsonUtils.nodeToMap(dataNode.path(DeviceMqttConstants.FIELD_STATE));
-
-        // 3. 更新主表
-        if (capabilities.isEmpty()) capabilities = null;
-        if (currentState.isEmpty()) currentState = null;
-
-        deviceInfoService.markOnline(deviceId, product, firmware, capabilities, currentState);
-        deviceInfoService.reconcileOtaOnOnline(deviceId, firmware);
-
-        // 4. 同步从机数据
-        JsonNode slavesNode = dataNode.path(DeviceMqttConstants.FIELD_SLAVES);
-        if (slavesNode.isArray()) {
-            List<Map<String, Object>> slavesList = jsonUtils.nodeToListMap(slavesNode);
-            deviceSlaveDataService.syncSlaveData(deviceId, slavesList);
-        }
-
-        log.info("设备上线 - deviceId: {}, firmware: {}, capabilities: {}", deviceId, firmware, capabilities);
-    }
-
-    private void handleOffline(String deviceId, JsonNode dataNode) {
-        String reason = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_REASON);
-        if (reason == null || reason.isBlank()) {
-            reason = DeviceOfflineReason.MQTT_LWT.getCode();
-        }
-        deviceInfoService.markOffline(deviceId, DeviceOfflineReason.fromCode(reason));
-        log.info("设备离线 - deviceId: {}, reason: {}", deviceId, reason);
     }
 }

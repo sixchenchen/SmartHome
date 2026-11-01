@@ -43,28 +43,36 @@ public class DeviceOtaProgressMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
-            String deviceId = extractDeviceId(topic);
-            JsonNode json = jsonUtils.parse(payload);
-            JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
+        String deviceId = extractDeviceId(topic);
+        JsonNode json = jsonUtils.parse(payload);
 
-            String state = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_OTA_STATE);
-            if (state == null || state.isBlank()) {
-                throw new IllegalArgumentException("OTA 进度缺少 state");
-            }
+        // 提取报文中顶层的 commandId
+        String commandId = jsonUtils.getString(json, DeviceMqttConstants.FIELD_COMMAND_ID);
 
-            Integer progress = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_OTA_PROGRESS);
-            if (progress == null) progress = 0;
-            progress = Math.max(0, Math.min(100, progress));
-            String version = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_OTA_VERSION);
+        JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
 
-            deviceInfoService.updateOtaState(deviceId, state, progress, version);
-
-            if (DeviceOtaStateConstants.SUCCESS.equals(state)) {
-                deviceInfoService.syncFirmwareIfTarget(deviceId, version);
-            }
-        } catch (Exception e) {
-            log.error("处理 OTA 进度失败 - topic: {}, error: {}", topic, e.getMessage(), e);
+        String state = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_OTA_STATE);
+        if (state == null || state.isBlank()) {
+            throw new IllegalArgumentException("OTA 进度缺少 state");
         }
+
+        Integer progress = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_OTA_PROGRESS);
+        if (progress == null) progress = 0;
+        progress = Math.max(0, Math.min(100, progress));
+
+        String version = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_OTA_VERSION);
+
+        // 1. 更新设备主表的实时状态（供前端实时看板展示）
+        deviceInfoService.updateOtaState(deviceId, state, progress, version);
+
+        // 2. OTA 成功 → 兜底同步固件版本
+        if (DeviceOtaStateConstants.SUCCESS.equals(state)) {
+            deviceInfoService.syncFirmwareIfTarget(deviceId, version);
+        }
+
+        // 3. 日志中带上 commandId，方便排查追踪
+        log.info("OTA 进度上报 - deviceId: {}, commandId: {}, state: {}, progress: {}, version: {}",
+                deviceId, commandId != null ? commandId : "未知", state, progress, version);
+
     }
 }

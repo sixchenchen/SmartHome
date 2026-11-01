@@ -23,7 +23,7 @@ public interface DeviceCommandService extends IService<DeviceCommand> {
     // 查询待下发指令
     List<DeviceCommand> listStalePending(int minWaitSeconds, int batchSize);
     // 处理 ACK 回执
-    void handleAck(String commandId, boolean success, Map<String, Object> payload, String errorMsg);
+    void handleAck(String deviceId,String commandId, boolean success, Map<String, Object> payload, String errorMsg);
     // 查询待下发指令
     List<DeviceCommand> listPending(int limit);
     // 查询需要重试的指令

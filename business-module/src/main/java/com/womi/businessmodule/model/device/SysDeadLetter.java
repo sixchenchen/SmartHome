@@ -16,6 +16,9 @@ public class SysDeadLetter {
     @TableField("error_msg")
     private String errorMsg;
 
+    @TableField("is_retryable")
+    private Integer isRetryable;
+
     /** 0-未处理 1-已重放成功 2-已忽略 */
     private Integer status;
 

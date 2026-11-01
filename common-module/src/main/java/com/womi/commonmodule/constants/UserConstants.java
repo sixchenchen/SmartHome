@@ -25,7 +25,7 @@ public final class UserConstants {
     public static final String DEFAULT_DEVICE_TYPE = "web";  // 默认设备类型
     public static final long NANOS_PER_MILLI = 1_000_000L;   // 1毫秒对应的纳秒数
     // ==================== 安全策略相关 ====================
-    public static final int LOGIN_MAX_FAIL = 5;                  // 最大失败次数
+    public static final Integer LOGIN_MAX_FAIL = 5;                  // 最大失败次数
     public static final long LOGIN_LOCK_MINUTES = 15;            // 锁定时长(分钟)
     public static final long SECONDS_PER_MINUTE = 60;            // 1分钟对应的秒数
 
@@ -34,13 +34,13 @@ public final class UserConstants {
     public static final Integer REVOKED_YES = 1;             // 已撤销
     public static final Integer REVOKED_NO = 0;              // 未撤销
     public static final String HASH_ALGORITHM_SHA256 = "SHA-256"; // 哈希算法
-    public static final int KEY_LENGTH = 32;
-    public static final int TOKEN_BEGIN_INDEX = 7;
+    public static final Integer KEY_LENGTH = 32;
+    public static final Integer TOKEN_BEGIN_INDEX = 7;
     public static final String  AUTHORIZATION_HEAD = "Authorization";
     public static final String BEARER = "Bearer ";
-    public static final String AUTHORITIES = "authorities ";
+    public static final String AUTHORITIES = "authorities";
     public static final String USER_ID = "userId";
 
 
-    public static final String USER_ROLE_ADMIN = "";
+    public static final String USER_ROLE_ADMIN = "ADMIN";
 }

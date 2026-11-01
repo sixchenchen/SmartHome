@@ -101,38 +101,7 @@ public class DeviceInfoServiceImpl
         return baseMapper.selectHeartbeatTimeoutDevices(threshold);
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public int markHeartbeatTimeoutOffline(int timeoutSeconds) {
-        List<DeviceInfo> devices = listHeartbeatTimeoutDevices(timeoutSeconds);
-        if (devices.isEmpty()) {
-            return 0;
-        }
 
-        int count = 0;
-        for (DeviceInfo device : devices) {
-            try {
-                // 仅当 online=1 且 last_heartbeat_time 未变时才标记
-                int rows = baseMapper.markOfflineIfTimeout(
-                        device.getDeviceId(),
-                        DeviceOfflineReason.HEARTBEAT_TIMEOUT.getCode(),
-                        device.getLastHeartbeatTime());
-
-                if (rows > 0) {
-                    count++;
-                    log.warn("设备心跳超时标记离线 - deviceId: {}, lastHeartbeat: {}", device.getDeviceId(), device.getLastHeartbeatTime());
-                } else {
-                    log.debug("设备已被心跳抢占，跳过离线标记 - deviceId: {}", device.getDeviceId());
-                }
-            } catch (Exception e) {
-                log.error("标记离线失败 - deviceId: {}", device.getDeviceId(), e);
-            }
-        }
-        if (count > 0) {
-            log.warn("心跳超时标记离线 - 共 {} 台", count);
-        }
-        return count;
-    }
 
     /**
      * 更新设备OTA状态
@@ -242,5 +211,11 @@ public class DeviceInfoServiceImpl
         // 3. 心跳时间必须在允许的时间窗口内（防 LWT 延迟）
         LocalDateTime threshold = LocalDateTime.now().minusSeconds(timeoutSeconds);
         return device.getLastHeartbeatTime().isAfter(threshold);
+    }
+
+    @Override
+    public boolean markOfflineIfTimeout(String deviceId, String reasonCode, LocalDateTime lastHeartbeatTime) {
+        int rows = baseMapper.markOfflineIfTimeout(deviceId, reasonCode, lastHeartbeatTime);
+        return rows > 0; // 大于0表示更新成功（确实离线了），等于0表示期间有心跳进来了
     }
 }

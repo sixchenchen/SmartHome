@@ -99,8 +99,11 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
     /**
      * 查询剩余锁定秒数（0 表示未锁定）。
      */
-    public long getLockRemainSeconds(String username) {
-        Long ttl = redis.getExpire(RedisConstants.REDIS_LOGIN_LOCK_PREFIX + username);
+    public long getLockRemainSeconds(String fullKey) {
+        if (fullKey == null || fullKey.isBlank()) {
+            return 0;
+        }
+        Long ttl = redis.getExpire(fullKey);
         return (ttl != null && ttl > 0) ? ttl : 0;
     }
 }

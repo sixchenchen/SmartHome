@@ -16,6 +16,8 @@ import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.JwtTokenUtil;
+import com.womi.webmodule.service.auth.AuthService; // 👈 必须导入接口
+import com.womi.webmodule.service.auth.RefreshTokenService; // 👈 导入接口
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,20 +36,18 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AuthServiceImpl {
+public class AuthServiceImpl implements AuthService {
 
     private final SysUserMapper sysUserMapper;
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleInfoMapper sysRoleInfoMapper;
     private final PasswordEncoder passwordEncoder;
     private final SysLoginLogMapper sysLoginLogMapper;
-    private final RefreshTokenServiceImpl refreshTokenServiceImpl;
-    private final JwtTokenUtil jwtTokenUtil;
-    // ❌ 删除了没用的 loginAttemptService
 
-    /**
-     * 注册用户 + 绑定默认角色，单事务
-     */
+    private final RefreshTokenService refreshTokenService;
+    private final JwtTokenUtil jwtTokenUtil;
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public SysUser register(UserRegisterRequest req) {
         // 1. 先查一次
@@ -92,9 +92,8 @@ public class AuthServiceImpl {
         log.info("用户注册成功: id={}, username={}", user.getId(), user.getUsername());
         return user;
     }
-    /**
-     * 登录成功后：更新 last_login_time，保存 IP / UA
-     */
+
+    @Override
     public void recordLoginSuccess(String username, HttpServletRequest request) {
         String ip = extractClientIp(request);
         String ua = truncate(request.getHeader("User-Agent"), UserConstants.USER_AGENT_MAX_LENGTH);
@@ -111,9 +110,7 @@ public class AuthServiceImpl {
         log.info("用户登录成功: username={}, ip={}, ua={}", username, ip, ua);
     }
 
-    /**
-     * 记录登录失败
-     */
+    @Override
     public void recordLoginFailure(String username, HttpServletRequest request, String reason) {
         String ip = extractClientIp(request);
         String ua = truncate(request.getHeader("User-Agent"), UserConstants.USER_AGENT_MAX_LENGTH);
@@ -121,21 +118,18 @@ public class AuthServiceImpl {
         log.warn("用户登录失败: username={}, ip={}, reason={}", username, ip, reason);
     }
 
-    /**
-     * 处理登录成功，生成双 Token 并返回结果
-     */
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public LoginResponse processLoginSuccess(UserDetails userDetails, HttpServletRequest request, String deviceType) {
         String username = userDetails.getUsername();
-
-        // 👈 只查一次数据库
+        // 只查一次数据库
         SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username));
 
         // 1. 生成 AccessToken (传入 user.getId())
         String accessToken = jwtTokenUtil.generateToken(userDetails, user.getId());
 
         // 2. 生成 RefreshToken
-        String refreshToken = refreshTokenServiceImpl.createRefreshToken(user.getId(), deviceType);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId(), deviceType);
 
         // 3. 写登录日志
         recordLoginSuccess(username, request);
@@ -143,13 +137,10 @@ public class AuthServiceImpl {
         return buildLoginResponse(userDetails, user, accessToken, refreshToken);
     }
 
-    /**
-     * 处理刷新 Token
-     */
+    @Override
     public LoginResponse processRefreshSuccess(UserDetails userDetails, SysUser user, String deviceType) {
-        // 👈 修复：传入 user.getId()
         String accessToken = jwtTokenUtil.generateToken(userDetails, user.getId());
-        String refreshToken = refreshTokenServiceImpl.createRefreshToken(user.getId(), deviceType);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId(), deviceType);
 
         return buildLoginResponse(userDetails, user, accessToken, refreshToken);
     }
@@ -175,7 +166,6 @@ public class AuthServiceImpl {
                 .nickname(user.getNickname() != null ? user.getNickname() : user.getUsername())
                 .roles(roles)
                 .permissions(permissions)
-                // 👈 修复：直接使用已经查出来的 user 对象，无需再调用 getLastLoginTime 查库
                 .lastLoginTime(user.getLastLoginTime())
                 .expiresAt(LocalDateTime.now().plusNanos(jwtTokenUtil.getExpirationMs() * UserConstants.NANOS_PER_MILLI))
                 .build();

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.commonmodule.enums.DeviceOfflineReason;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -39,10 +40,8 @@ public interface DeviceInfoService extends IService<DeviceInfo> {
      */
     List<DeviceInfo> listHeartbeatTimeoutDevices(int timeoutSeconds);
 
-    /**
-     * 标记过期心跳设备离线
-     */
-    int markHeartbeatTimeoutOffline(int timeoutSeconds);
+    boolean markOfflineIfTimeout(String deviceId, String reasonCode, LocalDateTime lastHeartbeatTime);
+
     /**
      * 更新 OTA 状态
      *

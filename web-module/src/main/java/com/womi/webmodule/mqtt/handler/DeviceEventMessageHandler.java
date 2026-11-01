@@ -1,7 +1,6 @@
 package com.womi.webmodule.mqtt.handler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.womi.businessmodule.model.device.DeviceEventRecord;
 import com.womi.businessmodule.service.device.DeviceEventRecordService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.utils.JsonUtils;
@@ -10,10 +9,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 
 /*
   事件处理器
@@ -47,17 +42,10 @@ public class DeviceEventMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
-            String deviceId = extractDeviceId(topic);
-            JsonNode json = jsonUtils.parse(payload);
-            if (deviceId == null || json == null) return;
+        String deviceId = extractDeviceId(topic);
+        JsonNode json = jsonUtils.parse(payload);
+        if (deviceId == null || json == null) return;
 
-            JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
-
-            eventRecordService.processDeviceEvent(deviceId, dataNode);
-
-        } catch (Exception e) {
-            log.error("处理设备事件消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
-        }
+        eventRecordService.processDeviceEvent(deviceId, json);
     }
 }

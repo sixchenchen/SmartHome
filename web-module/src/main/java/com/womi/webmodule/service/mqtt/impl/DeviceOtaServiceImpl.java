@@ -34,14 +34,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * OTA 升级服务：前端请求示例
- * POST /device/ota/start
+ * POST /api/user/ota/start
  * {
  * "deviceId": "B4BFE90CDBA1",
  * "action": "start",
@@ -162,10 +160,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
                 new LambdaQueryWrapper<DeviceCommand>()
                         .eq(DeviceCommand::getDeviceId, deviceId)
                         .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
-                        .in(DeviceCommand::getStatus,
-                                DeviceCommandStatus.PENDING.getCode(),
-                                DeviceCommandStatus.SENT.getCode(),
-                                DeviceCommandStatus.ACCEPTED.getCode()));
+                        .in(DeviceCommand::getStatus, DeviceCommandConstants.ACTIVE_STATUSES));
         if (exists) {
             log.warn("OTA 拒绝：存在未完成的 OTA 指令 - deviceId: {}", deviceId);
             throw new BusinessException(ErrorCode.OTA_IN_PROGRESS, "已有未完成的 OTA 指令，请等待完成或超时");
@@ -289,6 +284,21 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             log.info("[OTA-Dispatch] 结束：没有符合条件的设备可升级");
             return 0;
         }
+        // 提取所有目标设备的 deviceId
+        List<String> targetDeviceIds = devices.stream()
+                .map(DeviceInfo::getDeviceId)
+                .collect(Collectors.toList());
+
+        List<DeviceCommand> runningCommands = deviceCommandService.list(
+                new LambdaQueryWrapper<DeviceCommand>()
+                        .in(DeviceCommand::getDeviceId, targetDeviceIds)
+                        .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
+                        .in(DeviceCommand::getStatus, DeviceCommandConstants.ACTIVE_STATUSES)
+                        .select(DeviceCommand::getDeviceId)
+        );
+        Set<String> runningDeviceIds = runningCommands.stream()
+                .map(DeviceCommand::getDeviceId)
+                .collect(Collectors.toSet());
 
         // 3. 组装 OTA 参数
         DeviceOtaParam otaParam = DeviceOtaParam.builder()
@@ -303,25 +313,10 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         LocalDateTime now = LocalDateTime.now();
 
         for (DeviceInfo device : devices) {
-            // 日志：打印当前处理的设备
-            log.info("[OTA-Dispatch] 正在检查设备: {}, 当前版本: {}", device.getDeviceId(), device.getFirmware());
-
-            // 5. 防并发检查：检查该设备是否有未完成的 OTA 指令
-            boolean existsRunning = deviceCommandService.exists(
-                    new LambdaQueryWrapper<DeviceCommand>()
-                            .eq(DeviceCommand::getDeviceId, device.getDeviceId())
-                            .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
-                            .in(DeviceCommand::getStatus,
-                                    DeviceCommandStatus.PENDING.getCode(),
-                                    DeviceCommandStatus.SENT.getCode(),
-                                    DeviceCommandStatus.ACCEPTED.getCode())
-            );
-            if (existsRunning) {
-                // 日志：记录被跳过的设备及原因
+            if (runningDeviceIds.contains(device.getDeviceId())) {
                 log.warn("[OTA-Dispatch] 跳过设备 {}：存在未完成的 OTA 指令", device.getDeviceId());
                 continue;
             }
-
             DeviceCommand cmd = new DeviceCommand();
             cmd.setCommandId(UUID.randomUUID().toString().replace("-", ""));
             cmd.setDeviceId(device.getDeviceId());
@@ -348,7 +343,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             log.info("[OTA-Dispatch] 结束：所有符合条件的设备都存在未完成的 OTA 指令，无需重新生成");
             return 0;
         }
-
+        deviceCommandService.saveBatch(commands);
         // 6. 批量落库
         TransactionUtils.afterCommit(() -> {
             for (DeviceCommand cmd : commands) {

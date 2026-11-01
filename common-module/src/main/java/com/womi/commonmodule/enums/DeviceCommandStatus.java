@@ -3,16 +3,13 @@ package com.womi.commonmodule.enums;
 /**
  * 指令状态
  *
- * <p>对应数据库 device_command.status (tinyint)
- *
- * <pre>
  * 0-PENDING   待下发
  * 1-SENT      已下发
  * 2-SUCCESS   成功
  * 3-FAILED    失败
  * 4-TIMEOUT   超时
  * 5-CANCELLED 取消
- * </pre>
+ * 6-ACCEPTED  已接收 (设备已受理，正在执行)
  */
 public enum DeviceCommandStatus {
 
@@ -60,8 +57,17 @@ public enum DeviceCommandStatus {
         return this == SUCCESS || this == FAILED || this == TIMEOUT || this == CANCELLED;
     }
 
-    /** 是否待处理（待下发/已下发） */
+    /**
+     * 是否为待响应状态（严格指：待下发 / 已下发，等待设备 ACK）。
+     */
     public boolean isPending() {
         return this == PENDING || this == SENT;
+    }
+
+    /**
+     * 是否为活跃状态（未进入终态的所有状态，包含待下发、已下发、已接收）。
+     */
+    public boolean isActive() {
+        return !isFinished();
     }
 }

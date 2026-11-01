@@ -42,7 +42,6 @@ public class DeviceAckMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
             String deviceId = extractDeviceId(topic);
             JsonNode json = jsonUtils.parse(payload);
 
@@ -50,7 +49,7 @@ public class DeviceAckMessageHandler implements MqttMessageHandler {
             if (commandId == null || commandId.isBlank()) {
                 throw new IllegalArgumentException("ACK 缺少 commandId");
             }
-
+        log.info("设备 ACK 接收 - commandId: [{}], deviceId: {}", commandId, deviceId);
             Boolean success = jsonUtils.getBoolean(json, DeviceMqttConstants.FIELD_SUCCESS);
             if (success == null) success = false; // 默认按失败处理
 
@@ -58,9 +57,6 @@ public class DeviceAckMessageHandler implements MqttMessageHandler {
             Map<String, Object> data = jsonUtils.nodeToMap(json.path(DeviceMqttConstants.FIELD_DATA));
 
             // 调用 Service
-            deviceCommandService.handleAck(commandId, success, data, msg);
-        } catch (Exception e) {
-            log.error("处理 ACK 消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
-        }
+            deviceCommandService.handleAck(deviceId,commandId, success, data, msg);
     }
 }

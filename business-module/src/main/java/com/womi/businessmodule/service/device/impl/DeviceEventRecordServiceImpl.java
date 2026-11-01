@@ -43,9 +43,12 @@ public class DeviceEventRecordServiceImpl
                 .orderByDesc(DeviceEventRecord::getTimestamp)
                 .last("LIMIT " + limit));
     }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void processDeviceEvent(String deviceId, JsonNode dataNode) {
+    public void processDeviceEvent(String deviceId, JsonNode json) {
+        JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
+
         // 1. 提取 data 节点中的事件信息
         String eventType = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_TYPE);
         String eventName = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_EVENT);
@@ -67,22 +70,24 @@ public class DeviceEventRecordServiceImpl
         record.setTarget(target);
         record.setChannel(channel);
         record.setTriggerSource(triggerSource);
-
-        // 将完整的原始 data 报文作为 JSON 存入库中
         record.setPayload(jsonUtils.nodeToMap(dataNode));
 
-        // 3. 处理事件时间 (优先取设备时间)
-        Long timestampMs = jsonUtils.getLong(dataNode, DeviceMqttConstants.FIELD_TIMESTAMP);
-        LocalDateTime eventTime = LocalDateTime.now();
+        // 协议示例中时间在顶层，优先取顶层；如果没有，再取 data 内的；最后兜底 now
+        Long timestampMs = jsonUtils.getLong(json, DeviceMqttConstants.FIELD_TIMESTAMP);
+        if (timestampMs == null) {
+            timestampMs = jsonUtils.getLong(dataNode, DeviceMqttConstants.FIELD_TIMESTAMP);
+        }
+
+        LocalDateTime eventTime = LocalDateTime.now(); // 最终兜底
         if (timestampMs != null && timestampMs > 0) {
             try {
                 eventTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestampMs), ZoneId.systemDefault());
             } catch (Exception e) {
-                log.warn("设备上报的事件时间戳异常 - deviceId: {}, timestamp: {}", deviceId, timestampMs);
+                log.warn("设备上报的事件时间戳格式异常，使用当前时间兜底 - deviceId: {}, timestamp: {}", deviceId, timestampMs);
             }
         }
         record.setTimestamp(eventTime);
-        record.setCreateTime(LocalDateTime.now());
+        record.setCreateTime(LocalDateTime.now()); // 入库时间固定为当前时间
 
         // 4. 落库
         save(record);

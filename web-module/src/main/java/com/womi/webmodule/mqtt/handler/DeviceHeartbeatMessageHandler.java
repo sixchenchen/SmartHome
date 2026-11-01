@@ -46,7 +46,6 @@ public class DeviceHeartbeatMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
             String deviceId = extractDeviceId(topic);
             JsonNode json = jsonUtils.parse(payload);
             JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
@@ -60,8 +59,5 @@ public class DeviceHeartbeatMessageHandler implements MqttMessageHandler {
             if (Boolean.TRUE.equals(isBound)) {
                 heartbeatRecordService.recordHeartbeat(deviceId, uptime, payload);
             }
-        } catch (Exception e) {
-            log.error("处理心跳消息失败 - topic: {}, error: {}", topic, e.getMessage(), e);
-        }
     }
 }

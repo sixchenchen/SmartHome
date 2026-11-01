@@ -21,10 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -103,7 +100,7 @@ public class DeviceCommandServiceImpl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void handleAck(String commandId, boolean success,
+    public void handleAck(String deviceId, String commandId, boolean success,
                           Map<String, Object> payload, String errorMsg) {
         // 1. 查询指令
         DeviceCommand command = getByCommandId(commandId);
@@ -111,7 +108,12 @@ public class DeviceCommandServiceImpl
             log.warn("ACK 对应的指令不存在 - commandId: {}", commandId);
             return;
         }
-
+        if (!Objects.equals(deviceId, command.getDeviceId())) {
+            log.error(" 发现越权 ACK！设备 [{}] 试图伪造设备 [{}] 的指令 ACK - commandId: {}",
+                    deviceId, command.getDeviceId(), commandId);
+            // 直接丢弃，不更新任何状态
+            return;
+        }
         // 2. 决策：根据当前状态 + payload 判断是否需要变更
         AckDecision decision = decideAckTransition(command, success, payload, errorMsg);
         if (decision == null) {
@@ -296,6 +298,7 @@ public class DeviceCommandServiceImpl
 
     @Override
     public DeviceCommand getByCommandId(String commandId) {
+        if (commandId == null) return null;
         return baseMapper.selectByCommandId(commandId);
     }
 
@@ -396,13 +399,13 @@ public class DeviceCommandServiceImpl
             }
 
             switch (status) {
-                case PENDING   -> vo.setPending(vo.getPending() + count);
-                case SENT      -> vo.setSent(vo.getSent() + count);
-                case SUCCESS   -> vo.setSuccess(vo.getSuccess() + count);
-                case FAILED    -> vo.setFailed(vo.getFailed() + count);
-                case TIMEOUT   -> vo.setTimeout(vo.getTimeout() + count);
+                case PENDING -> vo.setPending(vo.getPending() + count);
+                case SENT -> vo.setSent(vo.getSent() + count);
+                case SUCCESS -> vo.setSuccess(vo.getSuccess() + count);
+                case FAILED -> vo.setFailed(vo.getFailed() + count);
+                case TIMEOUT -> vo.setTimeout(vo.getTimeout() + count);
                 case CANCELLED -> vo.setCancelled(vo.getCancelled() + count);
-                case ACCEPTED  -> vo.setSent(vo.getSent() + count); // 业务约定：已接收归入下发中
+                case ACCEPTED -> vo.setSent(vo.getSent() + count); // 业务约定：已接收归入下发中
             }
             // 累加总数
             vo.setTotal(vo.getTotal() + count);

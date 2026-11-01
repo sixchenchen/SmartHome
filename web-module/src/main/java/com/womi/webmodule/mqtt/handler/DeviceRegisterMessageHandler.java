@@ -52,7 +52,6 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
             String deviceId = extractProvisionDeviceId(topic);
             JsonNode json = jsonUtils.parse(payload);
 
@@ -64,9 +63,6 @@ public class DeviceRegisterMessageHandler implements MqttMessageHandler {
             DeviceRegisterRequest request = buildRequest(deviceId, json);
             DeviceRegisterResponse response = deviceRegisterService.register(request);
             sendResponse(deviceId, response);
-        } catch (Exception e) {
-            log.error("处理注册请求失败 - topic: {}, error: {}", topic, e.getMessage(), e);
-        }
     }
 
     /**

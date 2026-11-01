@@ -12,6 +12,7 @@ import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.model.device.DeviceMqttAuth;
 import com.womi.businessmodule.model.device.DeviceWhitelist;
 import com.womi.commonmodule.constants.DeviceConstants;
+import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.RegexConstants;
 import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.enums.EnableStatus;
@@ -21,6 +22,8 @@ import com.womi.commonmodule.utils.MacUtils;
 import com.womi.webmodule.service.device.DeviceAdminService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +39,7 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
     private final DeviceWhitelistMapper deviceWhitelistMapper;
     private final DeviceMqttAuthMapper deviceMqttAuthMapper;
     private final DeviceBindingMapper deviceBindingMapper;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public Page<DeviceInfo> pageDevices(Integer pageNum, Integer pageSize, String keyword) {
@@ -59,6 +63,7 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
         if (cleanMac == null || !cleanMac.matches(RegexConstants.MAC)) {
             throw new BusinessException(ErrorCode.MAC_FORMAT_ERROR, "MAC地址格式不正确");
         }
+
         // 1. 校验 MAC 地址是否已存在
         Long count = deviceInfoMapper.selectCount(
                 new LambdaQueryWrapper<DeviceInfo>().eq(DeviceInfo::getDeviceId, cleanMac)
@@ -67,29 +72,53 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
             throw new BusinessException(ErrorCode.DEVICE_ALREADY_EXIST, ErrorCode.DEVICE_ALREADY_EXIST.getMessage());
         }
 
-        // 2. 插入 device_info
-        String bindCode = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        // 2. 组装设备基本信息
         DeviceInfo device = new DeviceInfo();
         device.setDeviceId(cleanMac);
-        device.setBindCode(bindCode);
         device.setDeviceName(StringUtils.hasText(request.getDeviceName()) ? request.getDeviceName() : cleanMac);
         device.setProduct(request.getProduct());
         device.setLocation(request.getLocation());
-        device.setOnline(DeviceOnlineStatus.OFFLINE.getCode()); // 默认离线
-        deviceInfoMapper.insert(device);
+        device.setOnline(DeviceOnlineStatus.OFFLINE.getCode());
 
-        // 3. ：安全插入/更新 device_whitelist
+        // 3. 生成 BindCode 并插入（带重试机制）
+        int maxRetries = 3;
+        boolean insertSuccess = false;
+
+        for (int i = 0; i < maxRetries; i++) {
+            // 每次循环生成新的 6 位大写随机码
+            String bindCode = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+            device.setBindCode(bindCode);
+
+            try {
+                deviceInfoMapper.insert(device);
+                insertSuccess = true;
+                break; // 插入成功，跳出循环
+            } catch (DuplicateKeyException e) {
+                // 判断是否是 bind_code 冲突
+                if (e.getMessage() != null && e.getMessage().contains("uk_bind_code")) {
+                    log.warn("生成 bind_code 发生碰撞，准备重试 - deviceId: {}, 碰撞的 bindCode: {}", cleanMac, bindCode);
+                } else {
+                    // 如果是其他唯一键冲突（如 device_id），说明并发插入发生了，直接抛出
+                    throw new BusinessException(ErrorCode.DEVICE_ALREADY_EXIST, "设备已存在，请勿重复添加");
+                }
+            }
+        }
+
+        if (!insertSuccess) {
+            log.error("设备创建失败：生成唯一 bind_code 重试次数耗尽 - deviceId: {}", cleanMac);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "系统繁忙，设备绑定码生成失败，请重试");
+        }
+
+        // 4. 安全插入/更新 device_whitelist
         DeviceWhitelist existingWhitelist = deviceWhitelistMapper.selectOne(
                 new LambdaQueryWrapper<DeviceWhitelist>().eq(DeviceWhitelist::getDeviceId, cleanMac)
         );
 
         if (existingWhitelist != null) {
-            // 如果白名单已存在（比如之前是禁用的），直接恢复启用状态
             existingWhitelist.setEnabled(EnableStatus.ENABLED.getCode());
             existingWhitelist.setRemark(DeviceConstants.WHITELIST_REMARK_ADMIN_OVERRIDE);
             deviceWhitelistMapper.updateById(existingWhitelist);
         } else {
-            // 如果不存在，则新建
             DeviceWhitelist whitelist = new DeviceWhitelist();
             whitelist.setDeviceId(cleanMac);
             whitelist.setEnabled(EnableStatus.ENABLED.getCode());
@@ -97,7 +126,7 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
             deviceWhitelistMapper.insert(whitelist);
         }
 
-        log.info("管理员创建设备成功: deviceId={}", cleanMac);
+        log.info("管理员创建设备成功: deviceId={}, bindCode={}", cleanMac, device.getBindCode());
     }
 
     @Override
@@ -126,7 +155,14 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
         deviceBindingMapper.delete(
                 new LambdaQueryWrapper<DeviceBinding>().eq(DeviceBinding::getDeviceId, mac)
         );
-
+        // 5. 清理 Redis 缓存
+        try {
+            redisTemplate.opsForSet().remove(RedisConstants.BOUND_DEVICES_KEY, mac);
+            log.info("已清理设备 Redis 绑定缓存 - deviceId={}", mac);
+        } catch (Exception e) {
+            // 注意：Redis 清理失败不应该影响数据库事务的回滚
+            log.error("清理设备 Redis 绑定缓存失败 - deviceId={}", mac, e);
+        }
         log.info("管理员删除设备及关联数据成功: deviceId={}", mac);
     }
 }

@@ -1,5 +1,6 @@
 package com.womi.webmodule.service.mqtt.impl;
 
+import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.webmodule.service.mqtt.NonceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,7 @@ public class DeviceNonceServiceImpl implements NonceService {
             return false;
         }
         String key = KEY_PREFIX + nonce;
-        Boolean success = redisTemplate.opsForValue().setIfAbsent(key, "used", TTL);
+        Boolean success = redisTemplate.opsForValue().setIfAbsent(key, RedisConstants.REGISTER_USER, TTL);
         return Boolean.TRUE.equals(success);
     }
 

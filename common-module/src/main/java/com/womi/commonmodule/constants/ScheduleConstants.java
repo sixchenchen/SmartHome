@@ -5,38 +5,60 @@ package com.womi.commonmodule.constants;
  */
 public final class ScheduleConstants {
 
+    // ==================== 任务执行间隔 ====================
 
-    private ScheduleConstants() {
-    } // 防止实例化
-    // 心跳超时阈值（秒）：连续 3 个心跳周期未收到，判定离线
-    public static final int HEARTBEAT_TIMEOUT_SECONDS = 60;
-    // 心跳超时扫描间隔（毫秒）：每 30 秒扫描一次
+    /** 心跳超时扫描间隔（毫秒）：每 30 秒扫描一次 */
     public static final long HEARTBEAT_SCAN_FIXED_DELAY = 30_000L;
-    // 待下发指令扫描间隔
+
+    /** 待下发指令扫描间隔（毫秒） */
     public static final long DISPATCH_FIXED_DELAY = 1000L;
-    // 超时未 ACK 指令重试间隔（毫秒）
+
+    /** 超时未 ACK 指令重试间隔（毫秒） */
     public static final long RETRY_FIXED_DELAY = 3000L;
-    // 最小等待时间
-    public static final int DISPATCH_MIN_WAIT_SECONDS = 2;
-    // 过期指令标记间隔
+
+    /** 过期指令标记间隔（毫秒） */
     public static final long MARK_EXPIRED_FIXED_DELAY = 30000L;
-    // OTA过期间隔
+
+    /** OTA 过期间隔（毫秒） */
     public static final long OTA_EXPIRED_FIXED_DELAY = 5000L;
-    // 单批处理条数
-    public static final int BATCH_SIZE = 50;
-    // 重试超时阈值（秒）
+
+    // ==================== 业务阈值 ====================
+
+    /** 心跳超时阈值（秒）：连续 3 个心跳周期未收到，判定离线 */
+    public static final int HEARTBEAT_TIMEOUT_SECONDS = 60;
+
+    /** 最小等待时间（秒） */
+    public static final int DISPATCH_MIN_WAIT_SECONDS = 2;
+
+    /** 重试超时阈值（秒） */
     public static final int RETRY_TIMEOUT_SECONDS = 5;
-    // 每日清理历史指令
-    public static final String CLEAN_HISTORY_CRON = "0 0 2 * * ?";
+
+    /** 单批处理条数 */
+    public static final int BATCH_SIZE = 50;
+
     // ==================== 历史数据清理 ====================
-    // 传感器历史数据保留数7天
-    public static final int SENSOR_RECORD_RETENTION_DAYS = 7;
-    //心跳历史数据保留天数3天
-    public static final int HEARTBEAT_RECORD_RETENTION_DAYS = 3;
-    // 历史指令清理保留天数30天
-    public static final int CLEAN_RETENTION_DAYS = 30;
-    // 每天凌晨 3 点执行
+
+    /** 每日清理历史指令 (凌晨 2 点) */
+    public static final String CLEAN_HISTORY_CRON = "0 0 2 * * ?";
+
+    /** 每天凌晨 3 点执行 (传感器、心跳、状态轨迹) */
     public static final String CLEAN_RECORD_CRON = "0 0 3 * * ?";
-    // 状态轨迹数据保留30天
+
+    /** 传感器历史数据保留天数 */
+    public static final int SENSOR_RECORD_RETENTION_DAYS = 7;
+
+    /** 心跳历史数据保留天数 */
+    public static final int HEARTBEAT_RECORD_RETENTION_DAYS = 3;
+
+    /** 历史指令清理保留天数 */
+    public static final int CLEAN_RETENTION_DAYS = 30;
+
+    /** 状态轨迹数据保留天数 */
     public static final int STATE_RECORD_RETENTION_DAYS = 30;
+
+    /**
+     * 私有构造方法，防止实例化
+     */
+    private ScheduleConstants() {
+    }
 }

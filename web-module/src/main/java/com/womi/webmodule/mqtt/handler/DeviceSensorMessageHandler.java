@@ -51,7 +51,6 @@ public class DeviceSensorMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
             String deviceId = extractDeviceId(topic);
             JsonNode json = jsonUtils.parse(payload);
             JsonNode dataArray = json.path(DeviceMqttConstants.FIELD_DATA);
@@ -59,11 +58,6 @@ public class DeviceSensorMessageHandler implements MqttMessageHandler {
             if (!dataArray.isArray()) {
                 throw new IllegalArgumentException("传感器数据格式错误，data 节点不是数组");
             }
-
             deviceSensorDataService.processSensorData(deviceId, dataArray);
-
-        } catch (Exception e) {
-            log.error("处理传感器数据失败 - topic: {}, error: {}", topic, e.getMessage(), e);
-        }
     }
 }

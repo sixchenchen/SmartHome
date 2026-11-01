@@ -10,6 +10,7 @@ import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.webmodule.security.SecurityUser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -20,6 +21,7 @@ import org.springframework.util.CollectionUtils;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
@@ -54,7 +56,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 permCodes.forEach(code -> authorities.add(new SimpleGrantedAuthority(code)));
             }
         }
-
         // 5. 返回自定义的 SecurityUser
         return new SecurityUser(user, authorities);
     }

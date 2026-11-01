@@ -1,11 +1,13 @@
 package com.womi.webmodule.filter;
 
 import com.womi.businessmodule.model.sys.SysUser;
+import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.utils.JwtTokenUtil;
 import com.womi.webmodule.security.SecurityUser;
 import com.womi.webmodule.service.auth.impl.TokenBlacklistServiceImpl;
 import io.jsonwebtoken.Claims;
+import io.lettuce.core.codec.RedisCodec;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,13 +63,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 2. 从 Claims 中提取用户名和 userId
             String username = claims.getSubject();
-            Long userId = claims.get("userId", Long.class);
-
+            Long userId = claims.get(UserConstants.USER_ID, Long.class);
             // 3. 从 Claims 中提取权限列表
             @SuppressWarnings("unchecked")
             List<String> authorityStrs = (List<String>) claims.get(UserConstants.AUTHORITIES);
             if (authorityStrs == null) authorityStrs = Collections.emptyList();
-
+            log.info("请求解析到的 username: {}", username);
+            log.info("请求解析到的 authorities: {}", authorityStrs);
             // 如果上下文里还没有认证信息，才去构建
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 

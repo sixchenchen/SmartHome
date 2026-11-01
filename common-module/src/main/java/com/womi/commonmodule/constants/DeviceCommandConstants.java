@@ -18,7 +18,7 @@ public final class DeviceCommandConstants {
             .toList();
 
     /** 中间态：可能继续流转 */
-    public static final List<Integer> PENDING_STATUSES = List.of(
+    public static final List<Integer> ACTIVE_STATUSES = List.of(
             DeviceCommandStatus.PENDING.getCode(),
             DeviceCommandStatus.SENT.getCode(),
             DeviceCommandStatus.ACCEPTED.getCode() // 视业务而定，如果有需要可以加上

@@ -27,8 +27,14 @@ public class MqttMessageRouter {
             return true; // 处理成功
         } catch (Exception e) {
             // 存入死信表
-            deadLetterService.saveDeadLetter(topic, payload, e);
-            return false; // 处理失败，但异常被吞掉，MQTT 正常 ACK
+            boolean isRetryable = !(e instanceof IllegalArgumentException);
+
+            // 存入死信表（把 isRetryable 传给 Service，或者打上 type 标签）
+            deadLetterService.saveDeadLetter(topic, payload, e, isRetryable);
+
+            log.warn("MQTT消息处理失败，已存入死信队列 - topic: {}, 可重试: {}, 错误: {}",
+                    topic, isRetryable, e.getMessage());
+            return false; // 异常被吞掉，MQTT 正常 ACK，防止毒丸重发
         }
     }
 
