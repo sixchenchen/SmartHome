@@ -69,6 +69,7 @@ public class SecurityConfig {
                     // 1. 所有环境都放行的白名单
                     auth.requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
                             .requestMatchers("/ws/**").permitAll()
+                            .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "OPS")
                             .requestMatchers("/error", "/favicon.ico").permitAll();
 
                     // 2. 判断环境：如果不是 prod，才允许访问 Swagger 文档

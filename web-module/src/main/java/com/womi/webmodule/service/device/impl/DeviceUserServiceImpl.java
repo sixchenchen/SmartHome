@@ -20,6 +20,7 @@ import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
+import com.womi.commonmodule.utils.TransactionUtils;
 import com.womi.webmodule.service.device.DeviceUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -192,7 +193,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         deviceCommandService.save(cmd);
 
         // 立即通过 MQTT 下发
-        executeAfterCommit(() -> {
+        TransactionUtils.afterCommit(() -> {
             try {
                 commandSender.send(cmd);
                 deviceCommandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
@@ -205,17 +206,4 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         });
     }
 
-
-    private void executeAfterCommit(Runnable action) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    action.run();
-                }
-            });
-        } else {
-            action.run();
-        }
-    }
 }

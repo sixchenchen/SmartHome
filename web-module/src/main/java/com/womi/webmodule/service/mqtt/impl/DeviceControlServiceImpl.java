@@ -11,6 +11,7 @@ import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
+import com.womi.commonmodule.utils.TransactionUtils;
 import com.womi.webmodule.mqtt.core.MqttPublisher;
 import com.womi.webmodule.service.mqtt.DeviceControlService;
 import lombok.RequiredArgsConstructor;
@@ -64,7 +65,7 @@ public class DeviceControlServiceImpl implements DeviceControlService {
                 expireSeconds > 0 ? expireSeconds : DEFAULT_EXPIRE_SECONDS);
 
         // 4. 立即下发
-        executeAfterCommit(() -> trySendImmediately(command));
+        TransactionUtils.afterCommit(() -> trySendImmediately(command));
         return command;
     }
 
@@ -169,21 +170,6 @@ public class DeviceControlServiceImpl implements DeviceControlService {
     private void checkDeviceOnline(DeviceInfo device) {
         if (!deviceInfoService.isDeviceActuallyOnline(device, ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS)) {
             throw new BusinessException(ErrorCode.DEVICE_OFFLINE);
-        }
-    }
-    /**
-     * 事务提交后执行（如果当前没有事务，则立即执行）
-     */
-    private void executeAfterCommit(Runnable action) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    action.run();
-                }
-            });
-        } else {
-            action.run();
         }
     }
 }

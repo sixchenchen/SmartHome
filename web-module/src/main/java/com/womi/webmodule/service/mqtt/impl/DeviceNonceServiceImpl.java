@@ -45,4 +45,19 @@ public class DeviceNonceServiceImpl implements NonceService {
         Boolean success = redisTemplate.opsForValue().setIfAbsent(key, "used", TTL);
         return Boolean.TRUE.equals(success);
     }
+
+    @Override
+    public void release(String nonce) {
+        if (nonce == null || nonce.isBlank()) {
+            return;
+        }
+
+        try {
+            redisTemplate.delete(KEY_PREFIX + nonce);
+            log.debug("已释放 nonce - nonce: {}", nonce);
+        } catch (Exception e) {
+            // 吞掉异常，防止因为释放失败导致原本的业务异常被覆盖
+            log.error("释放 nonce 失败（请检查 Redis 连接） - nonce: {}", nonce, e);
+        }
+    }
 }

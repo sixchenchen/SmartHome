@@ -50,7 +50,7 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
                         if (jwtTokenUtil.validateToken(token, userDetails)) {
                             SecurityUser securityUser = (SecurityUser) userDetails;
                             boolean isAdmin = userDetails.getAuthorities().stream()
-                                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                                    .anyMatch(a -> a.getAuthority().equals(UserConstants.USER_ROLE_ADMIN));
 
                             StompPrincipal principal = new StompPrincipal(
                                     securityUser.sysUser().getId(), username, isAdmin);

@@ -20,4 +20,6 @@ public interface NonceService {
      * @return true=首次使用（获取成功）；false=已被使用（获取失败）
      */
     boolean tryAcquire(String nonce);
+
+    void release(String nonce);
 }

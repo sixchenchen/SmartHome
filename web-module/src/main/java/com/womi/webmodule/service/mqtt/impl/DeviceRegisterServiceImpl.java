@@ -109,8 +109,10 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
             return DeviceRegisterResponse.error(MqttErrorCode.INVALID_SIGNATURE);
         }
 
+        // 👈 1. 原子占位（验签通过后，立刻抢占 nonce）
         String nonce = request.getNonce();
-        if (nonceService.exists(nonce)) {
+        if (!nonceService.tryAcquire(nonce)) {
+            log.warn("重放攻击拦截（并发冲突） - deviceId: {}, nonce: {}", deviceId, nonce);
             return DeviceRegisterResponse.error(MqttErrorCode.REPLAY_ATTACK);
         }
 
@@ -125,12 +127,21 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
             } else {
                 saveFirstTimeDevice(request, credential);
             }
-        } catch (DuplicateKeyException e) {
-            log.warn("并发注册冲突 - deviceId: {}", deviceId);
-            return DeviceRegisterResponse.error(MqttErrorCode.DEVICE_ALREADY_REGISTERED);
+        } catch (Exception e) {
+            // 👈 2. 关键防御：如果业务处理失败，必须释放 nonce，允许设备用同一个 nonce 重试
+            nonceService.release(nonce);
+
+            if (e instanceof DuplicateKeyException) {
+                log.warn("并发注册冲突 - deviceId: {}", deviceId);
+                return DeviceRegisterResponse.error(MqttErrorCode.DEVICE_ALREADY_REGISTERED);
+            }
+            // 其他未知异常（如数据库宕机），抛出交由 Router 记录死信
+            log.error("设备注册业务处理异常 - deviceId: {}", deviceId, e);
+            throw e;
         }
 
-        registerNonceConsumption(nonce);
+        // ❌ 删掉这一行！不需要二次占位了
+        // registerNonceConsumption(nonce);
 
         // ==================== 6. 组装响应 ====================
         DeviceRegisterResponse response = DeviceRegisterResponse.success(

@@ -65,7 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 3. 从 Claims 中提取权限列表
             @SuppressWarnings("unchecked")
-            List<String> authorityStrs = (List<String>) claims.get("authorities");
+            List<String> authorityStrs = (List<String>) claims.get(UserConstants.AUTHORITIES);
             if (authorityStrs == null) authorityStrs = Collections.emptyList();
 
             // 如果上下文里还没有认证信息，才去构建

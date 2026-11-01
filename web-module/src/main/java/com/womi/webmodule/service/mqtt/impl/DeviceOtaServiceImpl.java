@@ -22,6 +22,7 @@ import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.DeviceOtaStateUtils;
+import com.womi.commonmodule.utils.TransactionUtils;
 import com.womi.webmodule.service.mqtt.DeviceControlService;
 import com.womi.webmodule.service.mqtt.DeviceOtaService;
 import lombok.RequiredArgsConstructor;
@@ -349,7 +350,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         }
 
         // 6. 批量落库
-        executeAfterCommit(() -> {
+        TransactionUtils.afterCommit(() -> {
             for (DeviceCommand cmd : commands) {
                 try {
                     commandSender.send(cmd);
@@ -365,16 +366,4 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         return commands.size();
     }
 
-    private void executeAfterCommit(Runnable action) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    action.run();
-                }
-            });
-        } else {
-            action.run();
-        }
-    }
 }

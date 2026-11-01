@@ -105,7 +105,7 @@ public final class DeviceMqttConstants {
      */
     public static final String SENSOR_TOPIC_FORMAT = "device/%s/sensor";
 
-    // ---------- Topic 格式：注册（Broker 1884） ----------
+    // ---------- Topic 格式：注册（Broker 8884） ----------
     /**
      * 注册请求：/provision/device/{mac}/register
      */

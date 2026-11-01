@@ -12,20 +12,24 @@ import com.womi.businessmodule.service.device.DeviceFirmwareService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.businessmodule.vo.OtaCheckResponse;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
-import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
+import com.womi.commonmodule.constants.ScheduleConstants;
 import com.womi.commonmodule.enums.BindStatus;
 import com.womi.commonmodule.enums.DeviceCommandStatus;
 import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
+import com.womi.commonmodule.utils.TransactionUtils;
 import com.womi.webmodule.service.mqtt.UserOtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -42,33 +46,24 @@ public class UserOtaServiceImpl implements UserOtaService {
 
     @Override
     public OtaCheckResponse checkUpdate(Long userId, String deviceId) {
-        // 1. 防越权：校验设备是否属于当前用户
+        // 1. 防越权
         checkDeviceBinding(userId, deviceId);
 
-        // 2. 查设备当前信息
+        // 2. 查设备
         DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
         if (device == null) {
-            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, ErrorCode.DEVICE_OFFLINE.getMessage());
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, ErrorCode.DEVICE_NOT_FOUND.getMessage());
         }
 
-        // 3. 查询该产品最新启用的固件
-        DeviceFirmware latest = firmwareService.getOne(
-                new LambdaQueryWrapper<DeviceFirmware>()
-                        .eq(DeviceFirmware::getProduct, device.getProduct())
-                        .eq(DeviceFirmware::getStatus, EnableStatus.ENABLED)
-                        .orderByDesc(DeviceFirmware::getCreateTime)
-                        .last("LIMIT 1")
-        );
+        // 3. 查最新固件
+        DeviceFirmware latest = getLatestFirmware(device.getProduct());
 
         OtaCheckResponse resp = new OtaCheckResponse();
-
-        // 4. 比对版本（如果没有固件，或者版本号一样，说明不需要更新）
         if (latest == null || latest.getVersion().equals(device.getFirmware())) {
             resp.setHasNewVersion(false);
             return resp;
         }
 
-        // 5. 发现新版本，组装返回
         resp.setHasNewVersion(true);
         resp.setFirmwareId(latest.getId());
         resp.setLatestVersion(latest.getVersion());
@@ -84,67 +79,74 @@ public class UserOtaServiceImpl implements UserOtaService {
         checkDeviceBinding(userId, deviceId);
 
         DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
-        if (device == null) throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND,ErrorCode.DEVICE_NOT_FOUND.getMessage());
-        if (device.getOnline() != DeviceConstants.DEVICE_ONLINE) throw new BusinessException(ErrorCode.DEVICE_OFFLINE, "设备不在线，无法升级");
+        if (device == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, ErrorCode.DEVICE_NOT_FOUND.getMessage());
+        }
 
-        // 2. 再次查最新固件（防止前端传假数据）
-        DeviceFirmware latest = firmwareService.getOne(
-                new LambdaQueryWrapper<DeviceFirmware>()
-                        .eq(DeviceFirmware::getProduct, device.getProduct())
-                        .eq(DeviceFirmware::getStatus, EnableStatus.ENABLED)
-                        .orderByDesc(DeviceFirmware::getCreateTime)
-                        .last("LIMIT 1")
-        );
+        // 安全的在线判定
+        if (!deviceInfoService.isDeviceActuallyOnline(device, ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS)) {
+            throw new BusinessException(ErrorCode.DEVICE_OFFLINE, "设备不在线或网络异常，无法升级");
+        }
+
+        // 2. 查最新固件
+        DeviceFirmware latest = getLatestFirmware(device.getProduct());
         if (latest == null || latest.getVersion().equals(device.getFirmware())) {
             throw new BusinessException(ErrorCode.OTA_ALREADY_LATEST, ErrorCode.OTA_ALREADY_LATEST.getMessage());
         }
 
-        // 3. 防并发：检查该设备是否已有正在进行的 OTA
+        // 3. 防并发
         boolean running = commandService.exists(
                 new LambdaQueryWrapper<DeviceCommand>()
                         .eq(DeviceCommand::getDeviceId, deviceId)
                         .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
-                        .in(DeviceCommand::getStatus, 0, 1, 6)
+                        .in(DeviceCommand::getStatus,
+                                DeviceCommandStatus.PENDING.getCode(),
+                                DeviceCommandStatus.SENT.getCode(),
+                                DeviceCommandStatus.ACCEPTED.getCode())
         );
         if (running) {
             throw new BusinessException(ErrorCode.OTA_IN_PROGRESS, "该设备正在升级中，请耐心等待");
         }
 
-        // 4. 组装 OTA 指令
+        // 4. 组装指令
         LocalDateTime now = LocalDateTime.now();
         DeviceCommand cmd = new DeviceCommand();
         cmd.setCommandId(UUID.randomUUID().toString().replace("-", ""));
         cmd.setDeviceId(deviceId);
-        cmd.setAction(DeviceMqttConstants.FIELD_ACTION);
+        cmd.setAction(DeviceMqttConstants.ACTION_START);
         cmd.setTarget(DeviceMqttConstants.TARGET_OTA);
-        cmd.setParams(Map.of(
-                DeviceMqttConstants.FIELD_OTA_URL, latest.getUrl(),
-                DeviceMqttConstants.FIELD_OTA_VERSION, latest.getVersion(),
-                DeviceMqttConstants.FIELD_OTA_SHA256, latest.getSha256(),
-                DeviceMqttConstants.FIELD_OTA_SIZE, latest.getSize()
-        ));
+
+        Map<String, Object> otaParams = new HashMap<>();
+        otaParams.put(DeviceMqttConstants.FIELD_OTA_URL, latest.getUrl());
+        otaParams.put(DeviceMqttConstants.FIELD_OTA_VERSION, latest.getVersion());
+        otaParams.put(DeviceMqttConstants.FIELD_OTA_SHA256, latest.getSha256());
+        otaParams.put(DeviceMqttConstants.FIELD_OTA_SIZE, latest.getSize());
+        cmd.setParams(otaParams);
+
         cmd.setQos(DeviceCommandConstants.DEFAULT_QOS);
         cmd.setRetain(DeviceCommandConstants.DEFAULT_RETAIN);
         cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
         cmd.setRetryCount(DeviceCommandConstants.DEFAULT_RETRY_COUNT);
         cmd.setMaxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY);
-        cmd.setOperator("user_" + userId); // 标记是用户端发起的
+        cmd.setOperator("user_" + userId);
         cmd.setSource(DeviceCommandConstants.SOURCE_WEB);
-        cmd.setExpireTime(now.plusMinutes(DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS));
+        cmd.setExpireTime(now.plusSeconds(DeviceCommandConstants.OTA_EXPIRE_SECONDS));
         cmd.setCreateTime(now);
         cmd.setUpdateTime(now);
 
         commandService.save(cmd);
 
-        // 5. 立即通过 MQTT 下发
-        try {
-            commandSender.send(cmd);
-            commandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
-            commandService.incrementRetryCount(cmd.getId());
-            log.info("用户端 OTA 指令下发成功 - userId: {}, deviceId: {}, commandId: {}", userId, deviceId, cmd.getCommandId());
-        } catch (Exception e) {
-            log.error("用户端 OTA 指令下发失败 - commandId: {}", cmd.getCommandId(), e);
-        }
+        // 5. 事务提交后再发 MQTT
+        TransactionUtils.afterCommit(() -> {
+            try {
+                commandSender.send(cmd);
+                commandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
+                commandService.incrementRetryCount(cmd.getId());
+                log.info("用户端 OTA 指令下发成功 - userId: {}, deviceId: {}, commandId: {}", userId, deviceId, cmd.getCommandId());
+            } catch (Exception e) {
+                log.error("用户端 OTA 指令下发失败，等待定时任务兜底 - commandId: {}", cmd.getCommandId(), e);
+            }
+        });
     }
 
     /**
@@ -155,10 +157,23 @@ public class UserOtaServiceImpl implements UserOtaService {
                 new LambdaQueryWrapper<DeviceBinding>()
                         .eq(DeviceBinding::getDeviceId, deviceId)
                         .eq(DeviceBinding::getUserId, userId)
-                        .eq(DeviceBinding::getBindStatus, BindStatus.BOUND)
+                        .eq(DeviceBinding::getBindStatus, BindStatus.BOUND.getCode())
         );
         if (binding == null) {
             throw new BusinessException(ErrorCode.DEVICE_NO_PERMISSION, ErrorCode.DEVICE_NO_PERMISSION.getMessage());
         }
+    }
+
+    /**
+     * 抽取查最新固件方法
+     */
+    private DeviceFirmware getLatestFirmware(String product) {
+        return firmwareService.getOne(
+                new LambdaQueryWrapper<DeviceFirmware>()
+                        .eq(DeviceFirmware::getProduct, product)
+                        .eq(DeviceFirmware::getStatus, EnableStatus.ENABLED.getCode())
+                        .orderByDesc(DeviceFirmware::getCreateTime)
+                        .last("LIMIT 1")
+        );
     }
 }

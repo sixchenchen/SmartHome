@@ -41,7 +41,7 @@ public class MqttPublisher {
     }
 
     /**
-     * 运行时发布（走 1883）
+     * 运行时发布（走 8883）
      */
     public void publish(String topic, Object payload, int qos, boolean retained) {
         doPublish(runtimeOutputChannel, topic, payload, qos, retained, "RUNTIME");
@@ -49,7 +49,7 @@ public class MqttPublisher {
 
     // ==================== 注册：发布 ====================
     /**
-     * 注册响应发布（走 1884）
+     * 注册响应发布（走 8884）
      */
     public void publishProvision(String topic, Object payload, int qos, boolean retained) {
         doPublish(provisionOutputChannel, topic, payload, qos, retained, "PROVISION");

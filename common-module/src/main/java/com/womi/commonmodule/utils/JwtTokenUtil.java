@@ -41,14 +41,14 @@ public class JwtTokenUtil {
 
         // 1. 直接用参数传入的 userId
         if (userId != null) {
-            claims.put("userId", userId);
+            claims.put(UserConstants.USER_ID, userId);
         }
 
         // 2. 提取权限列表
         List<String> authorities = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
-        claims.put("authorities", authorities);
+        claims.put(UserConstants.AUTHORITIES, authorities);
 
         Date now = new Date();
         return Jwts.builder()

@@ -6,7 +6,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.womi.businessmodule.mapper.device.DeviceInfoMapper;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.device.DeviceInfoService;
-import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.DeviceOtaStateConstants;
 import com.womi.commonmodule.enums.DeviceOfflineReason;
 import com.womi.commonmodule.enums.DeviceOnlineStatus;
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -209,18 +207,23 @@ public class DeviceInfoServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateSpecificState(String deviceId, String target, Integer channel, Integer state) {
-        // 1. 组装键名：例如 target="led", channel=1 -> "led_1"
         String key = target;
         if (channel != null && channel > 0) {
             key = target + "_" + channel;
         }
 
-        // 2. 使用 setSql 直接调用 MySQL 的 JSON_SET 函数，实现原子更新，彻底杜绝并发覆盖
-        // 生成的 SQL: current_state = JSON_SET(IFNULL(current_state, '{}'), '$."led_1"', 1)
-        update(new LambdaUpdateWrapper<DeviceInfo>()
-                .setSql("current_state = JSON_SET(IFNULL(current_state, '{}'), '$.\"" + key + "\"', " + state + ")")
-                .set(DeviceInfo::getUpdateTime, LocalDateTime.now())
-                .eq(DeviceInfo::getDeviceId, deviceId));
+        // 1. 正则白名单校验（防注入第一道防线）
+        if (key == null || !key.matches("^[a-zA-Z0-9_]{1,32}$")) {
+            log.warn("非法的设备状态键名，已拦截 - deviceId: {}, key: {}", deviceId, key);
+            throw new IllegalArgumentException("非法的 target 或 channel 组合");
+        }
+
+        // 2. 直接调用 Mapper，Java 层干干净净，不出现任何 SQL 片段
+        int rows = baseMapper.updateSpecificState(deviceId, key, state);
+
+        if (rows == 0) {
+            log.warn("更新设备状态失败，设备可能不存在 - deviceId: {}", deviceId);
+        }
     }
 
     @Override

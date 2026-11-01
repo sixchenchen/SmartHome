@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.womi.businessmodule.model.device.DeviceInfo;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,4 +51,15 @@ public interface DeviceInfoMapper extends BaseMapper<DeviceInfo> {
      * 定向清理 OTA 状态（只清 ota_state/ota_progress）
      */
     int clearOtaStateByDeviceId(@Param("deviceId") String deviceId);
+
+    /**
+     * 定向更新设备状态（利用 MySQL 的 JSON_SET 原子操作）
+     */
+    @Update("UPDATE device_info " +
+            "SET current_state = JSON_SET(IFNULL(current_state, '{}'), CONCAT('$.\"', #{key}, '\"'), #{state}), " +
+            "    update_time = NOW(3) " +
+            "WHERE device_id = #{deviceId}")
+    int updateSpecificState(@Param("deviceId") String deviceId,
+                            @Param("key") String key,
+                            @Param("state") Integer state);
 }

@@ -49,7 +49,7 @@ public class DeviceStateMessageHandler implements MqttMessageHandler {
 
     @Override
     public void handle(String topic, String payload, Integer qos) {
-        try {
+
             String deviceId = extractDeviceId(topic);
             JsonNode json = jsonUtils.parse(payload);
             JsonNode dataNode = json.path(DeviceMqttConstants.FIELD_DATA);
@@ -73,9 +73,5 @@ public class DeviceStateMessageHandler implements MqttMessageHandler {
             pushData.put("channel", channel);
             pushData.put("state", state);
             webSocketPushService.pushDeviceState(deviceId, pushData);
-
-        } catch (Exception e) {
-            log.error("处理设备状态失败 - topic: {}, error: {}", topic, e.getMessage(), e);
-        }
     }
 }

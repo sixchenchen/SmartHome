@@ -38,6 +38,9 @@ public final class UserConstants {
     public static final int TOKEN_BEGIN_INDEX = 7;
     public static final String  AUTHORIZATION_HEAD = "Authorization";
     public static final String BEARER = "Bearer ";
+    public static final String AUTHORITIES = "authorities ";
+    public static final String USER_ID = "userId";
 
 
+    public static final String USER_ROLE_ADMIN = "";
 }

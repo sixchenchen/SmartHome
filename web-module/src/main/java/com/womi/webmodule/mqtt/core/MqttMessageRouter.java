@@ -1,5 +1,6 @@
 package com.womi.webmodule.mqtt.core;
 
+import com.womi.webmodule.service.mqtt.SysDeadLetterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,28 +13,28 @@ import java.util.List;
 public class MqttMessageRouter {
 
     private final List<MqttMessageHandler> handlers;
-    /**
-     * 路由消息到对应的处理器
-     */
-    public void route(String topic, String payload, Integer qos) {
+    private final SysDeadLetterService deadLetterService;
+
+    public boolean route(String topic, String payload, Integer qos) {
+        MqttMessageHandler handler = findHandler(topic);
+        if (handler == null) {
+            log.warn("未找到匹配的处理器 - Topic: {}", topic);
+            return false;
+        }
+
         try {
-            MqttMessageHandler handler = findHandler(topic);
-            if (handler == null) {
-                log.warn("未找到匹配的处理器 - Topic: {}", topic);
-                return;
-            }
             handler.handle(topic, payload, qos);
+            return true; // 处理成功
         } catch (Exception e) {
-            log.error("路由消息失败 - Topic: {}, Error: {}", topic, e.getMessage(), e);
+            // 存入死信表
+            deadLetterService.saveDeadLetter(topic, payload, e);
+            return false; // 处理失败，但异常被吞掉，MQTT 正常 ACK
         }
     }
 
-    /**
-     * 查找匹配的处理器（支持通配符匹配）
-     */
     private MqttMessageHandler findHandler(String topic) {
         for (MqttMessageHandler handler : handlers) {
-            if (handler.supports(topic)) { // 遍历匹配当前处理器
+            if (handler.supports(topic)) {
                 return handler;
             }
         }

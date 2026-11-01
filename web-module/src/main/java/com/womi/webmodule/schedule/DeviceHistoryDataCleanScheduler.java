@@ -27,7 +27,6 @@ public class DeviceHistoryDataCleanScheduler {
     /**
      * 每天凌晨 3 点清理 7 天前的传感器数据
      */
-    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
     @SchedulerLock(name = "CleanScheduler_cleanSensorHistory", lockAtMostFor = "30m")
     @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
     public void cleanSensorHistory() {
@@ -47,7 +46,6 @@ public class DeviceHistoryDataCleanScheduler {
     /**
      * 每天凌晨 3 点清理 3 天前的心跳数据
      */
-    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
     @SchedulerLock(name = "CleanScheduler_cleanHeartbeatHistory", lockAtMostFor = "30m")
     @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
     public void cleanHeartbeatHistory() {
@@ -65,16 +63,16 @@ public class DeviceHistoryDataCleanScheduler {
     }
 
     /**
-     * 每天凌晨 2 点清理 30 天前的历史指令
+     * 每天凌晨 2 点清理 30 天前的历史指令 (注意这里是 2 点)
      */
-    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
-    @SchedulerLock(name = "CleanScheduler_cleanStateHistory", lockAtMostFor = "30m")
-    @Scheduled(cron = ScheduleConstants.CLEAN_HISTORY_CRON)
+    @SchedulerLock(name = "CleanScheduler_cleanCommandHistory", lockAtMostFor = "30m")
+    @Scheduled(cron = ScheduleConstants.CLEAN_HISTORY_CRON) // 使用 2 点的 cron
     public void cleanCommandHistory() {
         try {
+            log.info("开始清理历史指令...");
             int count = deviceCommandService.cleanHistory(ScheduleConstants.CLEAN_RETENTION_DAYS);
             if (count > 0) {
-                log.info("清理历史指令 - 共 {} 条", count);
+                log.info("清理历史指令完成 - 共 {} 条", count);
             }
         } catch (Exception e) {
             log.error("清理历史指令失败", e);
@@ -84,7 +82,8 @@ public class DeviceHistoryDataCleanScheduler {
     /**
      * 每天凌晨 3 点清理 30 天前的设备状态轨迹数据
      */
-    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON)
+    @SchedulerLock(name = "CleanScheduler_cleanStateHistory", lockAtMostFor = "30m")
+    @Scheduled(cron = ScheduleConstants.CLEAN_RECORD_CRON) // 使用 3 点的 cron
     public void cleanStateHistory() {
         try {
             log.info("开始清理过期设备状态轨迹数据...");
