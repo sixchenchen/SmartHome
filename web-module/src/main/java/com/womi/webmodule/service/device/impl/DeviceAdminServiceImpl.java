@@ -1,16 +1,11 @@
 package com.womi.webmodule.service.device.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.womi.businessmodule.dto.DeviceCreateRequest;
-import com.womi.businessmodule.mapper.device.DeviceBindingMapper;
-import com.womi.businessmodule.mapper.device.DeviceInfoMapper;
-import com.womi.businessmodule.mapper.device.DeviceMqttAuthMapper;
-import com.womi.businessmodule.mapper.device.DeviceWhitelistMapper;
-import com.womi.businessmodule.model.device.DeviceBinding;
-import com.womi.businessmodule.model.device.DeviceInfo;
-import com.womi.businessmodule.model.device.DeviceMqttAuth;
-import com.womi.businessmodule.model.device.DeviceWhitelist;
+import com.womi.businessmodule.mapper.device.*;
+import com.womi.businessmodule.model.device.*;
 import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.RegexConstants;
@@ -28,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Slf4j
@@ -40,7 +36,14 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
     private final DeviceMqttAuthMapper deviceMqttAuthMapper;
     private final DeviceBindingMapper deviceBindingMapper;
     private final StringRedisTemplate redisTemplate;
-
+    private final DeviceSensorMapper deviceSensorMapper;
+    private final DeviceSensorThresholdMapper deviceSensorThresholdMapper;
+    private final DeviceSlaveDataMapper deviceSlaveDataMapper;
+    private final DeviceCommandMapper deviceCommandMapper;
+    private final DeviceSensorRecordMapper deviceSensorRecordMapper;
+    private final DeviceEventRecordMapper deviceEventRecordMapper;
+    private final DeviceHeartbeatRecordMapper deviceHeartbeatRecordMapper;
+    private final DeviceStateRecordMapper deviceStateRecordMapper;
     @Override
     public Page<DeviceInfo> pageDevices(Integer pageNum, Integer pageSize, String keyword) {
         Page<DeviceInfo> page = new Page<>(pageNum, pageSize);
@@ -132,37 +135,79 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteDevice(Long id) {
-        DeviceInfo device = deviceInfoMapper.selectById(id);
+        DeviceInfo device = deviceInfoMapper.selectById(id); // MP 自动加 deleted=0
         if (device == null) {
-            return; // 设备不存在直接返回
+            return;
         }
         String mac = device.getDeviceId();
 
-        // 1. 删除 device_info
-        deviceInfoMapper.deleteById(id);
+        // ============================================================
+        // 第 1 组：释放唯一索引占用（必须，否则同 MAC 重新注册必冲突）
+        // ============================================================
 
-        // 2. 删除 device_whitelist (防止设备死灰复燃)
-        deviceWhitelistMapper.delete(
-                new LambdaQueryWrapper<DeviceWhitelist>().eq(DeviceWhitelist::getDeviceId, mac)
-        );
+        // 1.1 解绑（软解绑，保留绑定历史；同时释放 active_device_id 生成列唯一索引）
+        deviceBindingMapper.update(null, new LambdaUpdateWrapper<DeviceBinding>()
+                .eq(DeviceBinding::getDeviceId, mac)
+                .eq(DeviceBinding::getBindStatus, 1)
+                .set(DeviceBinding::getBindStatus, 0)
+                .set(DeviceBinding::getUnbindTime, LocalDateTime.now()));
 
-        // 3. 删除 device_mqtt_auth (废弃该设备的 MQTT 账号，防止继续连接)
-        deviceMqttAuthMapper.delete(
-                new LambdaQueryWrapper<DeviceMqttAuth>().eq(DeviceMqttAuth::getDeviceId, mac)
-        );
+        // 1.2 物理删除 MQTT 账号（uk_device_id 唯一索引会卡重注册）
+        deviceMqttAuthMapper.delete(new LambdaQueryWrapper<DeviceMqttAuth>()
+                .eq(DeviceMqttAuth::getDeviceId, mac));
 
-        // 4. 删除 device_binding (强制解除用户与该设备的绑定关系)
-        deviceBindingMapper.delete(
-                new LambdaQueryWrapper<DeviceBinding>().eq(DeviceBinding::getDeviceId, mac)
-        );
-        // 5. 清理 Redis 缓存
+        // 1.3 物理删除白名单（防止死灰复燃，同时释放 uk_device_id）
+        //     注意：删掉后同一 MAC 将无法再注册，若需支持换机重注册，改为 enabled=0
+        deviceWhitelistMapper.delete(new LambdaQueryWrapper<DeviceWhitelist>()
+                .eq(DeviceWhitelist::getDeviceId, mac));
+
+        // 1.4 物理删除传感器元数据和阈值配置（释放 uk_device_sensor_key）
+        //     若需要保留配置，需给这两张表加 deleted 字段并改复合唯一索引
+        deviceSensorMapper.delete(new LambdaQueryWrapper<DeviceSensor>()
+                .eq(DeviceSensor::getDeviceId, mac));
+        deviceSensorThresholdMapper.delete(new LambdaQueryWrapper<DeviceSensorThreshold>()
+                .eq(DeviceSensorThreshold::getDeviceId, mac));
+
+        // ============================================================
+        // 第 2 组：清理运行时/时序数据（防止孤儿数据）
+        //   按业务需要可选择性保留：如果要保留审计历史，注释掉对应行即可
+        // ============================================================
+
+        // 2.1 从机在线数据（表注释说"离线即删除"，设备删了必须清）
+        deviceSlaveDataMapper.delete(new LambdaQueryWrapper<DeviceSlaveData>()
+                .eq(DeviceSlaveData::getDeviceId, mac));
+
+        // 2.2 指令记录（临时性数据，清掉；如需审计可注释）
+        deviceCommandMapper.delete(new LambdaQueryWrapper<DeviceCommand>()
+                .eq(DeviceCommand::getDeviceId, mac));
+
+        // 2.3 传感器历史数据（量大，设备删了业务上无查询意义，清掉）
+        deviceSensorRecordMapper.delete(new LambdaQueryWrapper<DeviceSensorRecord>()
+                .eq(DeviceSensorRecord::getDeviceId, mac));
+
+        // 2.4 事件 / 心跳 / 状态时序（同上，按需保留）
+        deviceEventRecordMapper.delete(new LambdaQueryWrapper<DeviceEventRecord>()
+                .eq(DeviceEventRecord::getDeviceId, mac));
+        deviceHeartbeatRecordMapper.delete(new LambdaQueryWrapper<DeviceHeartbeatRecord>()
+                .eq(DeviceHeartbeatRecord::getDeviceId, mac));
+        deviceStateRecordMapper.delete(new LambdaQueryWrapper<DeviceStateRecord>()
+                .eq(DeviceStateRecord::getDeviceId, mac));
+
+        // ============================================================
+        // 第 3 组：软删除设备主记录（最后执行）
+        // ============================================================
+        deviceInfoMapper.deleteById(id);   // MP 自动 UPDATE deleted=id
+
+        // ============================================================
+        // 第 4 组：Redis 缓存清理（放最后，异常不影响事务）
+        // ============================================================
         try {
             redisTemplate.opsForSet().remove(RedisConstants.BOUND_DEVICES_KEY, mac);
             log.info("已清理设备 Redis 绑定缓存 - deviceId={}", mac);
         } catch (Exception e) {
-            // 注意：Redis 清理失败不应该影响数据库事务的回滚
             log.error("清理设备 Redis 绑定缓存失败 - deviceId={}", mac, e);
         }
-        log.info("管理员删除设备及关联数据成功: deviceId={}", mac);
+
+        log.info("管理员删除设备及关联数据成功: deviceId={}, id={}", mac, id);
     }
 }

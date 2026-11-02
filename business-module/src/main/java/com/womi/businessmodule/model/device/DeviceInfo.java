@@ -82,4 +82,7 @@ public class DeviceInfo {
 
     @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
+
+    @TableLogic(value = "0", delval = "id")
+    private Long deleted;
 }

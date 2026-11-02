@@ -3,13 +3,16 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.womi.businessmodule.mapper.device.DeviceInfoMapper">
 
+    <!-- 查询心跳超时的设备 -->
     <select id="selectHeartbeatTimeoutDevices" resultType="com.womi.businessmodule.model.device.DeviceInfo">
         SELECT *
         FROM device_info
         WHERE online = 1
+          AND deleted = 0
           AND last_heartbeat_time &lt; #{threshold}
     </select>
 
+    <!-- 心跳超时判定离线 -->
     <update id="markOfflineIfTimeout">
         UPDATE device_info
         SET online            = 0,
@@ -18,10 +21,12 @@
             update_time       = NOW(3)
         WHERE device_id = #{deviceId}
           AND online = 1
+          AND deleted = 0
           AND (last_heartbeat_time = #{lastHeartbeatTime}
             OR (last_heartbeat_time IS NULL AND #{lastHeartbeatTime} IS NULL))
     </update>
 
+    <!-- 更新心跳  -->
     <update id="updateHeartbeatByDeviceId">
         UPDATE device_info
         SET uptime              = #{uptime},
@@ -31,8 +36,10 @@
             offline_reason      = NULL,
             update_time         = NOW(3)
         WHERE device_id = #{deviceId}
+          AND deleted = 0
     </update>
 
+    <!-- 主动下线（如LWT） -->
     <update id="markOfflineByDeviceId">
         UPDATE device_info
         SET online            = 0,
@@ -41,26 +48,32 @@
             update_time       = NOW(3)
         WHERE device_id = #{deviceId}
           AND online = 1
+          AND deleted = 0
     </update>
 
+    <!-- 更新 OTA 状态 -->
     <update id="updateOtaStateByDeviceId">
         UPDATE device_info
         SET ota_state       = #{state},
-            ota_update_time = NOW(3),
-            update_time     = NOW(3)
+        ota_update_time = NOW(3),
+        update_time     = NOW(3)
         <if test="progress != null">, ota_progress = #{progress}</if>
         <if test="version != null">, ota_version = #{version}</if>
         WHERE device_id = #{deviceId}
+        AND deleted = 0
     </update>
 
+    <!-- 更新固件版本 -->
     <update id="updateFirmwareByDeviceId">
         UPDATE device_info
         SET firmware    = #{firmware},
             update_time = NOW(3)
         WHERE device_id = #{deviceId}
+          AND deleted = 0
           AND (firmware &lt;&gt; #{firmware} OR firmware IS NULL)
     </update>
 
+    <!-- 清理 OTA 状态 -->
     <update id="clearOtaStateByDeviceId">
         UPDATE device_info
         SET ota_state       = NULL,
@@ -68,5 +81,16 @@
             ota_update_time = NOW(3),
             update_time     = NOW(3)
         WHERE device_id = #{deviceId}
+          AND deleted = 0
     </update>
+
+    <!-- 定向更新设备状态 -->
+    <update id="updateSpecificState">
+        UPDATE device_info
+        SET current_state = JSON_SET(IFNULL(current_state, '{}'), CONCAT('$."', #{key}, '"'), #{state}),
+            update_time = NOW(3)
+        WHERE device_id = #{deviceId}
+          AND deleted = 0
+    </update>
+
 </mapper>

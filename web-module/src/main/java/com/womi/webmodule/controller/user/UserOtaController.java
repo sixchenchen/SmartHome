@@ -5,6 +5,7 @@ import com.womi.commonmodule.response.ApiResponse;
 import com.womi.webmodule.security.SecurityUser;
 import com.womi.webmodule.service.mqtt.UserOtaService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,19 +17,11 @@ public class UserOtaController {
     private final UserOtaService userOtaService;
 
     /**
-     * 获取当前登录用户的 ID
-     */
-    private Long getCurrentUserId() {
-        SecurityUser user = (SecurityUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return user.sysUser().getId();
-    }
-
-    /**
      * 检查设备是否有新版本
      */
     @GetMapping("/check/{deviceId}")
-    public ApiResponse<OtaCheckResponse> checkUpdate(@PathVariable String deviceId) {
-        OtaCheckResponse resp = userOtaService.checkUpdate(getCurrentUserId(), deviceId);
+    public ApiResponse<OtaCheckResponse> checkUpdate(@AuthenticationPrincipal SecurityUser securityUser, @PathVariable String deviceId) {
+        OtaCheckResponse resp = userOtaService.checkUpdate(securityUser.sysUser().getId(), deviceId);
         return ApiResponse.success(resp);
     }
 
@@ -36,8 +29,8 @@ public class UserOtaController {
      * 用户主动发起单设备升级
      */
     @PostMapping("/start/{deviceId}")
-    public ApiResponse<Void> startOta(@PathVariable String deviceId) {
-        userOtaService.startOta(getCurrentUserId(), deviceId);
+    public ApiResponse<Void> startOta(@AuthenticationPrincipal SecurityUser securityUser,@PathVariable String deviceId) {
+        userOtaService.startOta(securityUser.sysUser().getId(), deviceId);
         return ApiResponse.success(null);
     }
 }

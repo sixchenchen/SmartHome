@@ -46,6 +46,7 @@ public class DeviceInfoServiceImpl
     public DeviceInfo getByDeviceId(String deviceId) {
         return getOne(new LambdaQueryWrapper<DeviceInfo>()
                 .eq(DeviceInfo::getDeviceId, deviceId)
+                .eq(DeviceInfo::getDeleted, 0)
                 .last("LIMIT 1"));
     }
 

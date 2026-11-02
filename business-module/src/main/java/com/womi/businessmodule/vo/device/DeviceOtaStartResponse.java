@@ -1,4 +1,4 @@
-package com.womi.businessmodule.vo;
+package com.womi.businessmodule.vo.device;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

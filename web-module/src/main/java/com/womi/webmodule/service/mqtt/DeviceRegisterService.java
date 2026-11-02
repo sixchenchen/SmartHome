@@ -2,7 +2,7 @@ package com.womi.webmodule.service.mqtt;
 
 
 import com.womi.businessmodule.dto.DeviceRegisterRequest;
-import com.womi.businessmodule.vo.DeviceRegisterResponse;
+import com.womi.businessmodule.vo.device.DeviceRegisterResponse;
 
 public interface DeviceRegisterService {
 

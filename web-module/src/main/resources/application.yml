@@ -52,8 +52,8 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
-      logic-delete-field: deleted
-      logic-delete-value: 1
+      logic-delete-field: deleted   # 实体字段名
+      logic-delete-value: 1         # 全局默认，可被 @TableLogic 覆盖
       logic-not-delete-value: 0
   configuration:
     map-underscore-to-camel-case: true

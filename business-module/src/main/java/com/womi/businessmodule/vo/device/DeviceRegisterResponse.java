@@ -1,4 +1,4 @@
-package com.womi.businessmodule.vo;
+package com.womi.businessmodule.vo.device;
 
 
 import com.womi.commonmodule.enums.MqttErrorCode;

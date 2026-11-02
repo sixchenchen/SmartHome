@@ -2,8 +2,8 @@ package com.womi.webmodule.service.mqtt;
 
 
 import com.womi.businessmodule.dto.SendCommandRequest;
-import com.womi.businessmodule.vo.DeviceOtaProgressVO;
-import com.womi.businessmodule.vo.DeviceOtaStartResponse;
+import com.womi.businessmodule.vo.device.DeviceOtaProgressVO;
+import com.womi.businessmodule.vo.device.DeviceOtaStartResponse;
 
 public interface DeviceOtaService {
 

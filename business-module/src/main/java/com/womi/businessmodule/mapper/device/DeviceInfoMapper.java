@@ -55,10 +55,6 @@ public interface DeviceInfoMapper extends BaseMapper<DeviceInfo> {
     /**
      * 定向更新设备状态（利用 MySQL 的 JSON_SET 原子操作）
      */
-    @Update("UPDATE device_info " +
-            "SET current_state = JSON_SET(IFNULL(current_state, '{}'), CONCAT('$.\"', #{key}, '\"'), #{state}), " +
-            "    update_time = NOW(3) " +
-            "WHERE device_id = #{deviceId}")
     int updateSpecificState(@Param("deviceId") String deviceId,
                             @Param("key") String key,
                             @Param("state") Integer state);

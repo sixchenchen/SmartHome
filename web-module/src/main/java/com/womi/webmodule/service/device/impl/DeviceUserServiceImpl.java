@@ -11,6 +11,7 @@ import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
+import com.womi.businessmodule.vo.device.DeviceInfoVO;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.ScheduleConstants;
@@ -24,6 +25,7 @@ import com.womi.commonmodule.utils.TransactionUtils;
 import com.womi.webmodule.service.device.DeviceUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -116,26 +118,46 @@ public class DeviceUserServiceImpl implements DeviceUserService {
     }
 
     @Override
-    public Page<DeviceInfo> getMyDevices(Long userId, Integer pageNum, Integer pageSize) {
+    public Page<DeviceInfoVO> getMyDevices(Long userId, Integer pageNum, Integer pageSize) {
         // 1. 先查出该用户绑定的所有 deviceId
         List<DeviceBinding> bindings = deviceBindingMapper.selectList(
                 new LambdaQueryWrapper<DeviceBinding>()
                         .eq(DeviceBinding::getUserId, userId)
                         .eq(DeviceBinding::getBindStatus, BindStatus.BOUND.getCode()));
 
-        Page<DeviceInfo> page = new Page<>(pageNum, pageSize);
+        // 2. 构造目标分页对象
+        Page<DeviceInfoVO> voPage = new Page<>(pageNum, pageSize);
 
         if (bindings.isEmpty()) {
-            return page; // 返回空分页
+            return voPage; // 直接返回空分页，无需后续查询
         }
 
         List<String> deviceIds = bindings.stream()
                 .map(DeviceBinding::getDeviceId)
                 .collect(Collectors.toList());
 
-        // 2. 根据 deviceId 集合查询设备详情并分页
-        return deviceInfoMapper.selectPage(page,
-                new LambdaQueryWrapper<DeviceInfo>().in(DeviceInfo::getDeviceId, deviceIds));
+        // 3. 查询数据库实体分页
+        Page<DeviceInfo> entityPage = deviceInfoMapper.selectPage(
+                new Page<>(pageNum, pageSize),
+                new LambdaQueryWrapper<DeviceInfo>().in(DeviceInfo::getDeviceId, deviceIds)
+        );
+
+        // 4. 将 Entity 分页数据转换为 VO 分页数据
+        // 复制分页参数（total, current, size, pages 等元数据）
+        voPage.setTotal(entityPage.getTotal());
+        voPage.setPages(entityPage.getPages());
+
+        // 转换 records 列表
+        List<DeviceInfoVO> voList = entityPage.getRecords().stream().map(entity -> {
+            DeviceInfoVO vo = new DeviceInfoVO();
+            // 使用 Spring 自带的工具类拷贝同名属性，忽略 VO 中不存在的敏感字段
+            BeanUtils.copyProperties(entity, vo);
+            return vo;
+        }).collect(Collectors.toList());
+
+        voPage.setRecords(voList);
+
+        return voPage;
     }
 
     @Override
@@ -143,14 +165,20 @@ public class DeviceUserServiceImpl implements DeviceUserService {
     public void sendControlCommand(Long userId, DeviceControlRequest request) {
         String cleanMac = MacUtils.normalize(request.getDeviceId());
 
-        // ==================== 场景 1：校验绑定关系（防越权） ====================
-        DeviceInfo device = deviceInfoMapper.selectOne(
-                new LambdaQueryWrapper<DeviceInfo>().eq(DeviceInfo::getDeviceId, cleanMac));
+        // ==================== 1：校验设备是否存在（防报错） ====================
+        List<DeviceInfo> devices = deviceInfoMapper.selectList(
+                new LambdaQueryWrapper<DeviceInfo>()
+                        .eq(DeviceInfo::getDeviceId, cleanMac)
+                        .eq(DeviceInfo::getDeleted, 0) // 强制查未删除的
+                        .last("LIMIT 1") // 只取一条
+        );
 
-        if (device == null) {
-            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, ErrorCode.DEVICE_NOT_FOUND.getMessage());
+        if (devices.isEmpty()) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND, "设备不存在或已被删除");
         }
+        DeviceInfo device = devices.get(0);
 
+        // ==================== 场景 2：校验绑定关系（防越权） ====================
         DeviceBinding binding = deviceBindingMapper.selectOne(
                 new LambdaQueryWrapper<DeviceBinding>()
                         .eq(DeviceBinding::getActiveDeviceId, cleanMac)
@@ -160,12 +188,13 @@ public class DeviceUserServiceImpl implements DeviceUserService {
             throw new BusinessException(ErrorCode.DEVICE_NO_PERMISSION, "您未绑定该设备，无权操作");
         }
 
-        // ==================== 场景 4：校验在线状态 ====================
+        // ==================== 场景 3：校验在线状态 ====================
         if (!Integer.valueOf(DeviceOnlineStatus.ONLINE.getCode()).equals(device.getOnline())) {
             throw new BusinessException(ErrorCode.DEVICE_OFFLINE, "设备当前离线，请检查电源后重试");
         }
+
         // ==================== 场景 4：校验真实在线状态（防 LWT 延迟黑洞） ====================
-        int timeoutSeconds = ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS; // 假设你是 90 秒或 60 秒
+        int timeoutSeconds = ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS;
         if (!deviceInfoService.isDeviceActuallyOnline(device, timeoutSeconds)) {
             throw new BusinessException(ErrorCode.DEVICE_NETWORK_ERROR, "设备已离线或网络异常，请检查电源后重试");
         }
@@ -179,14 +208,14 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         cmd.setTarget(request.getTarget());
         cmd.setChannel(request.getChannel());
         cmd.setParams(request.getParams());
-        cmd.setQos(DeviceCommandConstants.DEFAULT_QOS); // 控制指令建议 QoS 1
+        cmd.setQos(DeviceCommandConstants.DEFAULT_QOS);
         cmd.setRetain(DeviceCommandConstants.DEFAULT_RETAIN);
         cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
         cmd.setRetryCount(DeviceCommandConstants.DEFAULT_RETRY_COUNT);
         cmd.setMaxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY);
         cmd.setOperator("user_" + userId);
         cmd.setSource(DeviceCommandConstants.SOURCE_WEB);
-        cmd.setExpireTime(now.plusSeconds(DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS)); // 控制指令过期时间设短一点，30秒
+        cmd.setExpireTime(now.plusSeconds(DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS));
         cmd.setCreateTime(now);
         cmd.setUpdateTime(now);
 
@@ -200,7 +229,6 @@ public class DeviceUserServiceImpl implements DeviceUserService {
                 deviceCommandService.incrementRetryCount(cmd.getId());
                 log.info("用户控制指令下发成功 - userId: {}, deviceId: {}, commandId: {}", userId, cleanMac, cmd.getCommandId());
             } catch (Exception e) {
-                // 因为事务已经提交，这里无法回滚，只能记录日志让定时任务重试
                 log.error("用户控制指令下发失败，等待定时任务兜底 - commandId: {}", cmd.getCommandId(), e);
             }
         });

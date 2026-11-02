@@ -16,7 +16,7 @@ import com.womi.commonmodule.utils.SignatureVerifierUtils;
 import com.womi.commonmodule.utils.TimestampValidatorUtils;
 import com.womi.businessmodule.model.mqtt.MqttCredential;
 import com.womi.businessmodule.dto.DeviceRegisterRequest;
-import com.womi.businessmodule.vo.DeviceRegisterResponse;
+import com.womi.businessmodule.vo.device.DeviceRegisterResponse;
 import com.womi.webmodule.mqtt.core.MqttCredentialGenerator;
 import com.womi.commonmodule.properties.MqttProperties;
 import com.womi.webmodule.service.mqtt.DeviceRegisterService;
@@ -26,8 +26,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
