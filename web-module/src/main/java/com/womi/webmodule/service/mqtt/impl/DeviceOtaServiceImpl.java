@@ -104,9 +104,27 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         DeviceOtaProgressVO vo = new DeviceOtaProgressVO();
         vo.setDeviceId(device.getDeviceId());
         vo.setOtaState(device.getOtaState());
+        vo.setOtaStateText(DeviceOtaStateUtils.textOf(device.getOtaState()));
         vo.setOtaProgress(device.getOtaProgress());
         vo.setOtaVersion(device.getOtaVersion());
-        vo.setUpdateTime(device.getUpdateTime());
+        vo.setOtaUpdateTime(device.getOtaUpdateTime());
+        vo.setRunning(DeviceOtaStateUtils.isRunning(device.getOtaState()));
+        vo.setFinished(DeviceOtaStateUtils.isFinal(device.getOtaState()));
+        vo.setServerTime(LocalDateTime.now());
+
+        // 关联最近一次 OTA 指令：commandId / 指令状态 / 失败原因
+        DeviceCommand latest = deviceCommandService.getOne(new LambdaQueryWrapper<DeviceCommand>()
+                .eq(DeviceCommand::getDeviceId, deviceId)
+                .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
+                .orderByDesc(DeviceCommand::getCreateTime)
+                .last("LIMIT 1"));
+        if (latest != null) {
+            vo.setCommandId(latest.getCommandId());
+            vo.setCommandStatus(latest.getStatus());
+            DeviceCommandStatus status = DeviceCommandStatus.fromCode(latest.getStatus());
+            vo.setCommandStatusText(status == null ? null : status.getMessage());
+            vo.setErrorMsg(latest.getErrorMsg());
+        }
         return vo;
     }
 

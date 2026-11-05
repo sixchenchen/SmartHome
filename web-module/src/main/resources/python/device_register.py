@@ -23,7 +23,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 import paho.mqtt.client as mqtt
 
 # ==================== 配置 ====================
-MQTT_HOST = "192.168.1.15"
+MQTT_HOST = "127.0.0.1"
 PROVISION_PORT = 8884        # 注册端口
 RUNTIME_PORT = 8883          # 业务端口
 

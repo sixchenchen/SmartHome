@@ -21,6 +21,7 @@
 8. [本轮新增接口详情（已实现）](#8-本轮新增接口详情-全部已实现)
 9. [前端对接风险与待确认项](#9-前端对接风险与待确认项)
 10. [联调检查清单](#10-联调检查清单)
+11. [OTA 升级全流程与实时进度（前端必读）](#11-ota-升级全流程与实时进度前端必读)
 
 ---
 
@@ -570,6 +571,8 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 
 **错误码**：4200、4210（未绑定）、4104（固件文件缺失）、4302（版本不兼容）
 
+> 完整的升级流程、状态机与实时数据处理见 [第 11 章](#11-ota-升级全流程与实时进度前端必读)。
+
 ---
 
 ### 5.10 发起单设备升级 ✅
@@ -583,6 +586,10 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 > 进度获取方式（本轮已补齐，二选一）：
 > 1. 轮询 `GET /api/user/ota/progress/{deviceId}`（见 8.5）；
 > 2. 订阅 WebSocket `/topic/device/{deviceId}/ota`（`type = ota_progress`，见 6.8）。
+>
+> ⚠️ 该接口**不返回 commandId**。前端应**先订阅 WebSocket，再调用 start**；首个 `ota_progress` 或
+> `GET /progress` 返回中的 `commandId` 即本次升级的指令 ID，用它匹配推送与升级记录。
+> 详细时序见 [11.3](#113-触发升级推荐时序)。
 
 ---
 
@@ -765,7 +772,7 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 | 连接鉴权 | `CONNECT` 帧校验 `Authorization` | 见 6.5 |
 | 订阅鉴权 | 仅对 `/topic/device/**` 做 "用户是否绑定该设备" 校验 | 见 6.7 |
 | 心跳 | 未显式配置，使用 Spring 默认 | 客户端仍要配 `heartbeatIncoming/Outgoing` 保活 |
-| 推送点 | 只有 3 处：外设状态、传感器数据、告警 | **OTA 进度与上下线不推送**（见 6.8 的更正说明） |
+| 推送点 | 外设状态、传感器、告警、OTA 进度、控制指令结果 | 上下线**仍不推送**，需轮询；OTA 进度见 6.8 与第 11 章 |
 
 ### 6.2 地址推导
 
@@ -1078,27 +1085,65 @@ ws.subscribeDevice('B4BFE90CDBA1');
 
 > 告警查询与确认接口已补齐：`GET /api/user/alerts`、`POST /api/user/alerts/{id}/ack`（见 8.4）；管理端处理见 `/api/admin/alerts/{id}/status`。收到推送后前端应刷新或合并列表。
 
-#### `ota_progress` —— OTA 进度（topic `/ota`，本轮新增）
+#### `ota_progress` —— OTA 实时进度（topic `/ota`）
+
+设备每进入一个升级阶段或进度有明显变化时上报，后端落库后立即转发给订阅者。
+**同一设备一次升级期间会收到多条**，`data` 始终是"最新快照"。
 
 `data` 字段：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | otaState | string | `accepted/downloading/verifying/flashing/rebooting/success/failed` |
-| progress | number | 0~100 |
+| otaStateText | string | 阶段中文文案（后端已转好，可直接展示） |
+| progress | number | 0~100（后端已夹紧；`success` 强制为 `100`） |
 | version | string | 目标版本号 |
-| commandId | string | 关联指令 ID（可能为 `null`） |
+| commandId | string \| null | 关联 OTA 指令 ID；设备未上报时后端会回填最近活跃指令 |
+| error | string \| null | 失败原因（仅 `failed` 时通常有值，来自设备 `data.error` / `message`） |
+| reportTime | string \| null | 设备上报时间（ISO-8601，来自报文顶层 `timestamp`）；为 `null` 时说明设备未带时间 |
+
+> 外层信封的 `timestamp` 是**服务端推送时间**，`data.reportTime` 是**设备发生时间**，两者可用于判断
+> "设备是否长时间没上报"。前端排序/去重请优先使用 `data.reportTime`。
+> 完整状态机与处理建议见 [第 11 章](#11-ota-升级全流程与实时进度前端必读)。
 
 ```json
 {
   "type": "ota_progress",
   "deviceId": "B4BFE90CDBA1",
-  "timestamp": "2026-11-05T10:30:00",
-  "data": { "otaState": "downloading", "progress": 45, "version": "1.0.30", "commandId": "abc123" }
+  "timestamp": "2026-11-05T10:30:12",
+  "data": {
+    "otaState": "downloading",
+    "otaStateText": "下载中",
+    "progress": 45,
+    "version": "1.0.30",
+    "commandId": "b624660c30e546efb7808b746453c4d6",
+    "error": null,
+    "reportTime": "2026-11-05T10:30:10"
+  }
 }
 ```
 
-> 断线期间可能丢失进度，可用 `GET /api/user/ota/progress/{deviceId}` 轮询兜底。
+失败示例：
+
+```json
+{
+  "type": "ota_progress",
+  "deviceId": "B4BFE90CDBA1",
+  "timestamp": "2026-11-05T10:31:05",
+  "data": {
+    "otaState": "failed",
+    "otaStateText": "升级失败",
+    "progress": 92,
+    "version": "1.0.30",
+    "commandId": "b624660c30e546efb7808b746453c4d6",
+    "error": "固件校验失败（sha256 不匹配）",
+    "reportTime": "2026-11-05T10:31:03"
+  }
+}
+```
+
+> 断线期间可能丢失进度：重连后先用 `GET /api/user/ota/progress/{deviceId}` 拉一次快照，再继续接收推送。
+> 当收到 `success` / `failed` 后可停止轮询。
 
 #### `command_result` —— 控制指令执行结果（topic `/command`，本轮新增）
 
@@ -1253,17 +1298,18 @@ ws.subscribeDevice('B4BFE90CDBA1');
 
 ### 7.3 OTA 阶段状态（`otaState`，字符串）✅
 
-| 值 | 含义 |
-|----|------|
-| `accepted` | 已受理 |
-| `downloading` | 下载中 |
-| `verifying` | 校验中 |
-| `flashing` | 刷写中 |
-| `rebooting` | 重启中 |
-| `success` | 成功 |
-| `failed` | 失败 |
+| 值 | 中文 | 典型进度区间 | 终态 |
+|----|------|-------------|------|
+| `accepted` | 已接受 | 0~5 | 否 |
+| `downloading` | 下载中 | 5~80 | 否 |
+| `verifying` | 校验中 | 80~90 | 否 |
+| `flashing` | 写入中 | 90~98 | 否 |
+| `rebooting` | 重启中 | 98~99 | 否 |
+| `success` | 升级成功 | 100（后端强制） | 是 |
+| `failed` | 升级失败 | 任意 | 是 |
 
 > 进行中：`accepted/downloading/verifying/flashing/rebooting`；终态：`success/failed`。
+> 状态码统一小写，设备上报大写时后端会自动归一化。中文文案也随推送返回（`otaStateText`）。
 
 ### 7.4 固件状态（`FirmwareVO.status`）⚠️
 
@@ -1464,11 +1510,31 @@ ws.subscribeDevice('B4BFE90CDBA1');
 | ✅ `GET /api/user/ota/records?deviceId=&pageNum=&pageSize=` | 升级历史（`OtaRecordVO`） |
 | ✅ `POST /api/user/ota/retry/{deviceId}` | 失败重试 |
 
-**`DeviceOtaProgressVO`**：`deviceId`、`otaState`、`otaProgress`、`otaVersion`、`updateTime`。
+**`DeviceOtaProgressVO`**（`GET /api/user/ota/progress/{deviceId}` 的 `data`）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| deviceId | string | 设备 MAC |
+| otaState | string \| null | OTA 阶段（`accepted/.../failed`），无升级记录时为 `null` |
+| otaStateText | string \| null | 阶段中文文案 |
+| otaProgress | number \| null | 0~100 |
+| otaVersion | string \| null | 目标版本号 |
+| commandId | string \| null | 最近一次 OTA 指令 ID |
+| commandStatus | number \| null | 指令状态（见 7.2） |
+| commandStatusText | string \| null | 指令状态文案 |
+| errorMsg | string \| null | 失败原因（来自 OTA 指令） |
+| otaUpdateTime | string \| null | OTA 状态最后更新时间 |
+| running | boolean | 是否升级进行中 |
+| finished | boolean | 是否已到终态（成功/失败） |
+| serverTime | string | 服务端当前时间，用于计算数据新鲜度 |
+
+> 轮询建议：`running=true` 时每 1~2 秒拉一次；收到 `finished=true` 后停止。
+> WebSocket 断线重连后先调用本接口补齐快照，再继续接收 `ota_progress`。
 
 **`OtaRecordVO`**：`id`、`commandId`、`deviceId`、`version`、`status`(number)、`statusText`、`otaState`、`progress`、`errorMsg`、`createTime`、`sendTime`、`ackTime`。
 
 > `records` 的 `deviceId` 为**必填**（不传返回参数错误）；记录按创建时间倒序，只返回 `target=ota` 的指令。
+> `otaState` / `progress` 仅在记录版本等于设备当前 `otaVersion` 时填充（即"最近一次升级"）。
 
 重试规则：仅当该设备最近一条 OTA 指令处于 `FAILED(3) / TIMEOUT(4) / CANCELLED(5)` 时才允许重试；否则返回业务异常（避免重复升级）。
 
@@ -1682,6 +1748,145 @@ ws.subscribeDevice('B4BFE90CDBA1');
 - [ ] 设备导出使用 blob 下载（非 JSON）
 - [ ] OTA 上传限制 `.bin` + 大小校验
 - [ ] 分页统一 `pageNum/pageSize`，读 `records/total`
+
+---
+
+## 11. OTA 升级全流程与实时进度（前端必读）
+
+### 11.1 数据流总览
+
+```
+前端                后端                      设备
+ │  POST /start ──────▶ 写 device_command ──▶ MQTT device/{mac}/command (target=ota)
+ │                                                │
+ │                                                ├─▶ device/{mac}/ack {success:true, data:{toVersion:...}}
+ │                                                │      └─▶ 指令状态 SENT → ACCEPTED（推送 command_result）
+ │                                                │
+ │                                                ├─▶ device/{mac}/ota_progress（多次）
+ │                                                │      └─▶ 更新 device_info.ota_state/ota_progress/ota_version
+ │                                                │      └─▶ 推进指令状态（ACCEPTED/SUCCESS/FAILED）
+ │ ◀── WS /topic/device/{mac}/ota (ota_progress) ─┘      └─▶ 推送前端
+ │
+ │  GET /api/user/ota/progress/{deviceId} ─▶ device_info + 最近指令快照（轮询兜底）
+```
+
+后端职责：
+- 设备上报的每个阶段都会**落库**（`device_info.ota_state / ota_progress / ota_version / ota_update_time`）；
+- 同一条数据**立即**通过 WebSocket 转发，前端无需等到轮询；
+- 设备未发 ACK 时，依据进度把 `device_command` 推进到 `ACCEPTED / SUCCESS / FAILED`，保证"升级记录"与"实时进度"一致。
+
+### 11.2 状态机
+
+```
+accepted → downloading → verifying → flashing → rebooting → success
+    └─────────────── 任意阶段失败 ───────────────┴─▶ failed
+```
+
+| 阶段 | 中文 | 前端建议文案 |
+|------|------|-------------|
+| `accepted` | 已接受 | 设备已受理升级请求 |
+| `downloading` | 下载中 | 正在下载固件 |
+| `verifying` | 校验中 | 正在校验固件完整性 |
+| `flashing` | 写入中 | 正在写入固件，请勿断电 |
+| `rebooting` | 重启中 | 设备重启中，连接可能短暂中断 |
+| `success` | 升级成功 | 升级完成，版本已更新 |
+| `failed` | 升级失败 | 升级失败，可查看原因后重试 |
+
+规则（后端已实现，前端可按此展示）：
+- `progress` 永远在 `0~100`；`success` 强制 `100`；
+- `failed` 时 `error` 一般非空；
+- 到达 `success/failed` 后，同一 `commandId` 不会回退（指令层面是"终态粘性"）；
+- 命令状态 `SUCCESS/FAILED` 与 `TIMEOUT/CANCELLED` 都视为终态，前端应停止进度动画。
+
+### 11.3 触发升级（推荐时序）
+
+1. `GET /api/user/ota/check/{deviceId}` 判断是否有新版本（拿到 `firmwareId / latestVersion`）。
+2. **先连 WebSocket**，订阅 `/topic/device/{deviceId}/ota`（强烈建议同时订阅 `/command`）。
+3. 调用 `POST /api/user/ota/start/{deviceId}`。
+4. 从首个 `ota_progress` 或 `GET /progress` 中拿到 `commandId`，把它作为本次升级的关联 ID。
+5. 进度展示：以 WS 为主通道，`GET /progress` 为兜底（重连、页面重新打开时必须先拉一次快照）。
+6. 收到 `success` / `failed` → 停止轮询，刷新设备列表（`firmware` 已由后端同步）与升级记录。
+
+错误码速查：
+- `4301` 已在升级中 → 禁止再点，按 `GET /progress` 展示当前进度；
+- `4201` 设备离线 → 提示设备需在线才能升级；
+- `4303` 已是最新版本 → 隐藏升级按钮；
+- `4300` 触发失败 → 允许重试（`POST /api/user/ota/retry/{deviceId}`，仅当最近一次为失败/超时/取消时可用）。
+
+### 11.4 实时数据的正确消费方式
+
+| 要点 | 说明 |
+|------|------|
+| 以 `data.reportTime` 排序 | 外层 `timestamp` 是服务端推送时间，设备时间才是业务时间 |
+| 同一 `commandId` 内进度不回退 | 极端情况下可对 `progress` 取 `Math.max`，避免 UI 抖动 |
+| `otaState` 已归一化 | 后端统一小写；文案直接用 `otaStateText` |
+| 终态停止动画 | `success/failed` 到达后停止计时器与轮询 |
+| 断线补齐 | 重连后先 `GET /progress` 再继续订阅，避免中间阶段丢失 |
+| 多设备 | 以 `deviceId + commandId` 为键维护各自进度，不要用全局单例 |
+
+最小处理示例（JavaScript）：
+
+```js
+const otaStore = new Map(); // key = deviceId
+
+function onOtaProgress(mac, data) {
+  const key = mac;
+  const prev = otaStore.get(key);
+  let next = { ...(prev || {}), ...data, deviceId: mac };
+
+  // 终态粘性：已成功/失败则忽略迟到的中间态
+  if (prev && (prev.otaState === 'success' || prev.otaState === 'failed')) {
+    return;
+  }
+  // 进度不回退（同一次升级）
+  if (prev && prev.commandId && prev.commandId === data.commandId) {
+    next.progress = Math.max(prev.progress ?? 0, data.progress ?? 0);
+  }
+  otaStore.set(key, next);
+  renderOtaCard(next); // otaStateText + progress + error
+
+  if (next.otaState === 'success' || next.otaState === 'failed') {
+    stopPolling(mac);
+    refreshDevice(mac);   // firmware / otaVersion 已更新
+    refreshOtaRecords(mac);
+  }
+}
+
+function onOtaPush(msg) { // msg = {type, deviceId, timestamp, data}
+  if (msg.type === 'ota_progress') onOtaProgress(msg.deviceId, msg.data);
+}
+```
+
+### 11.5 轮询兜底
+
+`GET /api/user/ota/progress/{deviceId}` 返回 [8.5](#85-ota-) 中的 `DeviceOtaProgressVO`。
+
+| 场景 | 建议 |
+|------|------|
+| 升级进行中 | 1~2 秒轮询一次 |
+| 页面首次打开 / 重连 | 立即拉一次，恢复快照 |
+| `finished=true` | 停止轮询 |
+| `serverTime - otaUpdateTime > 5 分钟` 且 `running=true` | 展示"升级可能已超时"，建议用户稍后重试；后端超过 5 分钟会自动清理僵死状态 |
+
+> 后端清理僵死状态后再次发起升级不会被 `4301` 拦截；指令超时（`TIMEOUT`）时 `device_info` 的 OTA 字段也会被清空。
+
+### 11.6 与 `command_result` 的关系
+
+- `ota_progress` 负责**阶段与百分比**；
+- `command_result` 负责**指令最终结果**（`status=2` 成功 / `3` 失败 / `4` 超时 / `5` 取消；`6` 表示 OTA 已受理、仍在执行）。
+
+前端建议：进度条用 `ota_progress`；"升级任务成功/失败"徽标以 `command_result` 或 `/progress.finished` 为准，二者会保持一致。
+
+### 11.7 升级记录与重试
+
+- `GET /api/user/ota/records?deviceId=...`：按时间倒序；`statusText`、`errorMsg` 可直接展示；
+- 最近一条记录会带 `otaState/progress`（与设备当前 `otaVersion` 匹配时）；
+- 重试：`POST /api/user/ota/retry/{deviceId}`，仅当最近一条为 `FAILED/TIMEOUT/CANCELLED` 时可用。
+
+### 11.8 管理端实时查看
+
+管理端订阅方式与用户端完全一致：管理员可订阅 `/topic/device/{任意设备}/ota`，不受绑定关系限制。
+管理端批量任务（`/api/admin/ota/tasks*`）展示的是任务维度统计；单台设备的实时进度仍以 `ota_progress` 与 `/progress` 为准。
 
 ---
 

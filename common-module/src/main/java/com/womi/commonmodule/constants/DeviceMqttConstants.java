@@ -145,6 +145,8 @@ public final class DeviceMqttConstants {
     public static final String FIELD_PARAMS = "params";
     public static final String FIELD_STATE = "state";
     public static final String FIELD_OTA_STATE = "otaState";
+    public static final String FIELD_OTA_STATE_TEXT = "otaStateText";
+    public static final String FIELD_REPORT_TIME = "reportTime";
     public static final String FIELD_SUCCESS = "success";
     public static final String FIELD_ERROR = "error";
     public static final String FIELD_MESSAGE = "message";

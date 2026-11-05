@@ -3,6 +3,7 @@ package com.womi.commonmodule.utils;
 import com.womi.commonmodule.constants.DeviceOtaStateConstants;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * OTA 状态工具类
@@ -27,7 +28,22 @@ public final class DeviceOtaStateUtils {
     }
 
     /**
-     * 判断 OTA 状态是否"僵死"：状态为进行中，但 ota_update_time 超过 {@link DeviceOtaStateConstants#STALE_OTA_MINUTES} 分钟未更新
+     * 状态英文码 → 中文文案（未知状态原样返回，便于前端直接展示）
+     */
+    public static String textOf(String otaState) {
+        if (otaState == null) {
+            return null;
+        }
+        for (Map.Entry<String, String> entry : DeviceOtaStateConstants.STATE_LABELS) {
+            if (entry.getKey().equals(otaState)) {
+                return entry.getValue();
+            }
+        }
+        return otaState;
+    }
+
+    /**
+     * 判断 OTA 状态是否为"僵死"：状态为进行中，但 ota_update_time 超过 {@link DeviceOtaStateConstants#STALE_OTA_MINUTES} 分钟未更新
      *
      * @param otaState      OTA 状态
      * @param otaUpdateTime OTA 状态最后更新时间（可为 null，视为僵死）
