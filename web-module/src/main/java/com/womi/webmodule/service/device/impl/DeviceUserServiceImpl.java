@@ -342,10 +342,10 @@ public class DeviceUserServiceImpl implements DeviceUserService {
 
         List<DeviceCommand> commands = new ArrayList<>();
         for (DeviceBatchControlRequest.ControlItem item : request.getItems()) {
+            // prepareCommand 内部已完成入库（PENDING），此处不可重复 save，否则会主键冲突
             DeviceCommand cmd = deviceCommandService.prepareCommand(device.getDeviceId(), item.getAction(), item.getTarget(),
                     item.getChannel(), item.getParams(), DeviceCommandConstants.USER_OPERATOR_PREFIX + userId,
                     DeviceCommandConstants.SOURCE_WEB, DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS);
-            deviceCommandService.save(cmd);
             commands.add(cmd);
         }
 
