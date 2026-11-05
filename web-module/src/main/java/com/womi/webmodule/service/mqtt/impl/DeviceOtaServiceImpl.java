@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.womi.businessmodule.dto.DeviceOtaParam;
 import com.womi.businessmodule.dto.SendCommandRequest;
+import com.womi.businessmodule.mapper.device.DeviceOtaTaskMapper;
 import com.womi.businessmodule.model.device.DeviceCommand;
 import com.womi.businessmodule.model.device.DeviceFirmware;
 import com.womi.businessmodule.model.device.DeviceInfo;
+import com.womi.businessmodule.model.device.DeviceOtaTask;
 import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceFirmwareService;
@@ -57,6 +59,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
     private final DeviceCommandService deviceCommandService;
     private final DeviceControlService deviceControlService;
     private final CommandSender commandSender;
+    private final DeviceOtaTaskMapper deviceOtaTaskMapper;
 
     // ==================== 主入口 ====================
 
@@ -309,6 +312,7 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
         // 4. 批量生成指令记录
         List<DeviceCommand> commands = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
+        String taskId = UUID.randomUUID().toString().replace("-", "");
 
         for (DeviceInfo device : devices) {
             if (runningDeviceIds.contains(device.getDeviceId())) {
@@ -321,7 +325,9 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             cmd.setAction(DeviceMqttConstants.ACTION_START);
             cmd.setTarget(DeviceMqttConstants.TARGET_OTA);
             cmd.setChannel(null);
-            cmd.setParams(otaParam.toMap());
+            Map<String, Object> params = new HashMap<>(otaParam.toMap());
+            params.put(DeviceMqttConstants.FIELD_TASK_ID, taskId);
+            cmd.setParams(params);
             cmd.setQos(DeviceCommandConstants.DEFAULT_QOS);
             cmd.setRetain(DeviceCommandConstants.DEFAULT_RETAIN);
             cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
@@ -342,6 +348,22 @@ public class DeviceOtaServiceImpl implements DeviceOtaService {
             return 0;
         }
         deviceCommandService.saveBatch(commands);
+
+        // 5. 记录批量任务（供管理端任务列表/详情/取消）
+        DeviceOtaTask task = new DeviceOtaTask();
+        task.setTaskId(taskId);
+        task.setFirmwareId(firmware.getId());
+        task.setTargetVersion(firmware.getVersion());
+        task.setTotalCount(commands.size());
+        task.setSuccessCount(0);
+        task.setFailedCount(0);
+        task.setPendingCount(commands.size());
+        task.setStatus(0);
+        task.setOperator(operator != null ? operator : DeviceCommandConstants.DEFAULT_OPERATOR);
+        task.setCreateTime(now);
+        task.setUpdateTime(now);
+        deviceOtaTaskMapper.insert(task);
+
         // 6. 批量落库
         TransactionUtils.afterCommit(() -> {
             for (DeviceCommand cmd : commands) {

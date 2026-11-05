@@ -8,5 +8,9 @@ public interface SysDeadLetterService extends IService<SysDeadLetter> {
     void saveDeadLetter(String topic, String payload, Exception e, boolean isRetryable);
     Page<SysDeadLetter> pageDeadLetters(Integer pageNum, Integer pageSize);
 
+    SysDeadLetter getDetail(Long id);
+
     void replay(Long id);
+
+    void ignore(Long id);
 }

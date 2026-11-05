@@ -28,6 +28,12 @@ public class DeviceInfoVO {
     @TableField(value = "current_state", typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> currentState;
 
+    // OTA 状态
+    private String otaState;
+    private Integer otaProgress;
+    private String otaVersion;
+    private LocalDateTime otaUpdateTime;
+
 
     // 时间
     private LocalDateTime createTime;

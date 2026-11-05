@@ -43,4 +43,11 @@ public final class UserConstants {
 
 
     public static final String USER_ROLE_ADMIN = "ADMIN";
+    public static final String USER_ROLE_OPS = "OPS";
+
+    /** 管理员权限串（Spring Security 角色带 ROLE_ 前缀） */
+    public static final String ADMIN_AUTHORITY = ROLE_PREFIX + USER_ROLE_ADMIN;
+
+    /** 密码加密强度 */
+    public static final int PASSWORD_ENCODER_STRENGTH = 12;
 }

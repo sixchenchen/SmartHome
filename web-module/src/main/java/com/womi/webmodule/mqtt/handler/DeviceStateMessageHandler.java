@@ -74,9 +74,9 @@ public class DeviceStateMessageHandler implements MqttMessageHandler {
                 : LocalDateTime.now();
         stateRecordService.recordState(deviceId, target, channel, paramsMap, eventTime);
         Map<String, Object> pushData = new HashMap<>();
-        pushData.put("target", target);
-        pushData.put("channel", channel);
-        pushData.put("state", state);
+        pushData.put(DeviceMqttConstants.FIELD_TARGET, target);
+        pushData.put(DeviceMqttConstants.FIELD_CHANNEL, channel);
+        pushData.put(DeviceMqttConstants.FIELD_STATE, state);
         webSocketPushService.pushDeviceState(deviceId, pushData);
     }
 }

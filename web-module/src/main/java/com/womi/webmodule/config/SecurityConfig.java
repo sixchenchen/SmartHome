@@ -1,5 +1,8 @@
 package com.womi.webmodule.config;
 
+import com.womi.commonmodule.constants.AvatarConstants;
+import com.womi.commonmodule.constants.HttpConstants;
+import com.womi.commonmodule.constants.UserConstants;
 import com.womi.webmodule.filter.JwtAuthenticationFilter;
 import com.womi.webmodule.handler.JsonAccessDeniedHandler;
 import com.womi.webmodule.handler.JsonAuthenticationEntryPoint;
@@ -38,7 +41,7 @@ public class SecurityConfig {
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(12);
+        return new BCryptPasswordEncoder(UserConstants.PASSWORD_ENCODER_STRENGTH);
     }
 
     /**
@@ -67,18 +70,24 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> {
 
                     // 1. 所有环境都放行的白名单
-                    auth.requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
-                            .requestMatchers("/ws/**").permitAll()
-                            .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "OPS")
-                            .requestMatchers("/error", "/favicon.ico").permitAll();
+                    auth.requestMatchers(
+                                    HttpConstants.AUTH_LOGIN_PATH,
+                                    HttpConstants.AUTH_REGISTER_PATH,
+                                    HttpConstants.AUTH_REFRESH_PATH)
+                            .permitAll()
+                            .requestMatchers(HttpConstants.WEBSOCKET_ENDPOINT_PATTERN).permitAll()
+                            .requestMatchers(HttpConstants.ACTUATOR_HEALTH_PATH, AvatarConstants.RESOURCE_HANDLER).permitAll()
+                            .requestMatchers(HttpConstants.ADMIN_API_PATTERN)
+                            .hasAnyRole(UserConstants.USER_ROLE_ADMIN, UserConstants.USER_ROLE_OPS)
+                            .requestMatchers(HttpConstants.ERROR_PATH, HttpConstants.FAVICON_PATH).permitAll();
 
                     // 2. 判断环境：如果不是 prod，才允许访问 Swagger 文档
-                    if (!env.acceptsProfiles(Profiles.of("prod"))) {
+                    if (!env.acceptsProfiles(Profiles.of(HttpConstants.PROD_PROFILE))) {
                         auth.requestMatchers(
-                                "/doc.html",
-                                "/webjars/**",
-                                "/v3/api-docs/**",
-                                "/swagger-resources/**"
+                                HttpConstants.DOC_HTML_PATH,
+                                HttpConstants.WEBJARS_PATTERN,
+                                HttpConstants.API_DOCS_PATTERN,
+                                HttpConstants.SWAGGER_RESOURCES_PATTERN
                         ).permitAll();
                     }
 

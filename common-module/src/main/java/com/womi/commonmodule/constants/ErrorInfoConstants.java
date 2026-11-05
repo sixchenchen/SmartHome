@@ -57,6 +57,8 @@ public final class ErrorInfoConstants {
     public static final String OTA_IN_PROGRESS = "OTA 正在进行中";
     /** OTA 版本不兼容 */
     public static final String OTA_VERSION_INCOMPATIBLE = "OTA 版本不兼容";
+    /** OTA 进度报文中缺少 state */
+    public static final String OTA_STATE_MISSING = "OTA 进度缺少 state";
 
     // ==================== 系统 ====================
     /** 系统异常 */

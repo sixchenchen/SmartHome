@@ -18,4 +18,29 @@ public final class HttpConstants {
     public static final String FORWARDED_FOR = "X-Forwarded-For";
     public static final String REAL_IP = "X-Real-IP";
     public static final String UNKNOWN = "unknown";
+
+    // ==================== 免认证路径 ====================
+    public static final String ACTUATOR_HEALTH_PATH = "/actuator/health";
+    public static final String WEBSOCKET_ENDPOINT_PATTERN = "/ws/**";
+    public static final String ERROR_PATH = "/error";
+    public static final String FAVICON_PATH = "/favicon.ico";
+
+    // ==================== 认证接口路径 ====================
+    public static final String AUTH_LOGIN_PATH = "/api/auth/login";
+    public static final String AUTH_REGISTER_PATH = "/api/auth/register";
+    public static final String AUTH_REFRESH_PATH = "/api/auth/refresh";
+
+    // ==================== 管理端路径 ====================
+    public static final String ADMIN_API_PATTERN = "/api/admin/**";
+
+    // ==================== 接口文档静态资源 ====================
+    public static final String DOC_HTML_PATH = "/doc.html";
+    public static final String DOC_HTML_LOCATION = "classpath:/META-INF/resources/";
+    public static final String WEBJARS_PATTERN = "/webjars/**";
+    public static final String WEBJARS_LOCATION = "classpath:/META-INF/resources/webjars/";
+    public static final String API_DOCS_PATTERN = "/v3/api-docs/**";
+    public static final String SWAGGER_RESOURCES_PATTERN = "/swagger-resources/**";
+
+    // ==================== 运行环境 ====================
+    public static final String PROD_PROFILE = "prod";
 }

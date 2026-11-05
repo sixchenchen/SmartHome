@@ -25,7 +25,7 @@ public class RedisConfiguration {
         ObjectMapper om = new ObjectMapper();
         // 允许访问所有字段（包括 private）
         om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-        // 👈 关键：在 JSON 中记录具体的类名，这样反序列化时才能还原成原来的对象，否则会变成 LinkedHashMap
+        // JSON 中记录具体的类名，这样反序列化时才能还原成原来的对象，否则会变成 LinkedHashMap
         om.activateDefaultTyping(LaissezFaireSubTypeValidator.instance, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
 
         GenericJackson2JsonRedisSerializer jackson2JsonRedisSerializer = new GenericJackson2JsonRedisSerializer(om);

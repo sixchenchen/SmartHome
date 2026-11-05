@@ -4,12 +4,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.constants.DeviceOtaStateConstants;
+import com.womi.commonmodule.constants.ErrorInfoConstants;
 import com.womi.commonmodule.utils.JsonUtils;
 import com.womi.webmodule.mqtt.core.MqttMessageHandler;
+import com.womi.webmodule.service.common.WebSocketPushService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /*
   OTA 进度上报处理器
@@ -35,6 +40,7 @@ public class DeviceOtaProgressMessageHandler implements MqttMessageHandler {
 
     private final JsonUtils jsonUtils;
     private final DeviceInfoService deviceInfoService;
+    private final WebSocketPushService webSocketPushService;
 
     @Override
     public boolean supports(String topic) {
@@ -53,7 +59,7 @@ public class DeviceOtaProgressMessageHandler implements MqttMessageHandler {
 
         String state = jsonUtils.getString(dataNode, DeviceMqttConstants.FIELD_OTA_STATE);
         if (state == null || state.isBlank()) {
-            throw new IllegalArgumentException("OTA 进度缺少 state");
+            throw new IllegalArgumentException(ErrorInfoConstants.OTA_STATE_MISSING);
         }
 
         Integer progress = jsonUtils.getInt(dataNode, DeviceMqttConstants.FIELD_OTA_PROGRESS);
@@ -70,7 +76,15 @@ public class DeviceOtaProgressMessageHandler implements MqttMessageHandler {
             deviceInfoService.syncFirmwareIfTarget(deviceId, version);
         }
 
-        // 3. 日志中带上 commandId，方便排查追踪
+        // 3. 实时推送给已订阅该设备的前端
+        Map<String, Object> pushData = new LinkedHashMap<>();
+        pushData.put(DeviceMqttConstants.FIELD_OTA_STATE, state);
+        pushData.put(DeviceMqttConstants.FIELD_OTA_PROGRESS, progress);
+        pushData.put(DeviceMqttConstants.FIELD_OTA_VERSION, version);
+        pushData.put(DeviceMqttConstants.FIELD_COMMAND_ID, commandId);
+        webSocketPushService.pushOtaProgress(deviceId, pushData);
+
+        // 4. 日志中带上 commandId，方便排查追踪
         log.info("OTA 进度上报 - deviceId: {}, commandId: {}, state: {}, progress: {}, version: {}",
                 deviceId, commandId != null ? commandId : "未知", state, progress, version);
 

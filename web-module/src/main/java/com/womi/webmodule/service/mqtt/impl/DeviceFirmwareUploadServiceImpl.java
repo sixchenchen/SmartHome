@@ -1,5 +1,7 @@
 package com.womi.webmodule.service.mqtt.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.womi.businessmodule.model.device.DeviceFirmware;
 import com.womi.businessmodule.service.device.DeviceFirmwareService;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
@@ -140,6 +142,43 @@ public class DeviceFirmwareUploadServiceImpl implements DeviceFirmwareUploadServ
         return firmwareService.listEnabled().stream()
                 .map(this::toVO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public Page<FirmwareVO> pageFirmware(Integer pageNum, Integer pageSize, String product, Integer status, String keyword) {
+        LambdaQueryWrapper<DeviceFirmware> wrapper = new LambdaQueryWrapper<DeviceFirmware>()
+                .eq(StringUtils.hasText(product), DeviceFirmware::getProduct, product)
+                .eq(status != null, DeviceFirmware::getStatus, status)
+                .like(StringUtils.hasText(keyword), DeviceFirmware::getVersion, keyword)
+                .orderByDesc(DeviceFirmware::getUploadTime);
+        Page<DeviceFirmware> page = firmwareService.page(new Page<>(pageNum, pageSize), wrapper);
+        Page<FirmwareVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        result.setRecords(page.getRecords().stream().map(this::toVO).collect(Collectors.toList()));
+        return result;
+    }
+
+    @Override
+    public FirmwareVO getDetail(Long id) {
+        DeviceFirmware firmware = firmwareService.getById(id);
+        if (firmware == null) {
+            throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND, ErrorInfoConstants.FIRMWARE_FILE_NOT_FOUND);
+        }
+        return toVO(firmware);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(Long id, Integer status) {
+        DeviceFirmware firmware = firmwareService.getById(id);
+        if (firmware == null) {
+            throw new BusinessException(ErrorCode.FIRMWARE_NOT_FOUND, ErrorInfoConstants.FIRMWARE_FILE_NOT_FOUND);
+        }
+        DeviceFirmware update = DeviceFirmware.builder()
+                .id(id)
+                .status(status)
+                .build();
+        firmwareService.updateById(update);
+        log.info("固件状态变更 - id: {}, status: {}", id, status);
     }
 
     @Override

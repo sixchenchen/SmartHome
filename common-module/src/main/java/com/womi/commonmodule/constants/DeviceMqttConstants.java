@@ -138,6 +138,7 @@ public final class DeviceMqttConstants {
     public static final String FIELD_DATA = "data";
     public static final String FIELD_TO_VERSION = "toVersion";
     public static final String FIELD_COMMAND_ID = "commandId";
+    public static final String FIELD_TASK_ID = "taskId";
     public static final String FIELD_ACTION = "action";
     public static final String FIELD_TARGET = "target";
     public static final String FIELD_CHANNEL = "channel";

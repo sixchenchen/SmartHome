@@ -68,8 +68,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @SuppressWarnings("unchecked")
             List<String> authorityStrs = (List<String>) claims.get(UserConstants.AUTHORITIES);
             if (authorityStrs == null) authorityStrs = Collections.emptyList();
-            log.info("请求解析到的 username: {}", username);
-            log.info("请求解析到的 authorities: {}", authorityStrs);
             // 如果上下文里还没有认证信息，才去构建
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 

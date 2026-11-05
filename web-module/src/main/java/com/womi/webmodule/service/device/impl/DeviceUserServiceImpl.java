@@ -2,7 +2,9 @@ package com.womi.webmodule.service.device.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.DeviceBatchControlRequest;
 import com.womi.businessmodule.dto.DeviceControlRequest;
+import com.womi.businessmodule.dto.UserDeviceUpdateRequest;
 import com.womi.businessmodule.mapper.device.DeviceBindingMapper;
 import com.womi.businessmodule.mapper.device.DeviceInfoMapper;
 import com.womi.businessmodule.model.device.DeviceBinding;
@@ -11,7 +13,10 @@ import com.womi.businessmodule.model.device.DeviceInfo;
 import com.womi.businessmodule.service.common.CommandSender;
 import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
+import com.womi.businessmodule.vo.CommandStatsVO;
+import com.womi.businessmodule.vo.device.DeviceDetailVO;
 import com.womi.businessmodule.vo.device.DeviceInfoVO;
+import com.womi.businessmodule.vo.device.DeviceOnlineVO;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.ScheduleConstants;
@@ -34,6 +39,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -162,7 +169,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void sendControlCommand(Long userId, DeviceControlRequest request) {
+    public String sendControlCommand(Long userId, DeviceControlRequest request) {
         String cleanMac = MacUtils.normalize(request.getDeviceId());
 
         // ==================== 1：校验设备是否存在（防报错） ====================
@@ -213,7 +220,7 @@ public class DeviceUserServiceImpl implements DeviceUserService {
         cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
         cmd.setRetryCount(DeviceCommandConstants.DEFAULT_RETRY_COUNT);
         cmd.setMaxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY);
-        cmd.setOperator("user_" + userId);
+        cmd.setOperator(DeviceCommandConstants.USER_OPERATOR_PREFIX + userId);
         cmd.setSource(DeviceCommandConstants.SOURCE_WEB);
         cmd.setExpireTime(now.plusSeconds(DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS));
         cmd.setCreateTime(now);
@@ -232,6 +239,163 @@ public class DeviceUserServiceImpl implements DeviceUserService {
                 log.error("用户控制指令下发失败，等待定时任务兜底 - commandId: {}", cmd.getCommandId(), e);
             }
         });
+        return cmd.getCommandId();
+    }
+
+    @Override
+    public DeviceDetailVO getDeviceDetail(Long userId, String deviceId) {
+        String cleanMac = MacUtils.normalize(deviceId);
+        DeviceBinding binding = requireBinding(userId, cleanMac);
+        DeviceInfo device = requireBoundDevice(userId, cleanMac);
+
+        DeviceDetailVO vo = new DeviceDetailVO();
+        BeanUtils.copyProperties(device, vo);
+        vo.setOnline(device.getOnline() != null && device.getOnline() == DeviceOnlineStatus.ONLINE.getCode());
+        vo.setBindTime(binding.getBindTime());
+        return vo;
+    }
+
+    @Override
+    public DeviceOnlineVO getOnlineStatus(Long userId, String deviceId) {
+        DeviceInfo device = requireBoundDevice(userId, deviceId);
+        DeviceOnlineVO vo = new DeviceOnlineVO();
+        vo.setDeviceId(device.getDeviceId());
+        vo.setOnline(device.getOnline() != null && device.getOnline() == DeviceOnlineStatus.ONLINE.getCode());
+        vo.setLastHeartbeatTime(device.getLastHeartbeatTime());
+        vo.setOfflineReason(device.getOfflineReason());
+        return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateDevice(Long userId, String deviceId, UserDeviceUpdateRequest request) {
+        if (request.getDeviceName() == null && request.getLocation() == null) {
+            throw new BusinessException(ErrorCode.PARAM_MISSING, "至少提交一个需要修改的字段");
+        }
+        DeviceInfo device = requireBoundDevice(userId, deviceId);
+        if (request.getDeviceName() != null) {
+            device.setDeviceName(request.getDeviceName().trim());
+        }
+        if (request.getLocation() != null) {
+            device.setLocation(request.getLocation().trim());
+        }
+        deviceInfoMapper.updateById(device);
+    }
+
+    @Override
+    public Page<DeviceCommand> pageCommands(Long userId, String deviceId, Integer status, Integer pageNum, Integer pageSize) {
+        List<String> deviceIds = resolveBoundDeviceIds(userId, deviceId);
+        Page<DeviceCommand> page = new Page<>(pageNum, pageSize);
+        if (deviceIds.isEmpty()) {
+            return page;
+        }
+        LambdaQueryWrapper<DeviceCommand> wrapper = new LambdaQueryWrapper<DeviceCommand>()
+                .in(DeviceCommand::getDeviceId, deviceIds)
+                .eq(status != null, DeviceCommand::getStatus, status)
+                .orderByDesc(DeviceCommand::getCreateTime);
+        return deviceCommandService.page(page, wrapper);
+    }
+
+    @Override
+    public DeviceCommand getCommand(Long userId, String commandId) {
+        DeviceCommand command = deviceCommandService.getByCommandId(commandId);
+        if (command == null) {
+            throw new BusinessException(ErrorCode.PARAM_INVALID, "指令不存在");
+        }
+        requireBoundDevice(userId, command.getDeviceId());
+        return command;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean cancelCommand(Long userId, Long id) {
+        DeviceCommand command = deviceCommandService.getById(id);
+        if (command == null) {
+            throw new BusinessException(ErrorCode.PARAM_INVALID, "指令不存在");
+        }
+        requireBoundDevice(userId, command.getDeviceId());
+        return deviceCommandService.cancelCommand(id, DeviceCommandConstants.USER_OPERATOR_PREFIX + userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean cancelCommandByCommandId(Long userId, String commandId) {
+        return cancelCommand(userId, getCommand(userId, commandId).getId());
+    }
+
+    @Override
+    public CommandStatsVO getCommandStats(Long userId, String deviceId) {
+        DeviceInfo device = requireBoundDevice(userId, deviceId);
+        return deviceCommandService.statsByDevice(device.getDeviceId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<String> batchControl(Long userId, String deviceId, DeviceBatchControlRequest request) {
+        DeviceInfo device = requireBoundDevice(userId, deviceId);
+        if (!Integer.valueOf(DeviceOnlineStatus.ONLINE.getCode()).equals(device.getOnline())) {
+            throw new BusinessException(ErrorCode.DEVICE_OFFLINE);
+        }
+        if (!deviceInfoService.isDeviceActuallyOnline(device, ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS)) {
+            throw new BusinessException(ErrorCode.DEVICE_NETWORK_ERROR);
+        }
+
+        List<DeviceCommand> commands = new ArrayList<>();
+        for (DeviceBatchControlRequest.ControlItem item : request.getItems()) {
+            DeviceCommand cmd = deviceCommandService.prepareCommand(device.getDeviceId(), item.getAction(), item.getTarget(),
+                    item.getChannel(), item.getParams(), DeviceCommandConstants.USER_OPERATOR_PREFIX + userId,
+                    DeviceCommandConstants.SOURCE_WEB, DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS);
+            deviceCommandService.save(cmd);
+            commands.add(cmd);
+        }
+
+        TransactionUtils.afterCommit(() -> {
+            for (DeviceCommand cmd : commands) {
+                try {
+                    commandSender.send(cmd);
+                    deviceCommandService.updateStatus(cmd.getId(), DeviceCommandStatus.SENT.getCode(), null);
+                    deviceCommandService.incrementRetryCount(cmd.getId());
+                } catch (Exception e) {
+                    log.error("批量指令下发失败，等待定时任务兜底 - commandId: {}", cmd.getCommandId(), e);
+                }
+            }
+        });
+
+        return commands.stream().map(DeviceCommand::getCommandId).collect(Collectors.toList());
+    }
+
+    @Override
+    public DeviceInfo requireBoundDevice(Long userId, String deviceId) {
+        String cleanMac = MacUtils.normalize(deviceId);
+        requireBinding(userId, cleanMac);
+        DeviceInfo device = deviceInfoMapper.selectOne(new LambdaQueryWrapper<DeviceInfo>()
+                .eq(DeviceInfo::getDeviceId, cleanMac)
+                .eq(DeviceInfo::getDeleted, 0)
+                .last("LIMIT 1"));
+        if (device == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
+        }
+        return device;
+    }
+
+    private DeviceBinding requireBinding(Long userId, String cleanMac) {
+        DeviceBinding binding = deviceBindingMapper.selectOne(new LambdaQueryWrapper<DeviceBinding>()
+                .eq(DeviceBinding::getActiveDeviceId, cleanMac)
+                .eq(DeviceBinding::getUserId, userId));
+        if (binding == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NO_PERMISSION);
+        }
+        return binding;
+    }
+
+    private List<String> resolveBoundDeviceIds(Long userId, String deviceId) {
+        if (deviceId != null && !deviceId.isBlank()) {
+            return Collections.singletonList(requireBoundDevice(userId, deviceId).getDeviceId());
+        }
+        List<DeviceBinding> bindings = deviceBindingMapper.selectList(new LambdaQueryWrapper<DeviceBinding>()
+                .eq(DeviceBinding::getUserId, userId)
+                .eq(DeviceBinding::getBindStatus, BindStatus.BOUND.getCode()));
+        return bindings.stream().map(DeviceBinding::getDeviceId).collect(Collectors.toList());
     }
 
 }

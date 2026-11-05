@@ -3,20 +3,32 @@ package com.womi.webmodule.service.device.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.AdminDeviceCommandRequest;
+import com.womi.businessmodule.dto.DeviceAdminUpdateRequest;
 import com.womi.businessmodule.dto.DeviceCreateRequest;
 import com.womi.businessmodule.mapper.device.*;
+import com.womi.businessmodule.mapper.sys.SysUserMapper;
 import com.womi.businessmodule.model.device.*;
+import com.womi.businessmodule.model.sys.SysUser;
+import com.womi.businessmodule.vo.device.AdminDeviceVO;
+import com.womi.businessmodule.vo.device.DeviceBindingVO;
+import com.womi.businessmodule.vo.device.DeviceOnlineStatsVO;
+import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.DeviceConstants;
 import com.womi.commonmodule.constants.RedisConstants;
 import com.womi.commonmodule.constants.RegexConstants;
+import com.womi.commonmodule.constants.ScheduleConstants;
+import com.womi.commonmodule.enums.BindStatus;
 import com.womi.commonmodule.enums.DeviceOnlineStatus;
 import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
 import com.womi.webmodule.service.device.DeviceAdminService;
+import com.womi.webmodule.service.mqtt.DeviceControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -24,7 +36,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -44,19 +61,152 @@ public class DeviceAdminServiceImpl implements DeviceAdminService {
     private final DeviceEventRecordMapper deviceEventRecordMapper;
     private final DeviceHeartbeatRecordMapper deviceHeartbeatRecordMapper;
     private final DeviceStateRecordMapper deviceStateRecordMapper;
-    @Override
-    public Page<DeviceInfo> pageDevices(Integer pageNum, Integer pageSize, String keyword) {
-        Page<DeviceInfo> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<DeviceInfo> wrapper = new LambdaQueryWrapper<>();
+    private final SysUserMapper sysUserMapper;
+    private final DeviceControlService deviceControlService;
 
+    @Override
+    public Page<AdminDeviceVO> pageDevices(Integer pageNum, Integer pageSize, String keyword) {
+        Page<DeviceInfo> entityPage = deviceInfoMapper.selectPage(new Page<>(pageNum, pageSize), buildQueryWrapper(keyword));
+        Page<AdminDeviceVO> result = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
+        result.setRecords(entityPage.getRecords().stream().map(this::toAdminDeviceVO).collect(Collectors.toList()));
+        return result;
+    }
+
+    private LambdaQueryWrapper<DeviceInfo> buildQueryWrapper(String keyword) {
+        LambdaQueryWrapper<DeviceInfo> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(keyword)) {
-            wrapper.like(DeviceInfo::getDeviceId, keyword)
-                    .or()
-                    .like(DeviceInfo::getDeviceName, keyword);
+            wrapper.and(w -> w.like(DeviceInfo::getDeviceId, keyword)
+                    .or().like(DeviceInfo::getDeviceName, keyword)
+                    .or().like(DeviceInfo::getProduct, keyword));
         }
         wrapper.orderByDesc(DeviceInfo::getCreateTime);
+        return wrapper;
+    }
 
-        return deviceInfoMapper.selectPage(page, wrapper);
+    private AdminDeviceVO toAdminDeviceVO(DeviceInfo device) {
+        AdminDeviceVO vo = new AdminDeviceVO();
+        BeanUtils.copyProperties(device, vo);
+        vo.setOnline(device.getOnline() != null && device.getOnline() == DeviceOnlineStatus.ONLINE.getCode());
+        return vo;
+    }
+
+    @Override
+    public AdminDeviceVO getDevice(Long id) {
+        return toAdminDeviceVO(requireDevice(id));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateDevice(Long id, DeviceAdminUpdateRequest request) {
+        if (request.getDeviceName() == null && request.getProduct() == null && request.getLocation() == null) {
+            throw new BusinessException(ErrorCode.PARAM_MISSING, "至少提交一个需要修改的字段");
+        }
+        DeviceInfo device = requireDevice(id);
+        if (request.getDeviceName() != null) {
+            device.setDeviceName(request.getDeviceName().trim());
+        }
+        if (request.getProduct() != null) {
+            device.setProduct(request.getProduct().trim());
+        }
+        if (request.getLocation() != null) {
+            device.setLocation(request.getLocation().trim());
+        }
+        deviceInfoMapper.updateById(device);
+    }
+
+    @Override
+    public Page<DeviceBindingVO> pageBindings(Long id, Integer pageNum, Integer pageSize) {
+        DeviceInfo device = requireDevice(id);
+        Page<DeviceBinding> page = deviceBindingMapper.selectPage(new Page<>(pageNum, pageSize),
+                new LambdaQueryWrapper<DeviceBinding>()
+                        .eq(DeviceBinding::getDeviceId, device.getDeviceId())
+                        .eq(DeviceBinding::getBindStatus, BindStatus.BOUND.getCode())
+                        .orderByDesc(DeviceBinding::getBindTime));
+        Page<DeviceBindingVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        if (page.getRecords().isEmpty()) {
+            return result;
+        }
+        List<Long> userIds = page.getRecords().stream().map(DeviceBinding::getUserId).distinct().collect(Collectors.toList());
+        Map<Long, SysUser> userMap = sysUserMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
+        List<DeviceBindingVO> records = new ArrayList<>();
+        for (DeviceBinding binding : page.getRecords()) {
+            DeviceBindingVO vo = new DeviceBindingVO();
+            vo.setBindingId(binding.getId());
+            vo.setUserId(binding.getUserId());
+            vo.setBindTime(binding.getBindTime());
+            vo.setBindStatus(binding.getBindStatus());
+            SysUser user = userMap.get(binding.getUserId());
+            if (user != null) {
+                vo.setUsername(user.getUsername());
+                vo.setNickname(user.getNickname());
+            }
+            records.add(vo);
+        }
+        result.setRecords(records);
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void unbindDevice(Long id, Long userId) {
+        DeviceInfo device = requireDevice(id);
+        DeviceBinding binding = deviceBindingMapper.selectOne(new LambdaQueryWrapper<DeviceBinding>()
+                .eq(DeviceBinding::getActiveDeviceId, device.getDeviceId())
+                .eq(DeviceBinding::getUserId, userId));
+        if (binding == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_BOUND);
+        }
+        binding.setBindStatus(BindStatus.UNBOUND.getCode());
+        binding.setUnbindTime(LocalDateTime.now());
+        deviceBindingMapper.updateById(binding);
+        redisTemplate.opsForSet().remove(RedisConstants.BOUND_DEVICES_KEY, device.getDeviceId());
+    }
+
+    @Override
+    public DeviceOnlineStatsVO getOnlineStats() {
+        DeviceOnlineStatsVO vo = new DeviceOnlineStatsVO();
+        long total = deviceInfoMapper.selectCount(new LambdaQueryWrapper<>());
+        long online = deviceInfoMapper.selectCount(new LambdaQueryWrapper<DeviceInfo>()
+                .eq(DeviceInfo::getOnline, DeviceOnlineStatus.ONLINE.getCode()));
+        LocalDateTime cutoff = LocalDateTime.now().minusSeconds(ScheduleConstants.HEARTBEAT_TIMEOUT_SECONDS);
+        long abnormal = deviceInfoMapper.selectCount(new LambdaQueryWrapper<DeviceInfo>()
+                .eq(DeviceInfo::getOnline, DeviceOnlineStatus.ONLINE.getCode())
+                .and(w -> w.lt(DeviceInfo::getLastHeartbeatTime, cutoff)
+                        .or().isNull(DeviceInfo::getLastHeartbeatTime)));
+        vo.setTotal(total);
+        vo.setOnline(online);
+        vo.setOffline(total - online);
+        vo.setAbnormal(abnormal);
+        return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String sendCommand(Long id, AdminDeviceCommandRequest request) {
+        DeviceInfo device = requireDevice(id);
+        DeviceCommand command = deviceControlService.sendCommand(device.getDeviceId(), request.getAction(),
+                request.getTarget(), request.getChannel(), request.getParams(),
+                DeviceCommandConstants.ADMIN_DEFAULT_OPERATOR,
+                DeviceCommandConstants.DEFAULT_EXPIRE_SECONDS);
+        return command.getCommandId();
+    }
+
+    @Override
+    public List<AdminDeviceVO> listForExport(String keyword) {
+        List<DeviceInfo> devices = deviceInfoMapper.selectList(buildQueryWrapper(keyword));
+        if (devices.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return devices.stream().map(this::toAdminDeviceVO).collect(Collectors.toList());
+    }
+
+    private DeviceInfo requireDevice(Long id) {
+        DeviceInfo device = deviceInfoMapper.selectById(id);
+        if (device == null) {
+            throw new BusinessException(ErrorCode.DEVICE_NOT_FOUND);
+        }
+        return device;
     }
 
     @Override

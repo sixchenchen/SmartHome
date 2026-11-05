@@ -22,8 +22,13 @@ public interface DeviceCommandService extends IService<DeviceCommand> {
     void incrementRetryCount(Long id);
     // 查询待下发指令
     List<DeviceCommand> listStalePending(int minWaitSeconds, int batchSize);
-    // 处理 ACK 回执
-    void handleAck(String deviceId,String commandId, boolean success, Map<String, Object> payload, String errorMsg);
+    /**
+     * 处理设备 ACK 回执。
+     *
+     * @return 状态发生变更时返回更新后的指令；指令不存在、设备越权或重复 ACK 时返回 {@code null}
+     */
+    DeviceCommand handleAck(String deviceId, String commandId, boolean success,
+                            Map<String, Object> payload, String errorMsg);
     // 查询待下发指令
     List<DeviceCommand> listPending(int limit);
     // 查询需要重试的指令

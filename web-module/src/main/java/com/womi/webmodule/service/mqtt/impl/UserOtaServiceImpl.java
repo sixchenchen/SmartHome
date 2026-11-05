@@ -1,6 +1,7 @@
 package com.womi.webmodule.service.mqtt.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.womi.businessmodule.mapper.device.DeviceBindingMapper;
 import com.womi.businessmodule.model.device.DeviceBinding;
 import com.womi.businessmodule.model.device.DeviceCommand;
@@ -11,6 +12,8 @@ import com.womi.businessmodule.service.device.DeviceCommandService;
 import com.womi.businessmodule.service.device.DeviceFirmwareService;
 import com.womi.businessmodule.service.device.DeviceInfoService;
 import com.womi.businessmodule.vo.OtaCheckResponse;
+import com.womi.businessmodule.vo.device.DeviceOtaProgressVO;
+import com.womi.businessmodule.vo.device.OtaRecordVO;
 import com.womi.commonmodule.constants.DeviceCommandConstants;
 import com.womi.commonmodule.constants.DeviceMqttConstants;
 import com.womi.commonmodule.constants.ScheduleConstants;
@@ -20,6 +23,7 @@ import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.TransactionUtils;
+import com.womi.webmodule.service.mqtt.DeviceOtaService;
 import com.womi.webmodule.service.mqtt.UserOtaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,8 +34,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -43,6 +49,7 @@ public class UserOtaServiceImpl implements UserOtaService {
     private final DeviceBindingMapper bindingMapper;
     private final DeviceCommandService commandService;
     private final CommandSender commandSender;
+    private final DeviceOtaService deviceOtaService;
 
     @Override
     public OtaCheckResponse checkUpdate(Long userId, String deviceId) {
@@ -128,7 +135,7 @@ public class UserOtaServiceImpl implements UserOtaService {
         cmd.setStatus(DeviceCommandStatus.PENDING.getCode());
         cmd.setRetryCount(DeviceCommandConstants.DEFAULT_RETRY_COUNT);
         cmd.setMaxRetry(DeviceCommandConstants.DEFAULT_MAX_RETRY);
-        cmd.setOperator("user_" + userId);
+        cmd.setOperator(DeviceCommandConstants.USER_OPERATOR_PREFIX + userId);
         cmd.setSource(DeviceCommandConstants.SOURCE_WEB);
         cmd.setExpireTime(now.plusSeconds(DeviceCommandConstants.OTA_EXPIRE_SECONDS));
         cmd.setCreateTime(now);
@@ -147,6 +154,68 @@ public class UserOtaServiceImpl implements UserOtaService {
                 log.error("用户端 OTA 指令下发失败，等待定时任务兜底 - commandId: {}", cmd.getCommandId(), e);
             }
         });
+    }
+
+    @Override
+    public DeviceOtaProgressVO getProgress(Long userId, String deviceId) {
+        checkDeviceBinding(userId, deviceId);
+        return deviceOtaService.getOtaProgress(deviceId);
+    }
+
+    @Override
+    public Page<OtaRecordVO> pageRecords(Long userId, String deviceId, Integer pageNum, Integer pageSize) {
+        checkDeviceBinding(userId, deviceId);
+        Page<DeviceCommand> page = commandService.page(new Page<>(pageNum, pageSize),
+                new LambdaQueryWrapper<DeviceCommand>()
+                        .eq(DeviceCommand::getDeviceId, deviceId)
+                        .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
+                        .orderByDesc(DeviceCommand::getCreateTime));
+
+        DeviceInfo device = deviceInfoService.getByDeviceId(deviceId);
+        Page<OtaRecordVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        List<OtaRecordVO> records = page.getRecords().stream().map(command -> {
+            OtaRecordVO vo = new OtaRecordVO();
+            vo.setId(command.getId());
+            vo.setCommandId(command.getCommandId());
+            vo.setDeviceId(command.getDeviceId());
+            vo.setStatus(command.getStatus());
+            DeviceCommandStatus status = DeviceCommandStatus.fromCode(command.getStatus());
+            vo.setStatusText(status == null ? null : status.getMessage());
+            vo.setErrorMsg(command.getErrorMsg());
+            vo.setCreateTime(command.getCreateTime());
+            vo.setSendTime(command.getSendTime());
+            vo.setAckTime(command.getAckTime());
+            if (command.getParams() != null) {
+                Object version = command.getParams().get(DeviceMqttConstants.FIELD_OTA_VERSION);
+                vo.setVersion(version == null ? null : String.valueOf(version));
+            }
+            if (device != null && device.getOtaVersion() != null && device.getOtaVersion().equals(vo.getVersion())) {
+                vo.setOtaState(device.getOtaState());
+                vo.setProgress(device.getOtaProgress());
+            }
+            return vo;
+        }).collect(Collectors.toList());
+        result.setRecords(records);
+        return result;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void retry(Long userId, String deviceId) {
+        checkDeviceBinding(userId, deviceId);
+        DeviceCommand lastFailed = commandService.getOne(new LambdaQueryWrapper<DeviceCommand>()
+                .eq(DeviceCommand::getDeviceId, deviceId)
+                .eq(DeviceCommand::getTarget, DeviceMqttConstants.TARGET_OTA)
+                .in(DeviceCommand::getStatus,
+                        DeviceCommandStatus.FAILED.getCode(),
+                        DeviceCommandStatus.TIMEOUT.getCode(),
+                        DeviceCommandStatus.CANCELLED.getCode())
+                .orderByDesc(DeviceCommand::getCreateTime)
+                .last("LIMIT 1"));
+        if (lastFailed == null) {
+            throw new BusinessException(ErrorCode.OTA_START_FAILED, "当前没有可重试的升级任务");
+        }
+        startOta(userId, deviceId);
     }
 
     /**

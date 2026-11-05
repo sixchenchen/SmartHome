@@ -100,25 +100,26 @@ public class DeviceCommandServiceImpl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void handleAck(String deviceId, String commandId, boolean success,
-                          Map<String, Object> payload, String errorMsg) {
+    public DeviceCommand handleAck(String deviceId, String commandId, boolean success,
+                                   Map<String, Object> payload, String errorMsg) {
         // 1. 查询指令
         DeviceCommand command = getByCommandId(commandId);
         if (command == null) {
             log.warn("ACK 对应的指令不存在 - commandId: {}", commandId);
-            return;
+            return null;
         }
         if (!Objects.equals(deviceId, command.getDeviceId())) {
             log.error(" 发现越权 ACK！设备 [{}] 试图伪造设备 [{}] 的指令 ACK - commandId: {}",
                     deviceId, command.getDeviceId(), commandId);
             // 直接丢弃，不更新任何状态
-            return;
+            return null;
         }
         // 2. 决策：根据当前状态 + payload 判断是否需要变更
         AckDecision decision = decideAckTransition(command, success, payload, errorMsg);
         if (decision == null) {
-            return;   // 忽略
+            return null;   // 忽略（重复 ACK / 终态）
         }
+        Integer previousStatus = command.getStatus();
 
         // 3. 执行状态更新
         updateStatus(command.getId(), decision.newStatus(), decision.errorMsg());
@@ -126,6 +127,7 @@ public class DeviceCommandServiceImpl
         // 4. 保存 response_payload
         if (payload != null && !payload.isEmpty()) {
             updateResponsePayload(command.getId(), payload);
+            command.setResponsePayload(payload);
         }
 
         // 5. OTA 最终成功 → 兜底更新 firmware
@@ -133,8 +135,16 @@ public class DeviceCommandServiceImpl
             updateFirmwareFromAck(command.getDeviceId(), payload);
         }
 
+        // 6. 回填内存态，供调用方推送 WebSocket（与 updateStatus 的落库结果保持一致）
+        command.setStatus(decision.newStatus());
+        command.setErrorMsg(decision.errorMsg());
+        if (DeviceCommandConstants.FINISHED_STATUSES.contains(decision.newStatus())) {
+            command.setAckTime(LocalDateTime.now());
+        }
+
         log.info("ACK 处理完成 - commandId: {}, 状态 {} → {}, success: {}",
-                commandId, command.getStatus(), decision.newStatus(), success);
+                commandId, previousStatus, decision.newStatus(), success);
+        return command;
     }
 
     /**

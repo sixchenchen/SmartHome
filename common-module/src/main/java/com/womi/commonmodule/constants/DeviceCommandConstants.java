@@ -54,6 +54,12 @@ public final class DeviceCommandConstants {
     /** Web 接口默认操作人 */
     public static final String WEB_DEFAULT_OPERATOR = "web-user";
 
+    /** 管理端默认操作人 */
+    public static final String ADMIN_DEFAULT_OPERATOR = "admin";
+
+    /** 用户端操作人前缀（拼接 userId） */
+    public static final String USER_OPERATOR_PREFIX = "user_";
+
     /** 指令来源：Web 接口 */
     public static final String SOURCE_WEB = "WEB";
 

@@ -1,6 +1,7 @@
 package com.womi.webmodule.controller.user;
 
 import com.womi.businessmodule.dto.LoginRequest;
+import com.womi.businessmodule.dto.RefreshRequest;
 import com.womi.businessmodule.dto.UserRegisterRequest;
 import com.womi.businessmodule.mapper.sys.SysUserMapper;
 import com.womi.businessmodule.model.sys.SysRefreshToken;
@@ -19,8 +20,8 @@ import com.womi.webmodule.service.auth.RefreshTokenService;
 import com.womi.webmodule.service.auth.TokenBlacklistService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,6 +31,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -39,7 +41,6 @@ public class UserAuthController {
     private final SysUserMapper sysUserMapper;
     private final JwtTokenUtil jwtTokenUtil;
 
-    // 👈 核心修改：全部注入接口，变量名去掉 Impl
     private final AuthService authService;
     private final LoginAttemptService loginAttemptService;
     private final RefreshTokenService refreshTokenService;
@@ -50,6 +51,7 @@ public class UserAuthController {
     public ApiResponse<LoginResponse> login(@RequestBody @Valid LoginRequest request,
                                             HttpServletRequest httpRequest,
                                             @RequestHeader(value = HttpConstants.DEVICE_TYPE_HEAD, required = false) String deviceType) {
+        log.info("用户{}请求登录",request.getUsername());
         String username = request.getUsername();
         String ip = getClientIp(httpRequest);
 
@@ -80,13 +82,9 @@ public class UserAuthController {
 
     @PostMapping("/register")
     public ApiResponse<UserRegisterResponse> register(@RequestBody @Valid UserRegisterRequest request) {
+        log.info("用户{}请求注册",request.getUsername());
         var user = authService.register(request);
         return ApiResponse.success(new UserRegisterResponse(user.getId(), user.getUsername(), user.getNickname()));
-    }
-
-    @Data
-    public static class RefreshRequest {
-        private String refreshToken;
     }
 
     @PostMapping("/refresh")
@@ -112,6 +110,7 @@ public class UserAuthController {
     @PostMapping("/logout")
     public ApiResponse<Void> logout(@RequestBody(required = false) RefreshRequest request,
                                     @RequestHeader(value = UserConstants.AUTHORIZATION_HEAD, required = false) String bearerToken) {
+        log.info("用户退出");
         // 1. 将 AccessToken 加入黑名单
         if (bearerToken != null && bearerToken.startsWith(UserConstants.BEARER)) {
             String token = bearerToken.substring(UserConstants.TOKEN_BEGIN_INDEX);

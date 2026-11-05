@@ -126,6 +126,20 @@ knife4j:
   setting:
     language: zh_cn
 
+app:
+  upload:
+    avatar-dir: uploads/avatar
+    avatar-base-url: /files/avatar/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 #logging:
 #  level:
 #    com.womi: debug

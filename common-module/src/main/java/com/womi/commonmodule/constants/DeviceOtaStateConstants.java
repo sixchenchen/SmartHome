@@ -1,5 +1,7 @@
 package com.womi.commonmodule.constants;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -28,4 +30,15 @@ public final class DeviceOtaStateConstants {
 
     /** 僵死判定阈值：ota_update_time 超过该分钟数未更新，视为僵死 */
     public static final int STALE_OTA_MINUTES = 5;
+
+    /** 状态与文案（按升级阶段顺序，供字典下发） */
+    public static final List<Map.Entry<String, String>> STATE_LABELS = List.of(
+            Map.entry(ACCEPTED, "已接受"),
+            Map.entry(DOWNLOADING, "下载中"),
+            Map.entry(VERIFYING, "校验中"),
+            Map.entry(FLASHING, "写入中"),
+            Map.entry(REBOOTING, "重启中"),
+            Map.entry(SUCCESS, "升级成功"),
+            Map.entry(FAILED, "升级失败")
+    );
 }

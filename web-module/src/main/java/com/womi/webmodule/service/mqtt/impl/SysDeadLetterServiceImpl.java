@@ -91,4 +91,25 @@ public class SysDeadLetterServiceImpl
         Page<SysDeadLetter> page = new Page<>(pageNum, pageSize);
         return page(page, new QueryWrapper<SysDeadLetter>().orderByDesc("create_time"));
     }
+
+    @Override
+    public SysDeadLetter getDetail(Long id) {
+        SysDeadLetter dl = getById(id);
+        if (dl == null) {
+            throw new BusinessException(ErrorCode.PARAM_INVALID, "死信记录不存在");
+        }
+        return dl;
+    }
+
+    @Override
+    public void ignore(Long id) {
+        SysDeadLetter dl = getDetail(id);
+        if (Objects.equals(dl.getStatus(), 2)) {
+            return;
+        }
+        dl.setStatus(2);
+        dl.setUpdateTime(LocalDateTime.now());
+        updateById(dl);
+        log.info("死信已标记忽略 - id: {}, topic: {}", id, dl.getTopic());
+    }
 }
