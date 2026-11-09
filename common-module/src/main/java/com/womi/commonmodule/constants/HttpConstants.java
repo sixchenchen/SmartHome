@@ -23,6 +23,12 @@ public final class HttpConstants {
     public static final String ACTUATOR_HEALTH_PATH = "/actuator/health";
     public static final String WEBSOCKET_ENDPOINT_PATTERN = "/ws/**";
     public static final String ERROR_PATH = "/error";
+    /** SockJS 降级传输（EventSource / SSE）的响应类型 */
+    public static final String SSE_CONTENT_TYPE = "text/event-stream";
+
+    /** SockJS 会话地址前缀（后端 WebSocket 端点下的传输请求） */
+    public static final String WEBSOCKET_TRANSPORT_PREFIX = "/ws/";
+
     public static final String FAVICON_PATH = "/favicon.ico";
 
     // ==================== 认证接口路径 ====================

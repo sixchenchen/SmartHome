@@ -1930,6 +1930,7 @@ CREATE TABLE `sys_user`  (
   `nickname` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '昵称',
   `email` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '邮箱',
   `phone` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '手机号',
+  `avatar` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '头像URL',
   `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：1启用，0禁用',
   `last_login_time` datetime NULL DEFAULT NULL COMMENT '最后登录时间',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1943,6 +1944,6 @@ CREATE TABLE `sys_user`  (
 -- ----------------------------
 -- Records of sys_user
 -- ----------------------------
-INSERT INTO `sys_user` VALUES (1, 'admin', '$2a$12$rv4E/xFYLPv1rbjdaJ53X.xRMgk7owbS2cn745lB3yMBI1HyLvrYG', '管理员', '123@qq.com', '17788888888', 1, '2026-11-05 16:07:58', '2026-11-05 15:56:35', '2026-11-05 16:07:58', 0);
+INSERT INTO `sys_user` VALUES (1, 'admin', '$2a$12$rv4E/xFYLPv1rbjdaJ53X.xRMgk7owbS2cn745lB3yMBI1HyLvrYG', '管理员', '123@qq.com', '17788888888', NULL, 1, '2026-11-05 16:07:58', '2026-11-05 15:56:35', '2026-11-05 16:07:58', 0);
 
 SET FOREIGN_KEY_CHECKS = 1;

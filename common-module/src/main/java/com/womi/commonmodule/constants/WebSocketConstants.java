@@ -43,6 +43,17 @@ public final class WebSocketConstants {
     public static final String MSG_TYPE_OTA_PROGRESS = "ota_progress";
     public static final String MSG_TYPE_COMMAND_RESULT = "command_result";
 
+    // ==================== Spring WebSocket 配置常量 ====================
+
+    /** 消息代理（Broker）广播主题前缀 (注意：配置类中不带结尾的 '/') */
+    public static final String BROKER_TOPIC_DESTINATION = "/topic";
+    /** 消息代理（Broker）队列前缀 (注意：配置类中不带结尾的 '/') */
+    public static final String BROKER_QUEUE_DESTINATION = "/queue";
+    /** 后端 Controller 接收消息的前缀 */
+    public static final String APP_DESTINATION_PREFIX = "/app";
+    /** WebSocket 连接端点路径 */
+    public static final String ENDPOINT_PATH = "/ws";
+
     // ==================== STOMP 会话属性 ====================
 
     /** 会话中的用户名（用户ID复用 UserConstants.USER_ID） */

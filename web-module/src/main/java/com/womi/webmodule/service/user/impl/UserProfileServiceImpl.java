@@ -16,6 +16,8 @@ import com.womi.businessmodule.vo.LoginLogVO;
 import com.womi.businessmodule.vo.UserProfileVO;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
+import com.womi.commonmodule.utils.TransactionUtils;
+import com.womi.webmodule.service.common.CommonService;
 import com.womi.webmodule.service.sys.UserGrantService;
 import com.womi.webmodule.service.user.UserProfileService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final SysRefreshTokenMapper sysRefreshTokenMapper;
     private final PasswordEncoder passwordEncoder;
     private final UserGrantService userGrantService;
+    private final CommonService commonService;
 
     @Override
     public UserProfileVO getProfile(Long userId) {
@@ -51,7 +54,8 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public UserProfileVO updateProfile(Long userId, UserProfileUpdateRequest request) {
-        if (request.getNickname() == null && request.getEmail() == null && request.getPhone() == null) {
+        if (request.getNickname() == null && request.getEmail() == null
+                && request.getPhone() == null && request.getAvatar() == null) {
             throw new BusinessException(ErrorCode.PARAM_MISSING, "至少提交一个需要修改的字段");
         }
         SysUser user = requireUser(userId);
@@ -63,6 +67,15 @@ public class UserProfileServiceImpl implements UserProfileService {
         }
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone().trim());
+        }
+        if (request.getAvatar() != null) {
+            String oldAvatar = user.getAvatar();
+            String newAvatar = request.getAvatar().trim();
+            user.setAvatar(newAvatar.isEmpty() ? null : newAvatar);
+            // 事务提交后再删除旧文件，避免回滚时误删
+            if (oldAvatar != null && !oldAvatar.equals(user.getAvatar())) {
+                TransactionUtils.afterCommit(() -> commonService.deleteAvatarFile(oldAvatar));
+            }
         }
         sysUserMapper.updateById(user);
         return getProfile(userId);

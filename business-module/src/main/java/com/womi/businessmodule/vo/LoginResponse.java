@@ -17,6 +17,8 @@ public class LoginResponse {
     private String token;
     private String username;
     private String nickname;
+    /** 头像 URL，未设置时为 null */
+    private String avatar;
     private String refreshToken;
     /** 上次登录时间（如果是第一次登录，则为 null） */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")

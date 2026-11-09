@@ -19,15 +19,12 @@ import java.util.regex.Pattern;
 /**
  * WebSocket 订阅授权组件。
  *
- * <p>授权规则：</p>
- * <ol>
- *     <li>管理员：拥有全部主题（{@code /topic/**}）的订阅权限，不做设备归属校验；</li>
- *     <li>普通用户：仅允许订阅自己已绑定设备的主题，格式为
- *     {@code /topic/device/{deviceId}/{state|sensor|alert|ota}}；</li>
- *     <li>非法地址、未认证身份、未绑定设备一律拒绝。</li>
- * </ol>
- *
- * <p>所有订阅请求在 STOMP {@code SUBSCRIBE} 阶段统一走此组件，避免权限逻辑散落在拦截器中。</p>
+ * 授权规则：
+ *     管理员：拥有全部主题（{@code /topic/**}）的订阅权限，不做设备归属校验
+ *     普通用户：仅允许订阅自己已绑定设备的主题，格式为
+ *     { /topic/device/{deviceId}/{state|sensor|alert|ota}}
+ *     非法地址、未认证身份、未绑定设备一律拒绝。
+ * 所有订阅请求在 STOMP {@code SUBSCRIBE} 阶段统一走此组件，避免权限逻辑散落在拦截器中
  */
 @Slf4j
 @Component

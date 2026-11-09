@@ -38,6 +38,13 @@ public final class AvatarConstants {
     public static final String EXTENSION_PNG = "png";
     public static final String EXTENSION_WEBP = "webp";
 
+    /** 文件名（仅允许本服务生成的 UUID 风格文件名） */
+    public static final String FILE_NAME_REGEX =
+            "[A-Za-z0-9_-]+\\." + "(" + EXTENSION_JPG + "|" + EXTENSION_PNG + "|" + EXTENSION_WEBP + ")";
+
+    /** 头像 URL 校验规则（仅允许本服务上传目录下的 jpg/png/webp） */
+    public static final String URL_REGEX = "^" + DEFAULT_BASE_URL + FILE_NAME_REGEX + "$";
+
     // ==================== 文件命名 ====================
 
     /** 扩展名分隔符 */

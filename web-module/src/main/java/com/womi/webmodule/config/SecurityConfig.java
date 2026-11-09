@@ -36,30 +36,6 @@ public class SecurityConfig {
     private final JsonAuthenticationEntryPoint authenticationEntryPoint;
     private final JsonAccessDeniedHandler accessDeniedHandler;
 
-    /**
-     * 密码编码器：BCrypt 强度 12
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(UserConstants.PASSWORD_ENCODER_STRENGTH);
-    }
-
-    /**
-     * 认证提供者：连接自定义 UserDetailsService 与 PasswordEncoder
-     */
-    @Bean
-    public DaoAuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
-        provider.setPasswordEncoder(passwordEncoder());
-        return provider;
-    }
-
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, Environment env) throws Exception {
         http
@@ -102,5 +78,29 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /**
+     * 密码编码器：BCrypt 强度 12
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(UserConstants.PASSWORD_ENCODER_STRENGTH);
+    }
+
+    /**
+     * 认证提供者：连接自定义 UserDetailsService 与 PasswordEncoder
+     */
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
     }
 }

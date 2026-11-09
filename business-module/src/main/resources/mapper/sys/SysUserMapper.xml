@@ -8,6 +8,7 @@
         <result column="nickname" property="nickname"/>
         <result column="email" property="email"/>
         <result column="phone" property="phone"/>
+        <result column="avatar" property="avatar"/>
         <result column="status" property="status"/>
         <result column="last_login_time" property="lastLoginTime"/>
         <result column="create_time" property="createTime"/>
@@ -15,7 +16,7 @@
         <result column="deleted" property="deleted"/>
     </resultMap>
     <sql id="Base_Column_List">
-        id, username, password_hash, nickname, email, phone, status, last_login_time, create_time, update_time, deleted
+        id, username, password_hash, nickname, email, phone, avatar, status, last_login_time, create_time, update_time, deleted
     </sql>
     <select id="selectByUsername" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/> FROM sys_user WHERE username = #{username} AND deleted = 0 LIMIT 1

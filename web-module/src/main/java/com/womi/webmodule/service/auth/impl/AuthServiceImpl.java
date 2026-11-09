@@ -164,6 +164,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .username(user.getUsername())
                 .nickname(user.getNickname() != null ? user.getNickname() : user.getUsername())
+                .avatar(user.getAvatar())
                 .roles(roles)
                 .permissions(permissions)
                 .lastLoginTime(user.getLastLoginTime())

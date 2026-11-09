@@ -1,10 +1,12 @@
 package com.womi.webmodule.handler;
 
+import com.womi.commonmodule.constants.HttpConstants;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException; // 👈 核心修复：改为 security 的包
@@ -138,9 +140,27 @@ public class GlobalExceptionHandler {
     // ==================== 兜底 ====================
 
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ApiResponse<Void> handleException(Exception e, HttpServletRequest request) {
+    public ApiResponse<Void> handleException(Exception e, HttpServletRequest request, HttpServletResponse response) {
+        // SockJS 传输请求使用 text/event-stream 长连接，客户端断开会触发 ERROR 派发，
+        // 此时响应已提交且无 JSON 转换器，不能再包装 ApiResponse，否则会二次报错
+        if (isStreamingRequest(request, response)) {
+            log.debug("忽略 WebSocket/SSE 传输层异常 - uri: {}, message: {}",
+                    request.getRequestURI(), e.getMessage());
+            return null;
+        }
         log.error("系统异常 - uri: {}", request.getRequestURI(), e);
+        response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
         return ApiResponse.error(ErrorCode.SYSTEM_ERROR.getCode(), ErrorCode.SYSTEM_ERROR.getMessage());
+    }
+
+    /**
+     * 判断当前请求是否为 WebSocket/SockJS 流式传输，或其响应已提交。
+     */
+    private boolean isStreamingRequest(HttpServletRequest request, HttpServletResponse response) {
+        String uri = request.getRequestURI();
+        return response.isCommitted()
+                || (uri != null && uri.startsWith(HttpConstants.WEBSOCKET_TRANSPORT_PREFIX))
+                || (response.getContentType() != null
+                && response.getContentType().startsWith(HttpConstants.SSE_CONTENT_TYPE));
     }
 }

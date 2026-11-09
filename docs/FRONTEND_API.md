@@ -429,6 +429,7 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 | refreshToken | string | 刷新令牌，7 天 |
 | username | string | 用户名 |
 | nickname | string | 昵称 |
+| avatar | string \| null | 头像 URL，未设置时为 `null` |
 | roles | string[] | 如 `["USER"]` |
 | permissions | string[] | 权限码 |
 | lastLoginTime | string | `yyyy-MM-dd HH:mm:ss`，首次登录为 `null` |
@@ -1375,7 +1376,7 @@ ws.subscribeDevice('B4BFE90CDBA1');
 | nickname | string | 昵称 |
 | email | string | 邮箱 |
 | phone | string | 手机号 |
-| avatar | string | **当前恒为 `null`**（后端未持久化头像，前端自行保存） |
+| avatar | string \| null | 头像 URL；未设置时 `null`（先调上传接口，再通过 PUT profile 保存） |
 | status | number | 1 启用 / 0 禁用 |
 | roles | string[] | 角色编码 |
 | permissions | string[] | 权限码 |
@@ -1389,6 +1390,7 @@ ws.subscribeDevice('B4BFE90CDBA1');
 | nickname | ≤64 位 |
 | email | 邮箱格式，≤128 位 |
 | phone | `^1[3-9]\d{9}$` 或空 |
+| avatar | `/files/avatar/{uuid}.jpg\|png\|webp`（来自上传接口）或空串（清除头像） |
 
 **PUT/POST /api/user/password** 请求体 `PasswordChangeRequest`：
 
@@ -1669,7 +1671,14 @@ ws.subscribeDevice('B4BFE90CDBA1');
 
 **头像上传限制**：≤2MB；仅 `image/jpeg` / `image/png` / `image/webp`；返回 `{ url, size, contentType }`，其中 `url` 形如 `/files/avatar/{uuid}.jpg`，可直接用于 `<img src>`。
 
-> 后端**没有用户头像字段**，上传后需前端自行保存 URL（例如随资料一起存本地或后续扩展字段）。`GET /api/user/profile` 的 `avatar` 当前恒为 `null`。
+**头像持久化流程（已补齐）：**
+
+1. `POST /api/common/upload/avatar` 拿到 `url`；
+2. 调用 `PUT /api/user/profile`，请求体带上 `{ "avatar": "<上一步的 url>" }`；
+3. 后端把 URL 写入 `sys_user.avatar`，再次登录/刷新时 `LoginResponse.avatar` 与 `GET /api/user/profile` 的 `avatar` 都会返回该地址；
+4. 传 `"avatar": ""` 表示清除头像；替换头像时后端会在事务提交后删除旧文件。
+
+> `avatar` 只接受本服务上传接口返回的地址（`/files/avatar/{uuid}.jpg\|png\|webp`），传外部链接会返回参数校验错误。
 
 **字典结构**（`data` 为对象）：
 
@@ -1690,7 +1699,7 @@ ws.subscribeDevice('B4BFE90CDBA1');
 
 | # | 限制 | 影响 | 前端应对 |
 |---|------|------|----------|
-| 1 | 用户资料无 `avatar` 字段 | 头像 URL 无法持久化 | 上传后本地保存，或在后续版本扩展 `sys_user.avatar` |
+| 1 | ~~用户资料无 `avatar` 字段~~ | ✅ 已补齐：`sys_user.avatar` 已持久化，登录与资料接口均返回 | 上传后调用 `PUT /api/user/profile` 保存 `avatar` |
 | 2 | 无独立审计表 | `/audit-logs` 只能反映"指令类操作" | 页面标题注明"指令审计"，不要承诺覆盖所有操作 |
 | 3 | OTA 任务统计在详情查询时回写 | 列表页统计可能滞后一次刷新 | 进入详情/刷新后为准；列表展示 `pendingCount` 仅作参考 |
 | 4 | 在线/离线无 WebSocket 推送 | 状态卡片不能实时变 | 轮询 `/{deviceId}/online` 或 `/online-stats` |
@@ -1717,7 +1726,7 @@ ws.subscribeDevice('B4BFE90CDBA1');
 | 10 | 离线原因枚举未导出 | 保持 | 字符串直出 + 默认兜底文案 |
 | 11 | 固件列表不分页 | **已解决** | 新增 `/api/admin/ota/firmware` 分页；旧 `/firmware/list` 保留兼容 |
 | 12 | 死信接口只用 `hasRole('ADMIN')` | 保持 | 前端菜单按角色控制即可 |
-| 13 | 头像 URL 无法持久化 | **已知限制** | 前端本地保存上传返回的 URL |
+| 13 | ~~头像 URL 无法持久化~~ | **已解决** | 上传后调用 `PUT /api/user/profile` 保存 `avatar`，登录与资料接口都会返回 |
 | 14 | 审计日志仅覆盖指令流水 | **已知限制** | 页面注明口径，避免误解为全量审计 |
 
 ---

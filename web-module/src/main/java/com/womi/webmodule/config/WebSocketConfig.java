@@ -1,5 +1,6 @@
 package com.womi.webmodule.config;
 
+import com.womi.commonmodule.constants.WebSocketConstants;
 import com.womi.webmodule.interceptor.WebSocketAuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,14 +23,19 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic", "/queue");
-        config.setApplicationDestinationPrefixes("/app");
+        // 后端发给前端订阅：路径用 /topic/xxx 或 /queue/xxx
+        config.enableSimpleBroker(
+                WebSocketConstants.BROKER_TOPIC_DESTINATION,
+                WebSocketConstants.BROKER_QUEUE_DESTINATION
+        );
+        // 前端发给后端处理：路径用 /app/xxx
+        config.setApplicationDestinationPrefixes(WebSocketConstants.APP_DESTINATION_PREFIX);
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // 前端域名
-        registry.addEndpoint("/ws")
+        registry.addEndpoint(WebSocketConstants.ENDPOINT_PATH)
                 .setAllowedOriginPatterns(allowedOrigins)
                 .withSockJS();
     }

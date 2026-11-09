@@ -17,8 +17,7 @@ import java.util.Map;
 
 /**
  * 设备 ACK 处理器
- * <p>topic: {@code device/{mac}/ack}</p>
- * <pre>
+ * topic: {@code device/{mac}/ack}
  * {
  *   "device": "B4BFE90CDBA0",
  *   "commandId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
@@ -28,8 +27,7 @@ import java.util.Map;
  *   "data": { "state": 1, "brightness": 80 },
  *   "message": null
  * }
- * </pre>
- * <p>处理完成后通过 WebSocket 推送 {@code command_result}，让前端实时感知指令最终结果。</p>
+ * 处理完成后通过 WebSocket 推送 {@code command_result}，让前端实时感知指令最终结果
  */
 @Slf4j
 @Component

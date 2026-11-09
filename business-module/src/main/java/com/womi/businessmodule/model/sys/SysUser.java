@@ -31,6 +31,9 @@ public class SysUser {
     /** 手机号 */
     private String phone;
 
+    /** 头像地址（本服务 /files/avatar/ 下的图片 URL） */
+    private String avatar;
+
     /** 状态：1启用，0禁用 */
     private Integer status;
 

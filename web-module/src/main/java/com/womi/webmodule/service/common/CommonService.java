@@ -12,5 +12,10 @@ public interface CommonService {
 
     AvatarUploadResponse uploadAvatar(MultipartFile file);
 
+    /**
+     * 删除用户旧头像文件（仅接受本服务上传目录下的 URL，非法地址直接忽略）
+     */
+    void deleteAvatarFile(String avatarUrl);
+
     Map<String, Object> getDictionaries();
 }

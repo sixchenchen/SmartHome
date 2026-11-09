@@ -84,6 +84,24 @@ public class CommonServiceImpl implements CommonService {
     }
 
     @Override
+    public void deleteAvatarFile(String avatarUrl) {
+        if (avatarUrl == null || !avatarUrl.startsWith(avatarBaseUrl)) {
+            return;
+        }
+        String filename = avatarUrl.substring(avatarBaseUrl.length());
+        if (!filename.matches(AvatarConstants.FILE_NAME_REGEX)) {
+            log.warn("忽略非法的头像删除请求: {}", avatarUrl);
+            return;
+        }
+        try {
+            Path dir = Paths.get(avatarDir).toAbsolutePath().normalize();
+            Files.deleteIfExists(dir.resolve(filename));
+        } catch (IOException e) {
+            log.warn("旧头像文件删除失败: {}", avatarUrl, e);
+        }
+    }
+
+    @Override
     public Map<String, Object> getDictionaries() {
         Map<String, Object> result = new LinkedHashMap<>();
 
