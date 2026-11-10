@@ -15,6 +15,8 @@ public final class HttpConstants {
     public static final String INTERNAL_ERROR_MESSAGE = "Internal Server Error";
 
     public static final String DEVICE_TYPE_HEAD = "X-Device-Type";
+    /** 设备指纹（前端生成的稳定设备标识） */
+    public static final String DEVICE_ID_HEAD = "X-Device-Id";
     public static final String FORWARDED_FOR = "X-Forwarded-For";
     public static final String REAL_IP = "X-Real-IP";
     public static final String UNKNOWN = "unknown";
@@ -35,6 +37,7 @@ public final class HttpConstants {
     public static final String AUTH_LOGIN_PATH = "/api/auth/login";
     public static final String AUTH_REGISTER_PATH = "/api/auth/register";
     public static final String AUTH_REFRESH_PATH = "/api/auth/refresh";
+    public static final String AUTH_CAPTCHA_PATH = "/api/auth/captcha";
 
     // ==================== 管理端路径 ====================
     public static final String ADMIN_API_PATTERN = "/api/admin/**";

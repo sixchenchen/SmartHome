@@ -2,6 +2,7 @@ package com.womi.webmodule.service.user.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.AdminUserCreateRequest;
 import com.womi.businessmodule.dto.AdminUserUpdateRequest;
 import com.womi.businessmodule.mapper.device.DeviceBindingMapper;
 import com.womi.businessmodule.mapper.device.DeviceInfoMapper;
@@ -19,7 +20,9 @@ import com.womi.businessmodule.vo.AdminUserDetailVO;
 import com.womi.businessmodule.vo.AdminUserVO;
 import com.womi.businessmodule.vo.device.DeviceInfoVO;
 import com.womi.commonmodule.constants.RedisConstants;
+import com.womi.commonmodule.constants.UserConstants;
 import com.womi.commonmodule.enums.BindStatus;
+import com.womi.commonmodule.enums.EnableStatus;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
 import com.womi.commonmodule.utils.MacUtils;
@@ -27,9 +30,12 @@ import com.womi.webmodule.service.sys.UserGrantService;
 import com.womi.webmodule.service.user.AdminUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -51,6 +57,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     private final DeviceInfoMapper deviceInfoMapper;
     private final UserGrantService userGrantService;
     private final StringRedisTemplate redisTemplate;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public Page<AdminUserVO> pageUsers(Integer pageNum, Integer pageSize, String keyword, Integer status, String roleCode) {
@@ -97,6 +104,36 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createUser(AdminUserCreateRequest request) {
+        String username = request.getUsername().trim();
+        if (sysUserMapper.selectByUsername(username) != null) {
+            throw new BusinessException(ErrorCode.USERNAME_EXIST);
+        }
+
+        SysUser user = new SysUser();
+        user.setUsername(username);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname().trim() : username);
+        user.setEmail(StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null);
+        user.setPhone(StringUtils.hasText(request.getPhone()) ? request.getPhone().trim() : null);
+        user.setStatus(request.getStatus() == null ? EnableStatus.ENABLED.getCode() : request.getStatus());
+        user.setDeleted(UserConstants.NOT_DELETED);
+        try {
+            sysUserMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ErrorCode.USERNAME_EXIST);
+        }
+
+        List<String> roleCodes = request.getRoleCodes();
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            roleCodes = Collections.singletonList(UserConstants.DEFAULT_ROLE_CODE);
+        }
+        userGrantService.replaceRoles(user.getId(), roleCodes);
+        return user.getId();
+    }
+
+    @Override
     public AdminUserDetailVO getUserDetail(Long userId) {
         SysUser user = requireUser(userId);
         AdminUserDetailVO vo = new AdminUserDetailVO();
@@ -133,6 +170,9 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long userId, Integer status) {
+        if (EnableStatus.fromCode(status) == null) {
+            throw new BusinessException(ErrorCode.USER_STATUS_INVALID);
+        }
         requireUser(userId);
         SysUser update = new SysUser();
         update.setId(userId);

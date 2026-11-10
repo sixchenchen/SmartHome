@@ -3,6 +3,7 @@ package com.womi.webmodule.handler;
 import com.womi.commonmodule.constants.HttpConstants;
 import com.womi.commonmodule.enums.ErrorCode;
 import com.womi.commonmodule.exception.BusinessException;
+import com.womi.commonmodule.exception.RateLimitException;
 import com.womi.commonmodule.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +33,15 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 @Hidden
 public class GlobalExceptionHandler {
+
+    // ==================== 限流异常 ====================
+
+    @ExceptionHandler(RateLimitException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ApiResponse<Void> handleRateLimitException(RateLimitException e, HttpServletRequest request) {
+        log.warn("限流拦截 - uri: {}, code: {}", request.getRequestURI(), e.getCode());
+        return ApiResponse.error(e.getCode(), e.getMessage());
+    }
 
     // ==================== 业务异常 ====================
 

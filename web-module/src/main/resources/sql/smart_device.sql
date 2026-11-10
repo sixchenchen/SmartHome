@@ -1768,7 +1768,7 @@ CREATE TABLE `sys_permission`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_permission_code`(`perm_code` ASC) USING BTREE,
   INDEX `idx_sys_permission_resource`(`resource` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 21 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '权限表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 31 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '权限表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_permission
@@ -1793,6 +1793,16 @@ INSERT INTO `sys_permission` VALUES (17, 'user:update', '修改用户', 'API', '
 INSERT INTO `sys_permission` VALUES (18, 'system:config', '系统配置', 'API', 'system', 'update', '修改系统级参数', 1, '2026-10-26 16:03:52', '2026-10-26 16:03:52', 0);
 INSERT INTO `sys_permission` VALUES (19, 'firmware:delete', '删除固件', 'API', 'firmware', 'delete', '删除废弃的固件包', 1, '2026-10-27 15:09:44', '2026-10-27 15:09:44', 0);
 INSERT INTO `sys_permission` VALUES (20, 'ota:list', '查询固件', 'API', 'firmware', 'select', '查询所有的固件包', 1, '2026-10-27 15:12:10', '2026-10-27 15:12:10', 0);
+INSERT INTO `sys_permission` VALUES (21, 'user:delete', '删除用户', 'API', 'user', 'delete', '逻辑删除用户', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (22, 'role:list', '查询角色', 'API', 'role', 'read', '查看角色列表与详情', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (23, 'role:create', '创建角色', 'API', 'role', 'create', '新增角色', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (24, 'role:update', '修改角色', 'API', 'role', 'update', '修改角色信息或启停状态', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (25, 'role:delete', '删除角色', 'API', 'role', 'delete', '删除非内置角色', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (26, 'role:assign-permission', '分配角色权限', 'API', 'role', 'update', '为角色覆盖式分配权限', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (27, 'permission:list', '查询权限', 'API', 'permission', 'read', '查看权限列表与详情', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (28, 'permission:create', '创建权限', 'API', 'permission', 'create', '新增权限', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (29, 'permission:update', '修改权限', 'API', 'permission', 'update', '修改权限信息或启停状态', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
+INSERT INTO `sys_permission` VALUES (30, 'permission:delete', '删除权限', 'API', 'permission', 'delete', '删除未被角色引用的权限', 1, '2026-11-10 10:00:00', '2026-11-10 10:00:00', 0);
 
 -- ----------------------------
 -- Table structure for sys_refresh_token
@@ -1874,7 +1884,7 @@ CREATE TABLE `sys_role_permission`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_role_permission`(`role_id` ASC, `permission_id` ASC) USING BTREE,
   INDEX `idx_sys_role_permission_perm`(`permission_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 40 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色-权限关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 50 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '角色-权限关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_role_permission
@@ -1918,6 +1928,16 @@ INSERT INTO `sys_role_permission` VALUES (36, 3, 2, '2026-10-26 16:03:52');
 INSERT INTO `sys_role_permission` VALUES (37, 3, 6, '2026-10-26 16:03:52');
 INSERT INTO `sys_role_permission` VALUES (38, 3, 7, '2026-10-26 16:03:52');
 INSERT INTO `sys_role_permission` VALUES (39, 3, 8, '2026-10-26 16:03:52');
+INSERT INTO `sys_role_permission` VALUES (40, 1, 21, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (41, 1, 22, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (42, 1, 23, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (43, 1, 24, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (44, 1, 25, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (45, 1, 26, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (46, 1, 27, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (47, 1, 28, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (48, 1, 29, '2026-11-10 10:00:00');
+INSERT INTO `sys_role_permission` VALUES (49, 1, 30, '2026-11-10 10:00:00');
 
 -- ----------------------------
 -- Table structure for sys_user

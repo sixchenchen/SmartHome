@@ -10,10 +10,14 @@ package com.womi.commonmodule.enums;
  *   3xxx  保留
  *   4000-4009 文件
  *   4010-4019 认证
- *   4020-4029 权限（预留）
+ *   4020-4029 权限
+ *   4030-4039 验证码
  *   4100-4109 固件
  *   4200-4209 设备
  *   4300-4309 OTA
+ *   4400-4409 角色
+ *   4500-4509 用户业务
+ *   4600-4609 限流
  *   5xxx  服务端
  */
 public enum ErrorCode {
@@ -28,6 +32,20 @@ public enum ErrorCode {
     ACCOUNT_LOCKED(4013, "账号已锁定"),
     TOKEN_INVALID(4014,"未登录或 token 已过期"),
     USER_NOT_FOUND(4015, "用户不存在"),
+
+    // ==================== 权限（4020-4029） ====================
+    PERMISSION_NOT_FOUND(4020, "权限不存在"),
+    PERMISSION_CODE_EXIST(4021, "权限编码已存在"),
+    PERMISSION_IN_USE(4022, "权限已被角色引用，无法删除"),
+    PERMISSION_TYPE_INVALID(4023, "权限类型非法"),
+    PERMISSION_CODE_IMMUTABLE(4024, "权限编码不允许修改"),
+
+    // ==================== 验证码（4030-4039） ====================
+    CAPTCHA_EXPIRED(4030, "验证码已过期，请重新获取"),
+    CAPTCHA_INVALID(4031, "验证码错误"),
+    CAPTCHA_REQUIRED(4032, "请输入验证码"),
+    CAPTCHA_TYPE_UNSUPPORTED(4033, "暂不支持该验证码类型"),
+    CAPTCHA_GENERATE_FAILED(4034, "验证码生成失败"),
 
     // ==================== 参数（1xxx） ====================
     PARAM_ERROR(1000, "参数错误"),
@@ -78,6 +96,24 @@ public enum ErrorCode {
     OTA_IN_PROGRESS(4301, "OTA 正在进行中"),
     OTA_VERSION_INCOMPATIBLE(4302, "OTA 版本不兼容"),
     OTA_ALREADY_LATEST(4303, "当前已是最新版本，无需升级"),
+
+    // ==================== 角色（4400-4409） ====================
+    ROLE_NOT_FOUND(4400, "角色不存在"),
+    ROLE_CODE_EXIST(4401, "角色编码已存在"),
+    ROLE_IN_USE(4402, "角色已分配给用户，无法删除"),
+    ROLE_BUILT_IN_PROTECTED(4403, "内置角色不允许该操作"),
+    ROLE_DISABLED(4404, "角色已禁用"),
+
+    // ==================== 用户业务（4500-4509） ====================
+    USERNAME_EXIST(4500, "用户名已存在"),
+    USER_ROLE_REQUIRED(4501, "至少需要分配一个角色"),
+    USER_STATUS_INVALID(4502, "用户状态非法"),
+
+    // ==================== 限流（4600-4609） ====================
+    RATE_LIMIT_EXCEEDED(4600, "请求过于频繁，请稍后再试"),
+    RISK_VERIFICATION_REQUIRED(4601, "请求过于频繁，请完成人机验证"),
+    IP_TEMPORARILY_BLOCKED(4602, "当前网络访问受限，请稍后再试"),
+
     // ==================== 系统（5xxx） ====================
     SYSTEM_ERROR(5000, "系统异常"),
     DB_ERROR(5001, "数据库异常"),

@@ -1,5 +1,6 @@
 package com.womi.webmodule.config;
 
+import com.womi.commonmodule.constants.RedisConstants;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.redis.spring.RedisLockProvider;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
@@ -7,6 +8,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
+/**
+ * 实例部署的定时任务上的一把"分布式互斥锁"
+ */
 @Configuration
 @EnableSchedulerLock(defaultLockAtMostFor = "5m") // 开启分布式锁，默认最大锁时长 5 分钟
 public class ShedLockConfig {
@@ -14,6 +18,6 @@ public class ShedLockConfig {
     @Bean
     public LockProvider lockProvider(RedisConnectionFactory connectionFactory) {
         // 使用 Redis 作为锁的存储介质
-        return new RedisLockProvider(connectionFactory, "my-iot-lock");
+        return new RedisLockProvider(connectionFactory, RedisConstants.REDIS_SHED_LOCK_PREFIX);
     }
 }

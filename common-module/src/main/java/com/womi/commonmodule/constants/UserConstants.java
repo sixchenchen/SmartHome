@@ -12,7 +12,7 @@ public final class UserConstants {
     /**
      * 角色与权限
      */
-    public static final String DEFAULT_ROLE_CODE = "USER";
+    public static final String DEFAULT_ROLE_CODE = RoleConstants.USER;
     public static final String ROLE_PREFIX = "ROLE_";
 
     // ==================== 登录日志相关 ====================
@@ -42,8 +42,8 @@ public final class UserConstants {
     public static final String USER_ID = "userId";
 
 
-    public static final String USER_ROLE_ADMIN = "ADMIN";
-    public static final String USER_ROLE_OPS = "OPS";
+    public static final String USER_ROLE_ADMIN = RoleConstants.ADMIN;
+    public static final String USER_ROLE_OPS = RoleConstants.OPS;
 
     /** 管理员权限串（Spring Security 角色带 ROLE_ 前缀） */
     public static final String ADMIN_AUTHORITY = ROLE_PREFIX + USER_ROLE_ADMIN;

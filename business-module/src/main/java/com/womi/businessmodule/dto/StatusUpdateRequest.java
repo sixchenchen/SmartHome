@@ -6,10 +6,10 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
- * 启用/禁用用户请求
+ * 通用启用/禁用请求（用户/角色/权限）
  */
 @Data
-public class UserStatusUpdateRequest {
+public class StatusUpdateRequest {
 
     @NotNull(message = "状态不能为空")
     @Min(value = 0, message = "状态值非法")

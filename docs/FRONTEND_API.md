@@ -1,7 +1,7 @@
 # WM_LAOHUA 前端对接文档
 
-> **文档版本**：v1.1　**编写日期**：2026-11-04　**最近更新**：2026-11-05　**适用代码**：当前 `main` 工作区
-> **性质**：前后端对接文档。**v1.1 已同步本轮后端实现结果**。
+> **文档版本**：v1.4　**编写日期**：2026-11-04　**最近更新**：2026-11-10　**适用代码**：当前 `main` 工作区
+> **性质**：前后端对接文档。**v1.4 新增三层限流与风控（验证码获取、登录请求、失败计数），详见第 12 章**。
 > **标注约定**：
 > - ✅ **已实现**：后端接口已存在，可直接联调（路径、参数、响应均按当前代码逐字段核对）。
 > - ⚠️ **已实现但有限制**：接口存在，但字段/校验/返回结构有坑，前端需注意。
@@ -22,6 +22,7 @@
 9. [前端对接风险与待确认项](#9-前端对接风险与待确认项)
 10. [联调检查清单](#10-联调检查清单)
 11. [OTA 升级全流程与实时进度（前端必读）](#11-ota-升级全流程与实时进度前端必读)
+12. [三层限流与风控（前端必读）](#12-三层限流与风控前端必读)
 
 ---
 
@@ -53,6 +54,7 @@ http://localhost:8080/api/user/devices/my
 | `Authorization` | 除登录/注册/刷新外**必填** | 值：`Bearer <accessToken>`（注意 `Bearer` 后有**一个空格**） |
 | `Content-Type` | 视接口 | JSON 用 `application/json`；固件上传用 `multipart/form-data` |
 | `X-Device-Type` | 否（仅登录时读取） | 登录时传入 `web` / `app` / `mini`，会写入 RefreshToken 记录；不传默认 `web` |
+| `X-Device-Id` | 否（强烈建议） | 设备指纹，前端生成并持久化（如 UUID）；用于设备维度限流。不传时后端降级使用 IP |
 
 > 后端 CORS 已改为**配置化白名单**，前端联调前必须把本地域名（如 `http://localhost:5173`）加入后端配置，否则浏览器会拦截。
 
@@ -140,6 +142,16 @@ http://localhost:8080/api/user/devices/my
 | **4013** | 账号已锁定 | 提示"账号已锁定，请 15 分钟后再试" |
 | **4014** | 未登录或 token 已过期 | **触发刷新 / 跳登录** |
 | **4015** | 用户不存在 | 跳登录 |
+| **4020** | 权限不存在 | 刷新权限列表 |
+| **4021** | 权限编码已存在 | 提示更换编码 |
+| **4022** | 权限已被角色引用，无法删除 | 提示先解除角色授权 |
+| **4023** | 权限类型非法 | 表单提示（MENU/BUTTON/API/ACTION） |
+| **4024** | 权限编码不允许修改 | 编码只读 |
+| **4030** | 验证码已过期，请重新获取 | 刷新验证码图片 |
+| **4031** | 验证码错误 | 提示并刷新验证码 |
+| **4032** | 请输入验证码 | 表单提示 |
+| **4033** | 暂不支持该验证码类型 | 仅使用 `image` |
+| **4034** | 验证码生成失败 | 重试 |
 | **4100** | 固件版本已存在 | 提示换版本号 |
 | **4101** | 固件不存在 | 刷新列表 |
 | **4102** | 固件已禁用 | 提示 |
@@ -165,6 +177,17 @@ http://localhost:8080/api/user/devices/my
 | **4301** | OTA 正在进行中 | 禁用升级按钮 |
 | **4302** | OTA 版本不兼容 | 提示 |
 | **4303** | 当前已是最新版本，无需升级 | 提示 |
+| **4400** | 角色不存在 | 刷新角色列表 |
+| **4401** | 角色编码已存在 | 提示更换编码 |
+| **4402** | 角色已分配给用户，无法删除 | 提示先解除用户角色 |
+| **4403** | 内置角色不允许该操作 | 禁用删除/禁用/改编码按钮 |
+| **4404** | 角色已禁用 | 提示 |
+| **4500** | 用户名已存在 | 表单提示 |
+| **4501** | 至少需要分配一个角色 | 表单提示 |
+| **4502** | 用户状态非法 | 表单提示 |
+| **4600** | 请求过于频繁，请稍后再试 | HTTP 429；按钮倒计时 |
+| **4601** | 请求过于频繁，请完成人机验证 | HTTP 429；展示滑块/行为验证（预留） |
+| **4602** | 当前网络访问受限，请稍后再试 | HTTP 429；提示稍后再试 |
 | **5000** | 系统异常 | 通用错误页 |
 | **5001** | 数据库异常 | 通用错误页 |
 | **5002** | 系统配置缺失 | 联系运维 |
@@ -213,16 +236,29 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 
 ### 3.5 角色与权限码（✅）
 
-角色：`ADMIN`、`USER`（注册用户默认 `USER`）。
+角色：`ADMIN`、`OPS`、`USER`（注册用户默认 `USER`）。
 `LoginResponse.permissions` 为权限码数组（如 `["device:list","firmware:upload"]`）。
+
+> `ADMIN`、`OPS`、`USER` 为内置角色（`builtIn=1`）：不允许删除、不允许修改角色编码、不允许禁用。
+> **升级提示**：已有数据库需执行 `web-module/src/main/resources/sql/smart_device.sql` 中 `sys_permission` id `21~30` 及 `sys_role_permission` id `40~49` 的增量记录，否则 ADMIN 调用角色/权限管理接口会返回 403。
 
 | 接口 | 角色要求 | 权限码要求 |
 |------|----------|------------|
 | `/api/admin/**` | `ADMIN`（`hasRole('ADMIN')`） | 见下 |
 | `GET /api/admin/users`、`GET /{id}`、`GET /{id}/devices` | ADMIN | `user:list` |
+| `POST /api/admin/users` | ADMIN | `user:create` |
 | `PUT /api/admin/users/{id}`、`/status`、`/roles` | ADMIN | `user:update` |
 | `DELETE /api/admin/users/{id}` | ADMIN | `user:delete` |
 | `POST /api/admin/users/{id}/force-unbind` | ADMIN | `device:unbind` |
+| `GET /api/admin/roles`、`/all`、`/{id}`、`/{id}/permissions` | ADMIN | `role:list` |
+| `POST /api/admin/roles` | ADMIN | `role:create` |
+| `PUT /api/admin/roles/{id}`、`/{id}/status` | ADMIN | `role:update` |
+| `DELETE /api/admin/roles/{id}` | ADMIN | `role:delete` |
+| `PUT /api/admin/roles/{id}/permissions` | ADMIN | `role:assign-permission` |
+| `GET /api/admin/permissions`、`/all`、`/{id}` | ADMIN | `permission:list` |
+| `POST /api/admin/permissions` | ADMIN | `permission:create` |
+| `PUT /api/admin/permissions/{id}`、`/{id}/status` | ADMIN | `permission:update` |
+| `DELETE /api/admin/permissions/{id}` | ADMIN | `permission:delete` |
 | `GET /api/admin/devices`、`/online-stats`、`/export` | ADMIN | `device:list` |
 | `GET /api/admin/devices/{id}`、`/{id}/bindings` | ADMIN | `device:read` |
 | `PUT /api/admin/devices/{id}` | ADMIN | `device:update` |
@@ -275,7 +311,7 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 | 19 | GET | `/api/admin/dead-letters` | ADMIN | ✅ |
 | 20 | POST | `/api/admin/dead-letters/{id}/replay` | ADMIN | ✅ |
 
-### 4.2 本轮新增接口（52 个）
+### 4.2 本轮新增接口（52 个，另含用户/角色/权限管理 17 个）
 
 **用户中心（4）**
 
@@ -373,6 +409,7 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 | 50 | POST | `/api/common/upload/avatar` | 头像上传 |
 | 51 | GET | `/api/common/dictionaries` | 字典下发 |
 | 52 | GET | `/actuator/health` | 健康检查（免认证） |
+| 53 | POST | `/api/auth/captcha` | 获取验证码（免认证） |
 
 ---
 
@@ -412,6 +449,45 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 
 `POST /api/auth/login`
 
+**前置：获取验证码**（`captcha.enabled=true` 时登录必须携带验证码）
+
+`POST /api/auth/captcha`　无需 Token
+
+请求体（可省略，默认图片验证码）：
+
+```json
+{ "type": "image" }
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| type | string | 否 | `image`（默认）；`sms`/`email` 为预留类型，当前返回 4033 |
+| target | string | 否 | 短信/邮箱接收目标，图片验证码无需传 |
+
+> **限流**：同一 IP 每分钟 ≤ 10 次、每小时 ≤ 100 次；同一设备每分钟 ≤ 5 次。超限返回 **HTTP 429**（`code=4600`），不返回具体触发维度，前端做按钮倒计时即可。
+
+响应 `data`：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| captchaId | string | 验证码唯一标识，登录时回传 |
+| captchaType | string | `image` |
+| imageBase64 | string | 图片 Base64，含 `data:image/png;base64,` 前缀，可直接作为 `img.src` |
+| expireIn | number | 有效期（秒），默认 300 |
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "captchaId": "8f3c2a9e4b7d41c6a1f0e5d2c9b8a7f6",
+    "captchaType": "image",
+    "imageBase64": "data:image/png;base64,iVBORw0KGgo...",
+    "expireIn": 300
+  }
+}
+```
+
 **请求头**：`X-Device-Type`（可选，`web`/`app`，默认 `web`）
 
 **请求体**
@@ -420,6 +496,8 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 |------|------|------|
 | username | string | 是 |
 | password | string | 是 |
+| captchaId | string | `captcha.enabled=true` 时必填 |
+| captchaCode | string | `captcha.enabled=true` 时必填，忽略大小写 |
 
 **响应 `data`（LoginResponse）**
 
@@ -435,7 +513,10 @@ code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
 | lastLoginTime | string | `yyyy-MM-dd HH:mm:ss`，首次登录为 `null` |
 | expiresAt | string | `yyyy-MM-dd HH:mm:ss`，Access Token 过期时间 |
 
-**错误码**：4010（用户名或密码错误）、4011（禁用）、4013（锁定）、4012（刷新令牌异常不会出现在登录）。
+**错误码**：4010（用户名或密码错误）、4011（禁用）、4013（锁定）、4030（验证码过期）、4031（验证码错误）、4032（未填验证码）。
+
+> 验证码校验成功后立即失效，同一 `captchaId` 不能重复使用；连续输错 5 次验证码立即失效，需重新获取。
+> **限流**：登录请求在验证码校验之前先经过第二层限流（IP 10 次/分钟、50 次/小时；设备 5 次/分钟；账号 5 次/分钟），超限返回 **HTTP 429**。详见 [第 12 章](#12-三层限流与风控前端必读)。
 
 ---
 
@@ -1356,7 +1437,7 @@ ws.subscribeDevice('B4BFE90CDBA1');
 
 ## 8. 本轮新增接口详情（✅ 全部已实现）
 
-> 本章原为"未实现接口建议契约"，本轮 **8.1～8.10 全部落地**。以下路径、参数、响应字段均按当前代码核对，前端可直接联调。
+> 本章原为"未实现接口建议契约"，本轮 **8.1～8.12 全部落地**。以下路径、参数、响应字段均按当前代码核对，前端可直接联调。
 
 ### 8.1 用户中心 ✅
 
@@ -1547,6 +1628,7 @@ ws.subscribeDevice('B4BFE90CDBA1');
 | 接口 | 权限码 | 说明 |
 |------|--------|------|
 | ✅ `GET /api/admin/users?pageNum=&pageSize=&keyword=&status=&role=` | `user:list` | 用户列表 |
+| ✅ `POST /api/admin/users` | `user:create` | 新增用户并分配角色 |
 | ✅ `GET /api/admin/users/{id}` | `user:list` | 用户详情 |
 | ✅ `PUT /api/admin/users/{id}` | `user:update` | 编辑资料 |
 | ✅ `PUT /api/admin/users/{id}/status` | `user:update` | 启用/禁用 |
@@ -1561,6 +1643,23 @@ ws.subscribeDevice('B4BFE90CDBA1');
 **`AdminUserDetailVO`** = 上述字段 + `deviceCount`(number)、`loginCount`(number)、`permissions`(string[])、`updateTime`。
 
 **请求体**
+
+- `POST /api/admin/users` →
+
+```json
+{
+  "username": "operator01",
+  "password": "Passw0rd123",
+  "nickname": "运维一号",
+  "email": "ops01@example.com",
+  "phone": "13800138000",
+  "roleCodes": ["OPS"],
+  "status": 1
+}
+```
+
+  字段约束：`username` 4-32 位字母/数字/下划线；`password` 8-64 位且同时包含字母和数字；`roleCodes` 为空时默认分配 `USER`；`status` 缺省为 1。
+  返回 `data` 为新用户 ID（number）。
 
 - `PUT /{id}` → `{ nickname?, email?, phone? }`
 - `PUT /{id}/status` → `{ "status": 0 | 1 }`
@@ -1695,7 +1794,91 @@ ws.subscribeDevice('B4BFE90CDBA1');
 
 ---
 
-### 8.11 已知限制（本轮实现后仍存在）
+### 8.11 管理端：角色管理 ✅（全部需要 ADMIN 角色）
+
+| 接口 | 权限码 | 说明 |
+|------|--------|------|
+| ✅ `GET /api/admin/roles?pageNum=&pageSize=&keyword=&status=` | `role:list` | 角色分页（编码/名称模糊） |
+| ✅ `GET /api/admin/roles/all` | `role:list` | 全部角色（下拉选择） |
+| ✅ `GET /api/admin/roles/{id}` | `role:list` | 角色详情（含权限） |
+| ✅ `POST /api/admin/roles` | `role:create` | 新增角色 |
+| ✅ `PUT /api/admin/roles/{id}` | `role:update` | 编辑角色 |
+| ✅ `PUT /api/admin/roles/{id}/status` | `role:update` | 启用/禁用角色 |
+| ✅ `DELETE /api/admin/roles/{id}` | `role:delete` | 删除角色 |
+| ✅ `GET /api/admin/roles/{id}/permissions` | `role:list` | 查询角色权限 |
+| ✅ `PUT /api/admin/roles/{id}/permissions` | `role:assign-permission` | 覆盖式分配权限 |
+
+**`AdminRoleVO`**：`id`、`roleCode`、`roleName`、`description`、`status`、`builtIn`(1 内置/0 自定义)、`userCount`、`permissionCount`、`createTime`、`updateTime`。
+
+**`AdminRoleDetailVO`** = 上述字段 + `permissionIds`(number[])、`permCodes`(string[])。
+
+**请求体**
+
+- `POST /api/admin/roles` / `PUT /api/admin/roles/{id}` →
+
+```json
+{
+  "roleCode": "AUDITOR",
+  "roleName": "审计员",
+  "description": "只读查看设备与告警",
+  "status": 1
+}
+```
+
+  约束：`roleCode` 3-32 位，以大写字母开头，仅包含大写字母、数字、下划线；`roleName` 必填且 ≤64 位。
+  返回 `data` 为新建角色 ID（number）。
+
+- `PUT /api/admin/roles/{id}/status` → `{ "status": 0 | 1 }`
+- `PUT /api/admin/roles/{id}/permissions` → `{ "permissionIds": [1, 2, 9] }`（传空数组表示清空）
+
+**内置角色保护（重要）**：`builtIn=1` 的角色（ADMIN/OPS/USER）不允许删除、不允许修改 `roleCode`、不允许禁用；前端应对这些操作置灰。
+删除自定义角色前需先解除该角色与用户的绑定，否则返回 `4402`。
+
+---
+
+### 8.12 管理端：权限管理 ✅（全部需要 ADMIN 角色）
+
+| 接口 | 权限码 | 说明 |
+|------|--------|------|
+| ✅ `GET /api/admin/permissions?pageNum=&pageSize=&keyword=&permType=&resource=&status=` | `permission:list` | 权限分页 |
+| ✅ `GET /api/admin/permissions/all` | `permission:list` | 全部权限（授权树/分组） |
+| ✅ `GET /api/admin/permissions/{id}` | `permission:list` | 权限详情 |
+| ✅ `POST /api/admin/permissions` | `permission:create` | 新增权限 |
+| ✅ `PUT /api/admin/permissions/{id}` | `permission:update` | 编辑权限 |
+| ✅ `PUT /api/admin/permissions/{id}/status` | `permission:update` | 启用/禁用权限 |
+| ✅ `DELETE /api/admin/permissions/{id}` | `permission:delete` | 删除权限 |
+
+**`AdminPermissionVO`**：`id`、`permCode`、`permName`、`permType`、`resource`、`action`、`description`、`status`、`roleCount`、`createTime`、`updateTime`。
+
+**请求体**
+
+- `POST /api/admin/permissions` / `PUT /api/admin/permissions/{id}` →
+
+```json
+{
+  "permCode": "report:export",
+  "permName": "导出报表",
+  "permType": "API",
+  "resource": "report",
+  "action": "export",
+  "description": "导出运营报表",
+  "status": 1
+}
+```
+
+  约束：`permCode` 必须符合 `resource:action` 小写格式；`permType` 取值 `MENU` / `BUTTON` / `API` / `ACTION`；`resource`、`action` 不传时自动从 `permCode` 拆分。
+  返回 `data` 为新建权限 ID（number）。
+
+- `PUT /api/admin/permissions/{id}/status` → `{ "status": 0 | 1 }`
+
+**规则（重要）**：
+- **权限编码创建后不可修改**，修改时传不同 `permCode` 会返回 `4024`。
+- 权限被任一角色引用时禁止删除（`4022`），需先在角色授权中移除。
+- 权限删除为逻辑删除，前端列表不再展示。
+
+---
+
+### 8.13 已知限制（本轮实现后仍存在）
 
 | # | 限制 | 影响 | 前端应对 |
 |---|------|------|----------|
@@ -1917,3 +2100,67 @@ function onOtaPush(msg) { // msg = {type, deviceId, timestamp, data}
 | **P2** | 字典、头像上传、健康检查、WebSocket 统一信封 | ✅ 已实现 |
 
 > 本轮共新增 **52 个接口**，后端已通过 `mvnw compile` 编译验证；文档与实际路径已逐项核对。
+
+---
+
+## 12. 三层限流与风控（前端必读）
+
+> 服务端已实现三层独立限流，各层互不替代。所有超限响应均为 **HTTP 429**，响应体仍是统一 `ApiResponse`；前端需同时判断 HTTP 状态码与 `code`。
+
+### 12.1 设备指纹 `X-Device-Id`
+
+- 前端首次访问时生成稳定 UUID，持久化到 `localStorage`，之后所有 `/api/auth/captcha`、`/api/auth/login` 请求都带上 `X-Device-Id`。
+- 未携带时后端降级用客户端 IP 作为设备标识，设备维度阈值会与 IP 维度叠加，更严格。
+- 设备指纹仅用于限流，不参与身份认证。
+
+### 12.2 第一层：验证码获取限流
+
+接口：`POST /api/auth/captcha`
+
+| 维度 | 阈值 | 超限动作 |
+|------|------|----------|
+| 同一 IP | 每分钟 ≤ 10 次 | HTTP 429 + `4600` |
+| 同一 IP | 每小时 ≤ 100 次 | HTTP 429 + `4600` |
+| 同一设备指纹 | 每分钟 ≤ 5 次 | HTTP 429 + `4600` |
+
+> 超限不返回空图、不暴露具体维度；前端收到 429 后停止自动刷新并倒计时。
+
+### 12.3 第二层：登录请求限流（验证码校验之前）
+
+接口：`POST /api/auth/login`
+
+| 维度 | 阈值 | 触发动作 | 响应 |
+|------|------|----------|------|
+| 同一 IP | 每分钟 > 10 次 | 临时封 IP 15 分钟 | 429 + `4600`；再次请求返回 429 + `4602` |
+| 同一 IP | 每小时 > 50 次 | 升级人机验证 | 429 + `4601` |
+| 同一设备指纹 | 每分钟 > 5 次 | 升级人机验证 | 429 + `4601` |
+| 同一账号 | 每分钟 > 5 次 | 仅频率限制，不锁定账号 | 429 + `4600` |
+
+> 本层发生在验证码校验之前，即使验证码正确也会被拦截；超限不写明细日志。
+
+### 12.4 第三层：失败计数与风控升级
+
+| 失败类型 | 计数维度 | 触发动作 |
+|----------|----------|----------|
+| 验证码错误 / 已过期 | IP、设备 | 1 小时内累计 20 次 → `4601` 强制人机验证；累计 50 次 → 临时封 IP 15 分钟 |
+| 账号不存在 | IP、设备 | 同验证码错误，防用户枚举 |
+| 密码错误 | 账号 | 5 次 → 锁定 15 分钟；10 次 → 锁定 1 小时 |
+| 验证码错误 | 账号 | **不计入**，不触发账号锁定 |
+
+关键区别：
+- 验证码错误是"人机识别失败"，风险信号归属 IP/设备，不归属账号；
+- 密码错误才是"身份认证失败"，按账号计数并锁定；
+- 账号锁定返回 `4013`，`message` 中包含剩余分钟数；登录成功后账号失败计数自动清零；
+- IP/设备风控计数不会因某次成功登录而清零。
+
+### 12.5 前端处理建议
+
+| HTTP 状态 | code | 建议处理 |
+|-----------|------|----------|
+| 429 | `4600` | 按钮倒计时（60 秒），提示"请求过于频繁，请稍后再试" |
+| 429 | `4601` | 展示滑块/行为验证组件（后端已预留标记）；暂未接入时提示稍后重试 |
+| 429 | `4602` | 提示"当前网络访问受限，请稍后再试"，不要提示"被封 IP" |
+| 200 | `4013` | 账号锁定，直接展示 `message` 中的剩余分钟数 |
+| 200 | `4030/4031` | 验证码失效或错误，自动刷新验证码图片 |
+
+> 建议前端在登录、获取验证码请求上统一封装 429 处理，避免每个页面重复实现。

@@ -1,10 +1,11 @@
 package com.womi.webmodule.controller.admin;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.AdminUserCreateRequest;
 import com.womi.businessmodule.dto.AdminUserUpdateRequest;
+import com.womi.businessmodule.dto.StatusUpdateRequest;
 import com.womi.businessmodule.dto.UserDeviceUnbindRequest;
 import com.womi.businessmodule.dto.UserRolesUpdateRequest;
-import com.womi.businessmodule.dto.UserStatusUpdateRequest;
 import com.womi.businessmodule.service.sys.SysUserService;
 import com.womi.businessmodule.vo.AdminUserDetailVO;
 import com.womi.businessmodule.vo.AdminUserVO;
@@ -43,6 +44,15 @@ public class AdminController {
     }
 
     /**
+     * 新增用户并分配角色
+     */
+    @PostMapping
+    @PreAuthorize("hasAuthority('" + PermissionConstants.USER_CREATE + "')")
+    public ApiResponse<Long> createUser(@RequestBody @Valid AdminUserCreateRequest request) {
+        return ApiResponse.success(adminUserService.createUser(request));
+    }
+
+    /**
      * 用户详情（含角色、权限、设备数、登录次数）
      */
     @GetMapping("/{id}")
@@ -66,7 +76,7 @@ public class AdminController {
      */
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('" + PermissionConstants.USER_UPDATE + "')")
-    public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestBody @Valid UserStatusUpdateRequest request) {
+    public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestBody @Valid StatusUpdateRequest request) {
         adminUserService.updateStatus(id, request.getStatus());
         return ApiResponse.success(null);
     }

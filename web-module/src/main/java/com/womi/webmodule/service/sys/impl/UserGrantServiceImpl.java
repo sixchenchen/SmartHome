@@ -13,6 +13,7 @@ import com.womi.webmodule.service.sys.UserGrantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,11 +52,24 @@ public class UserGrantServiceImpl implements UserGrantService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void replaceRoles(Long userId, List<String> roleCodes) {
+        List<String> targetCodes = roleCodes == null ? Collections.emptyList()
+                : roleCodes.stream()
+                        .filter(StringUtils::hasText)
+                        .map(String::trim)
+                        .distinct()
+                        .collect(Collectors.toList());
+        if (targetCodes.isEmpty()) {
+            throw new BusinessException(ErrorCode.USER_ROLE_REQUIRED);
+        }
+
         List<SysRole> roles = new ArrayList<>();
-        for (String roleCode : roleCodes) {
+        for (String roleCode : targetCodes) {
             SysRole role = sysRoleMapper.selectByRoleCode(roleCode);
-            if (role == null || (role.getStatus() != null && role.getStatus() != 1)) {
-                throw new BusinessException(ErrorCode.PARAM_INVALID, "角色不存在或已禁用: " + roleCode);
+            if (role == null) {
+                throw new BusinessException(ErrorCode.ROLE_NOT_FOUND, "角色不存在: " + roleCode);
+            }
+            if (role.getStatus() == null || role.getStatus() != 1) {
+                throw new BusinessException(ErrorCode.ROLE_DISABLED, "角色已禁用: " + roleCode);
             }
             roles.add(role);
         }

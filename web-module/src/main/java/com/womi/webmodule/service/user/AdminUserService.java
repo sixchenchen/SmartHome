@@ -1,6 +1,7 @@
 package com.womi.webmodule.service.user;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.womi.businessmodule.dto.AdminUserCreateRequest;
 import com.womi.businessmodule.dto.AdminUserUpdateRequest;
 import com.womi.businessmodule.vo.AdminUserDetailVO;
 import com.womi.businessmodule.vo.AdminUserVO;
@@ -14,6 +15,9 @@ import java.util.List;
 public interface AdminUserService {
 
     Page<AdminUserVO> pageUsers(Integer pageNum, Integer pageSize, String keyword, Integer status, String roleCode);
+
+    /** 新增用户并分配角色，返回新用户ID */
+    Long createUser(AdminUserCreateRequest request);
 
     AdminUserDetailVO getUserDetail(Long userId);
 

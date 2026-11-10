@@ -49,7 +49,8 @@ public class SecurityConfig {
                     auth.requestMatchers(
                                     HttpConstants.AUTH_LOGIN_PATH,
                                     HttpConstants.AUTH_REGISTER_PATH,
-                                    HttpConstants.AUTH_REFRESH_PATH)
+                                    HttpConstants.AUTH_REFRESH_PATH,
+                                    HttpConstants.AUTH_CAPTCHA_PATH)
                             .permitAll()
                             .requestMatchers(HttpConstants.WEBSOCKET_ENDPOINT_PATTERN).permitAll()
                             .requestMatchers(HttpConstants.ACTUATOR_HEALTH_PATH, AvatarConstants.RESOURCE_HANDLER).permitAll()

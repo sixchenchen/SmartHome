@@ -14,5 +14,19 @@ public final class RegexConstants {
     /** UUID */
     public static final String UUID = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
-    // 加：手机号、邮箱、身份证...
+    // ==================== 账号与权限 ====================
+    /** 用户名：4-32 位字母、数字、下划线 */
+    public static final String USERNAME = "^[a-zA-Z0-9_]{4,32}$";
+
+    /** 密码：8-64 位，至少同时包含字母和数字 */
+    public static final String PASSWORD = "^(?=.*[A-Za-z])(?=.*\\d).{8,64}$";
+
+    /** 手机号（允许空字符串） */
+    public static final String PHONE = "^$|^1[3-9]\\d{9}$";
+
+    /** 角色编码：3-32 位，以大写字母开头，仅包含大写字母、数字、下划线 */
+    public static final String ROLE_CODE = "^[A-Z][A-Z0-9_]{2,31}$";
+
+    /** 权限编码：resource:action，如 device:list、role:assign-permission */
+    public static final String PERM_CODE = "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$";
 }

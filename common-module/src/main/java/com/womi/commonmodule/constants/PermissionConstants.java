@@ -10,8 +10,22 @@ public final class PermissionConstants {
 
     // ==================== 用户管理 ====================
     public static final String USER_LIST = "user:list";
+    public static final String USER_CREATE = "user:create";
     public static final String USER_UPDATE = "user:update";
     public static final String USER_DELETE = "user:delete";
+
+    // ==================== 角色管理 ====================
+    public static final String ROLE_LIST = "role:list";
+    public static final String ROLE_CREATE = "role:create";
+    public static final String ROLE_UPDATE = "role:update";
+    public static final String ROLE_DELETE = "role:delete";
+    public static final String ROLE_ASSIGN_PERMISSION = "role:assign-permission";
+
+    // ==================== 权限管理 ====================
+    public static final String PERMISSION_LIST = "permission:list";
+    public static final String PERMISSION_CREATE = "permission:create";
+    public static final String PERMISSION_UPDATE = "permission:update";
+    public static final String PERMISSION_DELETE = "permission:delete";
 
     // ==================== 设备管理 ====================
     public static final String DEVICE_LIST = "device:list";
