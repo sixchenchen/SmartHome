@@ -1,1192 +1,858 @@
-# WM_LAOHUA 前端对接文档
+# WM_LAOHUA 前后端对接文档
 
-> **文档版本**：v1.4　**编写日期**：2026-11-04　**最近更新**：2026-11-10　**适用代码**：当前 `main` 工作区
-> **性质**：前后端对接文档。**v1.4 新增三层限流与风控（验证码获取、登录请求、失败计数），详见第 12 章**。
-> **标注约定**：
-> - ✅ **已实现**：后端接口已存在，可直接联调（路径、参数、响应均按当前代码逐字段核对）。
-> - ⚠️ **已实现但有限制**：接口存在，但字段/校验/返回结构有坑，前端需注意。
-> - 原 v1.0 的"❌ 未实现"清单（第 8 章）**已全部实现**，对应章节已改为实际契约。
-
----
+> 文档版本：v1.4　最近核对：2026-11-11
+> 适用代码：当前工作区后端实现；工程版本为 `0.0.1-SNAPSHOT`。
+> 适用对象：前端开发、后端开发、运维部署及设备固件开发人员。
 
 ## 目录
 
-1. [接入准备](#1-接入准备)
-2. [统一响应与错误码](#2-统一响应与错误码)
-3. [认证与权限](#3-认证与权限)
-4. [已实现接口总览](#4-已实现接口总览原有-20-个--本轮新增-52-个)
-5. [接口详情](#5-接口详情)
-6. [WebSocket 实时推送](#6-websocket-实时推送)
-7. [枚举字典](#7-枚举字典)
-8. [本轮新增接口详情（已实现）](#8-本轮新增接口详情-全部已实现)
-9. [前端对接风险与待确认项](#9-前端对接风险与待确认项)
-10. [联调检查清单](#10-联调检查清单)
-11. [OTA 升级全流程与实时进度（前端必读）](#11-ota-升级全流程与实时进度前端必读)
-12. [三层限流与风控（前端必读）](#12-三层限流与风控前端必读)
+1. [文档说明](#1-文档说明)
+2. [接入准备](#2-接入准备)
+3. [统一响应结构与错误码体系](#3-统一响应结构与错误码体系)
+4. [认证与权限体系](#4-认证与权限体系)
+5. [限流与风控体系](#5-限流与风控体系)
+6. [接口总览](#6-接口总览)
+7. [接口详细契约](#7-接口详细契约)
+8. [WebSocket STOMP 实时推送](#8-websocket-stomp-实时推送)
+9. [OTA 升级完整业务流程与状态机](#9-ota-升级完整业务流程与状态机)
+10. [枚举与字典说明](#10-枚举与字典说明)
+11. [系统已知限制与注意事项](#11-系统已知限制与注意事项)
+12. [联调与验收 Checklist](#12-联调与验收-checklist)
+13. [数据库核心表简要说明](#13-数据库核心表简要说明)
+14. [后端配置文件说明](#14-后端配置文件说明)
+15. [部署与 Nginx 配置要求](#15-部署与-nginx-配置要求)
+16. [常见故障排查指南](#16-常见故障排查指南)
 
 ---
 
-## 1. 接入准备
+## 1. 文档说明
 
-### 1.1 服务地址
+本文档描述 WM_LAOHUA 当前后端对外 HTTP API、WebSocket STOMP、MQTT 设备报文、OTA、鉴权与部署对接规则。契约以当前 Controller、DTO/VO、Security 配置、MQTT Handler、配置文件和 SQL 为准。
+
+| 标记 | 含义 |
+|---|---|
+| ✅ | 当前源码中已实现，可按契约联调 |
+| ⚠️ | 实现存在限制、边界条件或与旧文档有差异 |
+| **后端强制** | 服务端实际执行的校验；前端不能替代 |
+| **前端处理** | UI、请求重试、刷新锁、展示或轮询逻辑 |
+| **设备端契约** | 固件与 MQTT Broker/后端之间必须一致的主题和报文 |
+
+### 更新记录
+
+| 版本 | 更新内容 |
+|---|---|
+| v1.4 | 按当前实现重整接口目录；核对错误码、RBAC、三层限流、WebSocket、OTA、数据库及部署约束；补充勘误与故障定位说明 |
+
+> ⚠️ **勘误：原文档称“原有 20 + 新增 52 个接口”，但新增接口清单编号实际列到 53，其中验证码和健康检查也被列入清单。**本版按实际路由逐项列出，不以该数字限制接口范围；验收时应以本版路由和 Knife4j/Controller 为准。
+
+---
+
+## 2. 接入准备
+
+### 2.1 服务地址与接口文档
 
 | 环境 | Base URL | 说明 |
-|------|----------|------|
-| 本地开发 | `http://localhost:8080` | `server.port: 8080` |
-| 生产 | 由部署方提供 | `application-prod.yml`，需运维确认域名与是否启用 HTTPS |
+|---|---|---|
+| 本地开发 | `http://localhost:8080` | 默认 `server.port=8080` |
+| 生产 | 由运维提供 | 使用 HTTPS 时前端请求 HTTPS，WebSocket 使用 WSS |
 
-**重要**：项目**没有配置 `server.servlet.context-path`**（不存在 `/api` 作为全局前缀）。所有接口的 `/api/...` 前缀来自 Controller 上的 `@RequestMapping`，前端直接拼接即可：
+项目未配置全局 `server.servlet.context-path`；`/api` 是各 Controller 自身路由前缀，不要额外重复添加 context path。
 
-```
-http://localhost:8080/api/auth/login
-http://localhost:8080/api/user/devices/my
-```
+- Knife4j：`http://localhost:8080/doc.html`（开发环境）。
+- OpenAPI JSON：`/v3/api-docs`（非生产 profile）。
+- 健康检查：`GET /actuator/health`，匿名可访问，返回简要健康状态。
+- 生产默认关闭 Knife4j、Springdoc API Docs 和 Swagger UI。
 
-### 1.2 接口文档与调试
+### 2.2 公共请求头
 
-- Knife4j：`http://localhost:8080/doc.html`（开发环境开放；生产环境默认关闭，需运维确认）
-- OpenAPI JSON：`/v3/api-docs`
+| Header | 适用范围 | 说明 |
+|---|---|---|
+| `Authorization` | 除登录、注册、刷新外的认证接口 | 值为 Bearer、一个空格和 AccessToken |
+| `Content-Type` | 按请求类型 | JSON 使用 `application/json`；文件上传使用 `multipart/form-data` |
+| `X-Device-Type` | 登录可选 | `web`、`app`、`mini` 等客户端标识；不传默认 `web`，写入 RefreshToken 记录 |
+| `X-Device-Id` | 验证码、登录建议携带 | 前端生成并稳定持久化的设备指纹，仅用于限流，不是认证凭据 |
 
-### 1.3 公共请求头
+### 2.3 时间、时区与分页
 
-| Header | 必填 | 说明 |
-|--------|------|------|
-| `Authorization` | 除登录/注册/刷新外**必填** | 值：`Bearer <accessToken>`（注意 `Bearer` 后有**一个空格**） |
-| `Content-Type` | 视接口 | JSON 用 `application/json`；固件上传用 `multipart/form-data` |
-| `X-Device-Type` | 否（仅登录时读取） | 登录时传入 `web` / `app` / `mini`，会写入 RefreshToken 记录；不传默认 `web` |
-| `X-Device-Id` | 否（强烈建议） | 设备指纹，前端生成并持久化（如 UUID）；用于设备维度限流。不传时后端降级使用 IP |
+- 服务端 Jackson 时区：`Asia/Shanghai`。
+- 多数 `LocalDateTime` 字段序列化为 ISO-8601 字符串，例如 `2026-11-04T10:30:00`。
+- 登录响应的 `lastLoginTime`、`expiresAt` 为 `yyyy-MM-dd HH:mm:ss` 格式。
+- 分页参数为 `pageNum`、`pageSize`，通常默认 `1`、`10`；个别接口默认值不同，以接口说明为准。
+- MyBatis-Plus `Page` 常见字段：`records`、`total`、`size`、`current`、`pages`。列表取 `data.records`，总数取 `data.total`。
 
-> 后端 CORS 已改为**配置化白名单**，前端联调前必须把本地域名（如 `http://localhost:5173`）加入后端配置，否则浏览器会拦截。
+### 2.4 CORS 跨域
 
-### 1.4 时间与时区
+运维通过 `cors.allowed-origins` 配置精确的前端 Origin，包含协议、域名和端口，例如 `http://localhost:5173`。浏览器预检通过后才能发送跨域请求。
 
-- 服务端统一 `Asia/Shanghai`。
-- 普通 `LocalDateTime` 字段按 Spring Boot 默认序列化为 **ISO-8601 字符串**，例如 `"2026-11-04T10:30:00"`。
-- `LoginResponse` 中的 `lastLoginTime`、`expiresAt` 使用注解格式：`"2026-11-04 10:30:00"`。
-- 前端展示时统一按本地时区解析，不要用 `new Date("2026-11-04T10:30:00")` 之外的自定义解析。
-
-### 1.5 分页约定
-
-分页接口统一使用 `pageNum` / `pageSize`（不是 `page` / `size`），默认 `1` / `10`。
-
-响应为 MyBatis-Plus `Page` 直出，字段为：
-
-```json
-{
-  "records": [ ... ],
-  "total": 25,
-  "size": 10,
-  "current": 1,
-  "pages": 3
-}
-```
-
-> 前端取列表用 `data.records`，总数用 `data.total`。
+> ⚠️ **风险提示：当前 `CorsConfig` 的允许请求头列表没有 `X-Device-Id`（也没有 `X-Device-Type`）。**若浏览器跨域请求携带这些头，预检可能返回 403。部署前端风控功能时，后端必须把实际使用的自定义 Header 加入 CORS 允许列表；仅设置 `cors.allowed-origins` 不能解决 Header 未放行问题。此项是当前源码限制，不是前端可绕过的校验。
 
 ---
 
-## 2. 统一响应与错误码
+## 3. 统一响应结构与错误码体系
 
-### 2.1 响应结构（✅ 所有业务接口）
+### 3.1 统一 JSON 响应
+
+大多数业务接口响应采用 `ApiResponse<T>`：
 
 ```json
 {
   "code": 200,
   "message": "success",
-  "data": { },
+  "data": {},
   "timestamp": "2026-11-04T10:30:00"
 }
 ```
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
-| `code` | int | 业务码，`200` 为成功 |
-| `message` | string | 提示信息，可直接展示 |
-| `data` | T | 业务数据，可能为 `null` |
-| `timestamp` | string | 服务端时间，ISO-8601 |
+|---|---|---|
+| `code` | number | 业务码；`200` 表示业务成功 |
+| `message` | string | 状态或错误说明 |
+| `data` | object / array / primitive / null | 业务数据 |
+| `timestamp` | string | 服务端响应时间 |
 
-### 2.2 HTTP 状态与业务码的关系（⚠️ 前端必须理解）
+分页数据通常放在 `data` 中；CSV 导出和部分文件响应是原始文件流，不使用 JSON 信封。
 
-| 场景 | HTTP 状态 | `code` | 说明 |
-|------|-----------|--------|------|
-| 正常 | 200 | 200 | 成功 |
-| 参数/业务异常 | **200** | 1000/2000/42xx… | `GlobalExceptionHandler` 统一返回 HTTP 200 + 业务码，**不能只看 HTTP 状态** |
-| 未登录 / Token 无效 | **401** | 401 | 由 `JsonAuthenticationEntryPoint` 返回 |
-| 无权限 | **403** | 401（复用 FAIL） | 由 `JsonAccessDeniedHandler` 返回 |
-| 系统异常 | 200 或 500 | 5000 | 兜底分支返回业务码 5000 |
+### 3.2 HTTP 状态码与业务码
 
-**前端判断规则**：`if (res.code !== 200) 走错误分支`；HTTP 401 时触发刷新或跳登录页；HTTP 403 提示无权限。
+| 场景 | HTTP 状态 | 业务 `code` | 处理要求 |
+|---|---:|---:|---|
+| 正常业务响应 | 200 | 200 | 按 `data` 处理 |
+| 参数、业务校验失败 | 通常 200 | 1xxx/2xxx/4xxx | 检查响应体 `code`，不能仅按 HTTP 状态判断 |
+| 未认证 / AccessToken 无效 | 401 | 通常 401 | 按令牌策略刷新或跳转登录 |
+| 方法权限不足 | 403 | 401（`FAIL`） | 展示无权限，不应自动重试 |
+| 限流 | 429 | 4600/4601/4602 | 按限流原因提示、等待或进入人机校验流程 |
+| 资源不存在 | 404 | 404 | 提示资源不存在 |
+| 未处理服务异常 | 通常 500 | 5000 等 | 记录请求上下文并联系运维 |
 
-### 2.3 错误码全表（✅ 与 `ErrorCode` 一致）
+> ⚠️ **风险提示：业务异常常以 HTTP 200 返回。**前端响应拦截器必须判断 `res.code === 200`；仅判断 HTTP 2xx 会把业务失败当作成功。另一方面，401/403/429 必须同时处理 HTTP 状态和响应体业务码。
 
-| code | message | 前端建议处理 |
-|------|---------|--------------|
-| 200 | success | 正常 |
-| 401 | fail | 通用失败 |
-| 404 | 资源不存在 | 提示 |
-| **1000** | 参数错误 | 表单提示 |
-| **1001** | 缺少必要参数 | 表单提示 |
-| **1002** | 参数值非法 | 表单提示 |
-| **1003** | 参数不能为空 | 表单提示 |
-| **1010** | 密码不能为空 | 表单提示 |
-| **1011** | 密码长度不能少于6位 | 表单提示 |
-| **2000** | 业务异常 | 展示 message |
-| **4000** | 文件为空 | 上传组件拦截 |
-| **4001** | 文件超过大小限制 | 上传组件拦截 |
-| **4002** | 文件格式错误 | 提示 |
-| **4003** | 文件上传失败 | 重试 |
-| **4004** | 文件不存在 | 提示 |
-| **4010** | 用户名或密码错误 | 提示 |
-| **4011** | 账号已禁用，请联系管理员 | 提示，禁止重试 |
-| **4012** | RefreshToken 无效或已过期，请重新登录 | **跳转登录页** |
-| **4013** | 账号已锁定 | 提示"账号已锁定，请 15 分钟后再试" |
-| **4014** | 未登录或 token 已过期 | **触发刷新 / 跳登录** |
-| **4015** | 用户不存在 | 跳登录 |
-| **4020** | 权限不存在 | 刷新权限列表 |
-| **4021** | 权限编码已存在 | 提示更换编码 |
-| **4022** | 权限已被角色引用，无法删除 | 提示先解除角色授权 |
-| **4023** | 权限类型非法 | 表单提示（MENU/BUTTON/API/ACTION） |
-| **4024** | 权限编码不允许修改 | 编码只读 |
-| **4030** | 验证码已过期，请重新获取 | 刷新验证码图片 |
-| **4031** | 验证码错误 | 提示并刷新验证码 |
-| **4032** | 请输入验证码 | 表单提示 |
-| **4033** | 暂不支持该验证码类型 | 仅使用 `image` |
-| **4034** | 验证码生成失败 | 重试 |
-| **4100** | 固件版本已存在 | 提示换版本号 |
-| **4101** | 固件不存在 | 刷新列表 |
-| **4102** | 固件已禁用 | 提示 |
-| **4103** | 固件文件超过大小限制 | 上传组件拦截 |
-| **4104** | 固件文件不存在 | 提示 |
-| **4105** | 版本号不能为空 | 表单提示 |
-| **4106** | 文件格式必须是 .bin | 上传组件限制 `accept=".bin"` |
-| **4107** | 计算文件哈希失败 | 重试 |
-| **4200** | 设备不存在 | 提示 |
-| **4201** | 设备当前为离线状态，请检查电源后重试 | 提示，禁用控制按钮 |
-| **4202** | 设备ID为空 | 表单提示 |
-| **4203** | 设备ID格式错误 | 表单提示（MAC 12 位十六进制） |
-| **4204** | MAC 格式错误 | 表单提示 |
-| **4205** | 设备绑定码错误，请扫描设备机身上的二维码 | 提示 |
-| **4206** | 您已经绑定了该设备 | 提示 |
-| **4207** | 该设备已被其他用户绑定 | 提示 |
-| **4208** | 该设备已被绑定，请刷新重试 | 刷新列表 |
-| **4209** | 您尚未绑定该设备，或已被解绑 | 刷新 |
-| **4210** | 您未绑定该设备，无权操作 | 提示 |
-| **4211** | 设备心跳超时或网络异常，请稍后重试 | 提示 |
-| **4212** | 设备MAC地址已存在 | 提示 |
-| **4300** | OTA 触发失败 | 重试 |
-| **4301** | OTA 正在进行中 | 禁用升级按钮 |
-| **4302** | OTA 版本不兼容 | 提示 |
-| **4303** | 当前已是最新版本，无需升级 | 提示 |
-| **4400** | 角色不存在 | 刷新角色列表 |
-| **4401** | 角色编码已存在 | 提示更换编码 |
-| **4402** | 角色已分配给用户，无法删除 | 提示先解除用户角色 |
-| **4403** | 内置角色不允许该操作 | 禁用删除/禁用/改编码按钮 |
-| **4404** | 角色已禁用 | 提示 |
-| **4500** | 用户名已存在 | 表单提示 |
-| **4501** | 至少需要分配一个角色 | 表单提示 |
-| **4502** | 用户状态非法 | 表单提示 |
-| **4600** | 请求过于频繁，请稍后再试 | HTTP 429；按钮倒计时 |
-| **4601** | 请求过于频繁，请完成人机验证 | HTTP 429；展示滑块/行为验证（预留） |
-| **4602** | 当前网络访问受限，请稍后再试 | HTTP 429；提示稍后再试 |
-| **5000** | 系统异常 | 通用错误页 |
-| **5001** | 数据库异常 | 通用错误页 |
-| **5002** | 系统配置缺失 | 联系运维 |
-| **5003** | 网络异常 | 重试 |
+### 3.3 完整业务错误码表
 
----
+表中触发条件按 `ErrorCode`、`GlobalExceptionHandler` 及调用该错误码的业务服务整理。参数错误的具体字段以对应 DTO/校验注解为准。
 
-## 3. 认证与权限
+| code | message | 后端触发条件 | 前端建议 |
+|---:|---|---|---|
+| 200 | success | 业务处理成功 | 正常处理 `data` |
+| 401 | fail | 通用认证失败或方法授权失败时的统一失败码 | 结合 HTTP 401/403 及 `message` 判断 |
+| 404 | 资源不存在 | 请求资源不存在 / 静态资源路由未命中 | 提示并刷新资源 |
+| 1000 | 参数错误 | 非法参数或被全局处理的参数异常 | 标记表单错误 |
+| 1001 | 缺少必要参数 | 必填请求参数缺失 | 补齐参数 |
+| 1002 | 参数值非法 | DTO/业务字段值不符合约束 | 修正字段 |
+| 1003 | 参数不能为空 | 必填字段为空，如设备绑定的空 `deviceId` | 校验输入 |
+| 1010 | 密码不能为空 | 密码字段为空 | 提示输入密码 |
+| 1011 | 密码长度不能少于6位 | 通用密码长度校验不通过；注册/改密 DTO 还可能要求 8–64 位 | 以前端提示为辅，后端校验为准 |
+| 2000 | 业务异常 | 无更具体业务码的业务规则拒绝 | 展示 `message` |
+| 4000 | 文件为空 | 上传文件为空 | 选择文件 |
+| 4001 | 文件超过大小限制 | Multipart 上传超出配置限制 | 提示文件大小限制 |
+| 4002 | 文件格式错误 | 文件类型/扩展名不符合接口要求 | 选择支持格式 |
+| 4003 | 文件上传失败 | 上传/写文件失败 | 提示重试并检查服务端 |
+| 4004 | 文件不存在 | 请求引用的上传文件不存在 | 刷新或重新上传 |
+| 4010 | 用户名或密码错误 | 登录凭据认证失败 | 提示凭据错误 |
+| 4011 | 账号已禁用，请联系管理员 | 用户账号状态为禁用 | 联系管理员，不要自动重试 |
+| 4012 | RefreshToken 无效或已过期，请重新登录 | RefreshToken 不存在、过期、已撤销或已被并发消费 | 清除本地令牌并重新登录 |
+| 4013 | 账号已锁定 | 账号密码失败计数触发锁定 | 展示服务端 message 中剩余时间 |
+| 4014 | 未登录或 token 已过期 | HTTP API AccessToken 缺失、无效或过期 | 尝试单次刷新；失败后跳登录 |
+| 4015 | 用户不存在 | RefreshToken 对应的用户已不存在 | 清除令牌并重新登录 |
+| 4020 | 权限不存在 | 管理端引用的权限记录不存在 | 刷新权限数据 |
+| 4021 | 权限编码已存在 | 创建重复权限码 | 修改权限码 |
+| 4022 | 权限已被角色引用，无法删除 | 删除仍被角色关联的权限 | 先解除角色授权 |
+| 4023 | 权限类型非法 | `permType` 非 `MENU/BUTTON/API/ACTION` | 使用允许值 |
+| 4024 | 权限编码不允许修改 | 更新时尝试修改既有 `permCode` | 编码不可编辑 |
+| 4030 | 验证码已过期，请重新获取 | 验证码不存在或过期 | 重新获取验证码 |
+| 4031 | 验证码错误 | 验证码内容不匹配 | 提示并刷新验证码 |
+| 4032 | 请输入验证码 | 启用验证码时缺少验证码参数 | 补齐验证码 |
+| 4033 | 暂不支持该验证码类型 | 请求当前未支持的短信/邮件验证码类型 | 使用 `image` |
+| 4034 | 验证码生成失败 | 图形验证码生成失败 | 提示重试 |
+| 4100 | 固件版本已存在 | 同产品固件版本重复 | 修改版本或产品 |
+| 4101 | 固件不存在 | 固件 ID 无对应记录 | 刷新固件列表 |
+| 4102 | 固件已禁用 | 使用禁用固件 | 选择启用固件 |
+| 4103 | 固件文件超过大小限制 | 固件超过固件上传业务限制 | 降低文件大小 |
+| 4104 | 固件文件不存在 | 固件记录引用的文件路径不可用 | 联系运维检查文件存储 |
+| 4105 | 版本号不能为空 | 上传固件缺少版本号 | 填写版本号 |
+| 4106 | 文件格式必须是 .bin | 固件扩展名不为 `.bin` | 仅选择 `.bin` |
+| 4107 | 计算文件哈希失败 | 服务端计算固件摘要失败 | 联系运维检查文件读写 |
+| 4200 | 设备不存在 | 设备记录不存在 | 刷新设备列表 |
+| 4201 | 设备当前为离线状态，请检查电源后重试 | 需在线的控制/OTA 操作遇到离线设备 | 展示离线状态并轮询 |
+| 4202 | 设备ID为空 | 服务端业务层收到空设备 ID | 补齐设备 ID |
+| 4203 | 设备ID格式错误 | 设备 ID 格式不符合业务约束 | 校验设备 ID |
+| 4204 | MAC 格式错误 | MAC 地址格式不符合要求 | 使用 12 位十六进制 MAC |
+| 4205 | 设备绑定码错误，请扫描设备机身上的二维码 | 绑定码不匹配 | 重新扫描机身二维码 |
+| 4206 | 您已经绑定了该设备 | 当前用户重复绑定同一设备 | 刷新设备列表 |
+| 4207 | 该设备已被其他用户绑定 | 设备已被其他账号有效绑定 | 联系设备所有者/管理员 |
+| 4208 | 该设备已被绑定，请刷新重试 | 并发绑定导致唯一约束冲突 | 刷新后再操作 |
+| 4209 | 您尚未绑定该设备，或已被解绑 | 用户设备归属关系无效 | 刷新绑定列表 |
+| 4210 | 您未绑定该设备，无权操作 | 当前用户不拥有目标设备 | 禁止继续操作 |
+| 4211 | 设备心跳超时或网络异常，请稍后重试 | 设备心跳/网络状态不满足业务要求 | 等待后重试或检查设备网络 |
+| 4212 | 设备MAC地址已存在 | 管理端新增重复 MAC | 使用未登记设备 |
+| 4300 | OTA 触发失败 | 创建/触发升级指令失败 | 查询进度后谨慎重试 |
+| 4301 | OTA 正在进行中 | 设备已有运行中的 OTA 状态或任务 | 展示当前进度，不重复启动 |
+| 4302 | OTA 版本不兼容 | 固件产品或版本不适用于目标设备 | 选择兼容固件 |
+| 4303 | 当前已是最新版本，无需升级 | 当前固件已是最新版本 | 隐藏/禁用升级入口 |
+| 4400 | 角色不存在 | 角色 ID 无对应记录 | 刷新角色列表 |
+| 4401 | 角色编码已存在 | 创建重复角色编码 | 修改编码 |
+| 4402 | 角色已分配给用户，无法删除 | 删除仍分配给用户的角色 | 先解除用户角色关系 |
+| 4403 | 内置角色不允许该操作 | 对 `builtIn=1` 角色执行受保护操作 | 禁用对应 UI 操作 |
+| 4404 | 角色已禁用 | 使用或分配禁用角色 | 选择启用角色 |
+| 4500 | 用户名已存在 | 注册或管理端新增重复用户名 | 修改用户名 |
+| 4501 | 至少需要分配一个角色 | 用户角色更新结果为空 | 至少分配一个角色 |
+| 4502 | 用户状态非法 | 用户状态值不在允许范围 | 使用接口允许状态 |
+| 4600 | 请求过于频繁，请稍后再试 | 验证码/登录请求超过频率限制 | 等待后重试 |
+| 4601 | 请求过于频繁，请完成人机验证 | IP/设备失败计数触发风控升级 | 当前无实际滑块校验契约，按提示等待或联系后端 |
+| 4602 | 当前网络访问受限，请稍后再试 | IP 临时封锁期间继续请求 | 停止请求并等待封锁到期 |
+| 5000 | 系统异常 | 未分类的服务端异常 | 提示稍后重试并记录请求时间 |
+| 5001 | 数据库异常 | 数据库访问异常映射 | 联系运维 |
+| 5002 | 系统配置缺失 | 必需配置缺失 | 联系运维补齐配置 |
+| 5003 | 网络异常 | 后端依赖或网络访问异常映射 | 检查网络并重试 |
 
-### 3.1 双 Token 机制（✅）
-
-| 项 | 说明 |
-|----|------|
-| Access Token | 登录/刷新返回，放在 `Authorization` 头 |
-| Refresh Token | 登录/刷新返回，有效期 **7 天**，**一次一换**（旋转） |
-| 失效规则 | 刷新成功后**旧 RefreshToken 立即作废**；登出会把 AccessToken 加入黑名单并撤销 RefreshToken |
-| 前端存储 | 建议 `localStorage` 存两个 token；不要只存一个 |
-| 有效期 | 以 `LoginResponse.expiresAt` 为准，前端据此提前 5 分钟刷新 |
-
-### 3.2 推荐流程
-
-```
-登录 → 保存 token + refreshToken + roles + permissions
-   ↓
-业务请求带 Authorization
-   ↓
-code=4014 或 HTTP 401 → 调用 /api/auth/refresh（带 refreshToken）
-   ↓
-成功：替换两个 token，重放原请求
-失败（4012）：清空本地，跳登录页
-```
-
-### 3.3 ⚠️ 刷新并发限制（必须处理）
-
-后端刷新是**原子核销**：同一个 `refreshToken` 并发调用只会成功一次，其余返回 `4012`。
-
-**前端必须加"刷新锁"**：多个请求同时收到 401 时，只允许一个请求去刷新，其余挂起等待结果，成功后统一重放。
-
-### 3.4 登录失败锁定（✅）
-
-- 维度：**同一 IP + 同一用户名**
-- 阈值：5 次失败
-- 锁定时长：15 分钟
-- 返回码：`4013`
-- 前端：登录页展示锁定提示并倒计时，避免用户连续点击。
-
-### 3.5 角色与权限码（✅）
-
-角色：`ADMIN`、`OPS`、`USER`（注册用户默认 `USER`）。
-`LoginResponse.permissions` 为权限码数组（如 `["device:list","firmware:upload"]`）。
-
-> `ADMIN`、`OPS`、`USER` 为内置角色（`builtIn=1`）：不允许删除、不允许修改角色编码、不允许禁用。
-> **升级提示**：已有数据库需执行 `web-module/src/main/resources/sql/smart_device.sql` 中 `sys_permission` id `21~30` 及 `sys_role_permission` id `40~49` 的增量记录，否则 ADMIN 调用角色/权限管理接口会返回 403。
-
-| 接口 | 角色要求 | 权限码要求 |
-|------|----------|------------|
-| `/api/admin/**` | `ADMIN`（`hasRole('ADMIN')`） | 见下 |
-| `GET /api/admin/users`、`GET /{id}`、`GET /{id}/devices` | ADMIN | `user:list` |
-| `POST /api/admin/users` | ADMIN | `user:create` |
-| `PUT /api/admin/users/{id}`、`/status`、`/roles` | ADMIN | `user:update` |
-| `DELETE /api/admin/users/{id}` | ADMIN | `user:delete` |
-| `POST /api/admin/users/{id}/force-unbind` | ADMIN | `device:unbind` |
-| `GET /api/admin/roles`、`/all`、`/{id}`、`/{id}/permissions` | ADMIN | `role:list` |
-| `POST /api/admin/roles` | ADMIN | `role:create` |
-| `PUT /api/admin/roles/{id}`、`/{id}/status` | ADMIN | `role:update` |
-| `DELETE /api/admin/roles/{id}` | ADMIN | `role:delete` |
-| `PUT /api/admin/roles/{id}/permissions` | ADMIN | `role:assign-permission` |
-| `GET /api/admin/permissions`、`/all`、`/{id}` | ADMIN | `permission:list` |
-| `POST /api/admin/permissions` | ADMIN | `permission:create` |
-| `PUT /api/admin/permissions/{id}`、`/{id}/status` | ADMIN | `permission:update` |
-| `DELETE /api/admin/permissions/{id}` | ADMIN | `permission:delete` |
-| `GET /api/admin/devices`、`/online-stats`、`/export` | ADMIN | `device:list` |
-| `GET /api/admin/devices/{id}`、`/{id}/bindings` | ADMIN | `device:read` |
-| `PUT /api/admin/devices/{id}` | ADMIN | `device:update` |
-| `POST /api/admin/devices` | ADMIN | `device:create` |
-| `DELETE /api/admin/devices/{id}` | ADMIN | `device:delete` |
-| `POST /api/admin/devices/{id}/unbind` | ADMIN | `device:unbind` |
-| `POST /api/admin/devices/{id}/command` | ADMIN | `command:send` |
-| `POST /api/admin/ota/firmware/upload`、`PUT /firmware/{id}/status` | ADMIN | `firmware:upload` |
-| `GET /api/admin/ota/firmware`、`/firmware/list`、`/firmware/{id}`、`/tasks`、`/tasks/{id}` | ADMIN | `ota:list` |
-| `DELETE /api/admin/ota/firmware/{id}` | ADMIN | `firmware:delete` |
-| `POST /api/admin/ota/batch-dispatch` | ADMIN | `ota:create` |
-| `POST /api/admin/ota/tasks/{id}/cancel` | ADMIN | `ota:cancel` |
-| `GET /api/admin/dashboard/summary`、`/commands`、`/audit-logs` | ADMIN | `device:list` |
-| `GET /api/admin/alerts` | ADMIN | `alert:list` |
-| `PUT /api/admin/alerts/{id}/status` | ADMIN | `alert:handle` |
-| `GET/POST /api/admin/dead-letters**` | ADMIN | 仅角色，无权限码 |
-| `/api/user/**` | 登录用户 | 无权限码，走设备归属校验 |
-| `/api/common/**` | 登录用户 | 无权限码 |
-
-> 前端菜单/按钮建议按 `permissions` 渲染；注意 `dead-letters` 只校验角色。
+> 说明：有些错误码在 `ErrorCode` 中定义，但并非每个 Controller 都会主动返回。表格中的“触发条件”描述通用业务含义，不保证所有底层异常都映射到同一业务码。
 
 ---
 
-## 4. 已实现接口总览（原有 20 个 + 本轮新增 52 个）
+## 4. 认证与权限体系
 
-> 本轮已完成 **第 8 章全部待实现接口**，后端已全部落地并通过编译。下面按模块汇总，详细字段见第 5 章与第 8 章。
+### 4.1 RBAC 模型与角色
 
-### 4.1 原有接口（20 个，本轮已修正限制）
+授权关系：`sys_user` → `sys_role_info` → `sys_role` → `sys_role_permission` → `sys_permission.perm_code`。登录响应包含 `roles` 与 `permissions`，供前端控制菜单和按钮。
 
-| # | 方法 | 路径 | 权限 | 状态 |
-|---|------|------|------|------|
-| 1 | POST | `/api/auth/register` | 匿名 | ✅ |
-| 2 | POST | `/api/auth/login` | 匿名 | ✅ |
-| 3 | POST | `/api/auth/refresh` | 匿名 | ✅ |
-| 4 | POST | `/api/auth/logout` | 登录 | ✅ |
-| 5 | POST | `/api/user/devices/bind` | 登录 | ✅ 已加 `@Valid`（`deviceId` 必填） |
-| 6 | POST | `/api/user/devices/unbind` | 登录 | ✅ 已加 `@Valid`（`deviceId` 必填） |
-| 7 | GET | `/api/user/devices/my` | 登录 | ✅ 已补 OTA 字段 |
-| 8 | POST | `/api/user/devices/control` | 登录 | ✅ 现返回 `commandId` |
-| 9 | GET | `/api/user/ota/check/{deviceId}` | 登录 | ✅ |
-| 10 | POST | `/api/user/ota/start/{deviceId}` | 登录 | ✅ |
-| 11 | DELETE | `/api/admin/users/{id}` | ADMIN + `user:delete` | ✅ |
-| 12 | GET | `/api/admin/devices` | ADMIN + `device:list` | ✅ 现返回 `AdminDeviceVO`（不再暴露实体） |
-| 13 | POST | `/api/admin/devices` | ADMIN + `device:create` | ✅ |
-| 14 | DELETE | `/api/admin/devices/{id}` | ADMIN + `device:delete` | ✅ |
-| 15 | POST | `/api/admin/ota/firmware/upload` | ADMIN + `firmware:upload` | ✅ |
-| 16 | GET | `/api/admin/ota/firmware/list` | ADMIN + `ota:list` | ✅（不分页，保留兼容） |
-| 17 | DELETE | `/api/admin/ota/firmware/{id}` | ADMIN + `firmware:delete` | ✅ |
-| 18 | POST | `/api/admin/ota/batch-dispatch` | ADMIN + `ota:create` | ✅ 现同时生成批量任务 |
-| 19 | GET | `/api/admin/dead-letters` | ADMIN | ✅ |
-| 20 | POST | `/api/admin/dead-letters/{id}/replay` | ADMIN | ✅ |
+| 角色 | 用途 | 约束 |
+|---|---|---|
+| `ADMIN` | 系统管理 | 内置角色，不允许删除、改角色编码或禁用 |
+| `OPS` | 运维管理 | 内置角色；仅能访问其被分配角色/权限允许的管理操作 |
+| `USER` | 普通用户 | 注册默认角色；用户端设备操作受设备绑定归属检查 |
 
-### 4.2 本轮新增接口（52 个，另含用户/角色/权限管理 17 个）
+上述角色 SQL 中标记 `built_in=1`。管理端路径 `/api/admin/**` 首先要求 `ADMIN` 或 `OPS`，方法上的 `@PreAuthorize` 再检查具体权限码；部分接口只允许 `ADMIN`。
 
-**用户中心（4）**
+当前常见权限码：
 
-| # | 方法 | 路径 | 权限 |
-|---|------|------|------|
-| 1 | GET | `/api/user/profile` | 登录 |
-| 2 | PUT | `/api/user/profile` | 登录 |
-| 3 | PUT / POST | `/api/user/password` | 登录 |
-| 4 | GET | `/api/user/login-logs` | 登录 |
+```text
+user:list  user:create  user:update  user:delete
+role:list  role:create  role:update  role:delete  role:assign-permission
+permission:list  permission:create  permission:update  permission:delete
+device:list  device:read  device:create  device:update  device:delete  device:unbind
+command:send
+firmware:upload  firmware:delete  ota:list  ota:create  ota:cancel
+alert:list  alert:handle  system:config
+```
 
-**用户设备 / 指令（9）**
+### 4.2 后端鉴权与前端 UI 边界
 
-| # | 方法 | 路径 | 权限 |
-|---|------|------|------|
-| 5 | GET | `/api/user/devices/{deviceId}` | 登录 + 绑定校验 |
-| 6 | GET | `/api/user/devices/{deviceId}/online` | 登录 + 绑定校验 |
-| 7 | PUT | `/api/user/devices/{deviceId}` | 登录 + 绑定校验 |
-| 8 | GET | `/api/user/devices/{deviceId}/commands` | 登录 + 绑定校验 |
-| 9 | GET | `/api/user/devices/{deviceId}/commands/stats` | 登录 + 绑定校验 |
-| 10 | POST | `/api/user/devices/{deviceId}/commands/batch` | 登录 + 绑定校验 |
-| 11 | GET | `/api/user/commands` | 登录 |
-| 12 | GET | `/api/user/commands/{commandId}` | 登录 |
-| 13 | POST | `/api/user/commands/{commandId}/cancel` | 登录 |
+- **后端强制鉴权：**Spring Security JWT Filter、`/api/admin/**` 角色限制、方法级 `@PreAuthorize` 权限码校验、用户设备绑定归属校验、STOMP 连接和订阅鉴权。
+- **前端 UI：**根据 `roles`、`permissions` 隐藏菜单/按钮；依据设备 `capabilities` 展示可用操作；这些措施不构成安全边界。
+- **后端兜底：**客户端即使绕过 UI 直接请求接口，后端仍必须校验身份、权限、设备归属及业务状态。
 
-**传感器 / 事件 / 告警（6）**
+> ⚠️ **风险提示：前端权限只用于 UI 控制。**用户端设备操作必须在服务端确认当前用户与设备存在有效绑定；不得以客户端传入 `deviceId` 作为所有权证明。管理员 WebSocket 全量订阅权限也不代表其拥有所有 HTTP 方法权限。
 
-| # | 方法 | 路径 | 权限 |
-|---|------|------|------|
-| 14 | GET | `/api/user/devices/{deviceId}/sensors` | 登录 + 绑定校验 |
-| 15 | GET | `/api/user/devices/{deviceId}/sensors/latest` | 登录 + 绑定校验 |
-| 16 | GET | `/api/user/devices/{deviceId}/events` | 登录 + 绑定校验 |
-| 17 | GET | `/api/user/devices/{deviceId}/states` | 登录 + 绑定校验 |
-| 18 | GET | `/api/user/alerts` | 登录 |
-| 19 | POST | `/api/user/alerts/{id}/ack` | 登录 + 归属校验 |
+### 4.3 AccessToken / RefreshToken
 
-**用户 OTA（3）**
+| 项 | 机制 |
+|---|---|
+| AccessToken | 登录响应字段名为 `token`；HTTP 请求头 `Authorization` 的值为 Bearer、空格和 `token`；默认过期时间 24 小时 |
+| RefreshToken | 登录响应字段 `refreshToken`；有效期 7 天；数据库保存其 SHA-256 哈希和 `deviceType` |
+| 旋转刷新 | `/api/auth/refresh` 原子消费旧 RefreshToken 后返回一组新的 `token` 与 `refreshToken` |
+| 撤销 | 登出可将 AccessToken 的 JTI 加入黑名单并撤销请求中的 RefreshToken；改密会撤销该用户的 RefreshToken |
 
-| # | 方法 | 路径 | 权限 |
-|---|------|------|------|
-| 20 | GET | `/api/user/ota/progress/{deviceId}` | 登录 + 绑定校验 |
-| 21 | GET | `/api/user/ota/records` | 登录 |
-| 22 | POST | `/api/user/ota/retry/{deviceId}` | 登录 + 绑定校验 |
+### 4.4 登录、刷新、登出流程
 
-**管理端用户（7）**
+```text
+获取验证码（captcha.enabled=true）
+  → POST /api/auth/login
+  → 保存 token、refreshToken、roles、permissions、expiresAt
+  → HTTP 请求携带 Authorization Header（认证方案 + 空格 + token）
+  → AccessToken 过期/4014：单次刷新锁 → POST /api/auth/refresh
+  → 成功：原子替换两个 Token 并重放等待请求
+  → 失败/4012：清理本地凭据并跳转登录
+  → 登出：断开 WebSocket → POST /api/auth/logout → 清理本地凭据
+```
 
-| # | 方法 | 路径 | 权限码 |
-|---|------|------|--------|
-| 23 | GET | `/api/admin/users` | `user:list` |
-| 24 | GET | `/api/admin/users/{id}` | `user:list` |
-| 25 | PUT | `/api/admin/users/{id}` | `user:update` |
-| 26 | PUT | `/api/admin/users/{id}/status` | `user:update` |
-| 27 | PUT | `/api/admin/users/{id}/roles` | `user:update` |
-| 28 | GET | `/api/admin/users/{id}/devices` | `user:list` |
-| 29 | POST | `/api/admin/users/{id}/force-unbind` | `device:unbind` |
+登出请求头可选；若带有效 AccessToken，服务端尝试将其加入黑名单。请求体可以传 `{"refreshToken":"..."}`，也可以为空。前端即使登出请求失败，也应清除本地令牌。
 
-**管理端设备（7）**
+### 4.5 并发刷新锁
 
-| # | 方法 | 路径 | 权限码 |
-|---|------|------|--------|
-| 30 | GET | `/api/admin/devices/{id}` | `device:read` |
-| 31 | PUT | `/api/admin/devices/{id}` | `device:update` |
-| 32 | GET | `/api/admin/devices/{id}/bindings` | `device:read` |
-| 33 | POST | `/api/admin/devices/{id}/unbind` | `device:unbind` |
-| 34 | GET | `/api/admin/devices/online-stats` | `device:list`（兼容 `/stats/online`） |
-| 35 | POST | `/api/admin/devices/{id}/command` | `command:send` |
-| 36 | GET | `/api/admin/devices/export` | `device:list`（直接下载 CSV） |
+> ⚠️ **风险提示：同一个 RefreshToken 只能原子消费一次。**若多个 API 请求同时遇到 401 并并发刷新，只有一个刷新可成功，其余请求将收到 `4012`，且原 RefreshToken 已失效。
 
-**管理端固件 / OTA 任务（6）**
+**前端必须**实现单飞刷新锁：同时发生的 401 请求共用一个刷新 Promise；其他请求等待刷新完成；成功后替换 AccessToken 和 RefreshToken 并重放请求；失败时停止重试、清理凭据并跳登录。WebSocket 重连刷新也应复用同一刷新锁。
 
-| # | 方法 | 路径 | 权限码 |
-|---|------|------|--------|
-| 37 | GET | `/api/admin/ota/firmware` | `ota:list` |
-| 38 | GET | `/api/admin/ota/firmware/{id}` | `ota:list` |
-| 39 | PUT | `/api/admin/ota/firmware/{id}/status` | `firmware:upload` |
-| 40 | GET | `/api/admin/ota/tasks` | `ota:list` |
-| 41 | GET | `/api/admin/ota/tasks/{id}` | `ota:list` |
-| 42 | POST | `/api/admin/ota/tasks/{id}/cancel` | `ota:cancel` |
+### 4.6 登录失败锁定
 
-**管理端运维 / 死信（7）**
+密码错误按用户名维度计数，失败窗口为 1 小时：
 
-| # | 方法 | 路径 | 权限码 |
-|---|------|------|--------|
-| 43 | GET | `/api/admin/dashboard/summary` | `device:list` |
-| 44 | GET | `/api/admin/commands` | `device:list` |
-| 45 | GET | `/api/admin/alerts` | `alert:list` |
-| 46 | PUT | `/api/admin/alerts/{id}/status` | `alert:handle` |
-| 47 | GET | `/api/admin/audit-logs` | `device:list` |
-| 48 | GET | `/api/admin/dead-letters/{id}` | ADMIN |
-| 49 | POST | `/api/admin/dead-letters/{id}/ignore` | ADMIN |
+| 密码失败次数 | 后端动作 |
+|---:|---|
+| 5 次 | 锁定 15 分钟 |
+| 10 次 | 锁定 1 小时，并清理失败计数 |
 
-**通用能力（3）**
+成功登录会清除账号失败计数和锁定记录。验证码错误不计入密码错误账号锁定；账号不存在按 IP/设备失败计数，降低用户枚举风险。锁定返回 `4013`，message 可包含剩余等待分钟数。
 
-| # | 方法 | 路径 | 说明 |
-|---|------|------|------|
-| 50 | POST | `/api/common/upload/avatar` | 头像上传 |
-| 51 | GET | `/api/common/dictionaries` | 字典下发 |
-| 52 | GET | `/actuator/health` | 健康检查（免认证） |
-| 53 | POST | `/api/auth/captcha` | 获取验证码（免认证） |
+### 4.7 权限校验规则
+
+1. `/api/admin/**` 要求 `ADMIN` 或 `OPS` 角色。
+2. 管理 Controller 方法继续以 `@PreAuthorize` 检查细粒度权限码。
+3. 用户侧设备 API 要求已登录，并由后端校验目标设备当前绑定关系。
+4. 死信管理接口使用 `hasRole('ADMIN')`；角色和权限管理接口另有对应 `role:*` / `permission:*` 权限码。
+5. 用户角色/权限变化后建议重新登录以获取最新的登录权限快照。
 
 ---
 
-## 5. 接口详情
+## 5. 限流与风控体系
 
-### 5.1 用户注册 ✅
+所有限流异常由后端以 HTTP `429` 返回统一 `ApiResponse`。前端必须同时读取 HTTP 状态与业务码。
 
-`POST /api/auth/register`　无需 Token
+### 5.1 `X-Device-Id` 设备指纹
 
-**请求体**
+- 前端首次访问生成 UUID，持久化并在验证码、登录请求中重复使用。
+- 后端用它进行设备维度限流，不将其作为身份认证信息。
+- 未携带时后端降级使用客户端 IP；IP 与设备计数可能叠加。
+- Header 长度上限由后端常量限制为 128。
 
-| 字段 | 类型 | 必填 | 校验规则 |
-|------|------|------|----------|
-| username | string | 是 | 4~32 位，仅字母/数字/下划线 |
-| password | string | 是 | 8~64 位，必须同时含字母和数字 |
-| nickname | string | 否 | ≤64 位 |
-| email | string | 否 | 邮箱格式，≤128 位 |
-| phone | string | 否 | `^1[3-9]\\d{9}$` 或空 |
+### 5.2 第一层：验证码接口限流
 
-```json
-{ "username": "test001", "password": "abc12345", "nickname": "测试", "email": "a@b.com", "phone": "13800138000" }
-```
+接口：`POST /api/auth/captcha`
 
-**响应**
+| 维度 | 阈值 | 超限 |
+|---|---:|---|
+| 同一 IP | 每分钟 10 次 | HTTP 429 + `4600` |
+| 同一 IP | 每小时 100 次 | HTTP 429 + `4600` |
+| 同一设备指纹 | 每分钟 5 次 | HTTP 429 + `4600` |
 
-```json
-{ "code": 200, "message": "success", "data": { "userId": 12, "username": "test001", "nickname": "测试" }, "timestamp": "..." }
-```
+超限时后端不提供可用于绕过限流的维度细节。前端应停止自动刷新验证码并进行等待倒计时。
 
-**错误码**：1001/1002/1003（参数）、2000（业务，如用户名重复）。
+### 5.3 第二层：登录请求限流
 
-> 注册成功后**不自动登录**，需前端再调登录接口。
+限流发生在登录验证码校验之前。
+
+| 维度 | 阈值/动作 | 响应 |
+|---|---|---|
+| IP | 每分钟超过 10 次，临时封锁 15 分钟 | 首次超限 `4600`；封锁中 `4602` |
+| IP | 每小时超过 50 次 | `4601` 人机验证风控标记 |
+| 设备指纹 | 每分钟超过 5 次 | `4601` |
+| 账号 | 每分钟超过 5 次，仅做频率限制 | `4600` |
+
+### 5.4 第三层：失败计数与风控升级
+
+| 失败类型 | 计数维度 | 后端升级动作 |
+|---|---|---|
+| 验证码错误或过期 | IP、设备；1 小时窗口 | 达 20 次返回 `4601`；达 50 次临时封 IP 15 分钟 |
+| 账号不存在 | IP、设备 | 计入匿名失败计数，避免账号枚举 |
+| 密码错误 | 账号 | 5 次锁定 15 分钟；10 次锁定 1 小时 |
+| 验证码错误 | 不计入密码失败账号计数 | 不触发账号密码锁定 |
+
+> ⚠️ **风险提示：`4601` 代表后端风控要求，不等于已有可完成挑战的滑块接口。**当前验证码接口只支持图片验证码；前端没有可提交的人机验证凭据契约时，应提示稍后重试并由产品/后端另行确认，不能伪造字段提交。
+
+### 5.5 前后端处理边界
+
+| HTTP / code | 后端含义 | 前端处理 |
+|---|---|---|
+| 429 / `4600` | 当前频率限制 | 停止连续请求，做合理倒计时后重试 |
+| 429 / `4601` | 需要人机验证的风控升级 | 显示风控提示；当前没有可用 challenge 提交 API |
+| 429 / `4602` | IP 网络访问受限 | 停止请求，提示稍后重试，不自动轮询 |
+| 200 / `4013` | 账号被锁定 | 展示服务端 message 与剩余时间 |
+| 200 / `4030`、`4031` | 验证码过期/错误 | 重新获取图片验证码 |
+
+前端 UI 可以避免误触和高频请求；限流计数、锁定、封 IP 和业务拒绝均由后端强制执行。
 
 ---
 
-### 5.2 登录 ✅
+## 6. 接口总览
 
-`POST /api/auth/login`
+鉴权简写：**匿名**表示无需 AccessToken；**登录**表示需要有效 AccessToken；**归属**表示登录外还需要服务端设备绑定/资源归属检查；**角色+权限码**表示同时满足管理路径角色和方法权限；**ADMIN**表示仅管理员角色。
 
-**前置：获取验证码**（`captcha.enabled=true` 时登录必须携带验证码）
+### 6.1 认证与用户端接口
 
-`POST /api/auth/captcha`　无需 Token
+| 模块 | 方法 | URL | 鉴权 |
+|---|---|---|---|
+| 认证 | POST | `/api/auth/register` | 匿名 |
+| 认证 | POST | `/api/auth/login` | 匿名 |
+| 认证 | POST | `/api/auth/refresh` | 匿名 |
+| 认证 | POST | `/api/auth/logout` | AccessToken 可选；可撤销 RefreshToken |
+| 验证码 | POST | `/api/auth/captcha` | 匿名 |
+| 用户中心 | GET / PUT | `/api/user/profile` | 登录 |
+| 用户中心 | PUT / POST | `/api/user/password` | 登录 |
+| 用户中心 | GET | `/api/user/login-logs` | 登录 |
+| 用户设备 | POST | `/api/user/devices/bind`、`/unbind` | 登录 |
+| 用户设备 | GET | `/api/user/devices/my` | 登录 |
+| 用户设备 | GET / PUT | `/api/user/devices/{deviceId}` | 登录 + 归属 |
+| 用户设备 | GET | `/api/user/devices/{deviceId}/online` | 登录 + 归属 |
+| 用户设备 | POST | `/api/user/devices/control` | 登录 + 归属 |
+| 指令 | GET | `/api/user/commands`、`/api/user/commands/{commandId}` | 登录 + 用户数据范围 |
+| 指令 | POST | `/api/user/commands/{commandId}/cancel` | 登录 + 用户数据范围 |
+| 指令 | GET | `/api/user/devices/{deviceId}/commands`、`/commands/stats` | 登录 + 归属 |
+| 指令 | POST | `/api/user/devices/{deviceId}/commands/batch` | 登录 + 归属 |
+| 传感器 | GET | `/api/user/devices/{deviceId}/sensors`、`/sensors/latest` | 登录 + 归属 |
+| 事件/状态 | GET | `/api/user/devices/{deviceId}/events`、`/states` | 登录 + 归属 |
+| 告警 | GET | `/api/user/alerts` | 登录 + 用户数据范围 |
+| 告警 | POST | `/api/user/alerts/{id}/ack` | 登录 + 设备归属 |
+| 用户 OTA | GET | `/api/user/ota/check/{deviceId}`、`/progress/{deviceId}` | 登录 + 归属 |
+| 用户 OTA | POST | `/api/user/ota/start/{deviceId}`、`/retry/{deviceId}` | 登录 + 归属 |
+| 用户 OTA | GET | `/api/user/ota/records` | 登录；必须传 `deviceId` |
 
-请求体（可省略，默认图片验证码）：
+### 6.2 管理端、通用接口与统计口径
 
-```json
-{ "type": "image" }
+| 模块 | 方法 | URL | 鉴权 |
+|---|---|---|---|
+| 管理用户 | GET / POST | `/api/admin/users` | `user:list` / `user:create` |
+| 管理用户 | GET / PUT / DELETE | `/api/admin/users/{id}` | `user:list` / `user:update` / `user:delete` |
+| 管理用户 | PUT | `/api/admin/users/{id}/status`、`/roles` | `user:update` |
+| 管理用户 | GET | `/api/admin/users/{id}/devices` | `user:list` |
+| 管理用户 | POST | `/api/admin/users/{id}/force-unbind` | `device:unbind` |
+| 管理设备 | GET / POST | `/api/admin/devices` | `device:list` / `device:create` |
+| 管理设备 | GET / PUT / DELETE | `/api/admin/devices/{id}` | `device:read` / `device:update` / `device:delete` |
+| 管理设备 | GET / POST | `/api/admin/devices/{id}/bindings`、`/{id}/unbind` | `device:read` / `device:unbind` |
+| 管理设备 | GET | `/api/admin/devices/online-stats`、`/export` | `device:list` |
+| 管理设备 | POST | `/api/admin/devices/{id}/command` | `command:send` |
+| 固件/OTA | POST | `/api/admin/ota/firmware/upload` | `firmware:upload` |
+| 固件/OTA | GET | `/api/admin/ota/firmware`、`/firmware/list`、`/firmware/{id}` | `ota:list` |
+| 固件/OTA | PUT / DELETE | `/api/admin/ota/firmware/{id}/status`、`/firmware/{id}` | `firmware:upload` / `firmware:delete` |
+| 固件/OTA | POST | `/api/admin/ota/batch-dispatch` | `ota:create` |
+| 固件/OTA | GET / POST | `/api/admin/ota/tasks`、`/tasks/{id}`、`/tasks/{id}/cancel` | `ota:list` / `ota:cancel` |
+| 角色 | GET / POST | `/api/admin/roles`、`/roles/all`、`/roles/{id}` | `role:list` / `role:create` |
+| 角色 | PUT / DELETE | `/api/admin/roles/{id}`、`/{id}/status`、`/{id}/permissions` | `role:update` / `role:delete` / `role:assign-permission` |
+| 角色 | GET | `/api/admin/roles/{id}/permissions` | `role:list` |
+| 权限 | GET / POST | `/api/admin/permissions`、`/permissions/all`、`/permissions/{id}` | `permission:list` / `permission:create` |
+| 权限 | PUT / DELETE | `/api/admin/permissions/{id}`、`/{id}/status` | `permission:update` / `permission:delete` |
+| 运维 | GET | `/api/admin/dashboard/summary`、`/api/admin/commands`、`/api/admin/audit-logs` | `device:list` |
+| 运维告警 | GET / PUT | `/api/admin/alerts`、`/api/admin/alerts/{id}/status` | `alert:list` / `alert:handle` |
+| 死信 | GET / POST | `/api/admin/dead-letters`、`/{id}`、`/{id}/replay`、`/{id}/ignore` | ADMIN |
+| 通用 | POST | `/api/common/upload/avatar` | 登录 |
+| 通用 | GET | `/api/common/dictionaries` | 登录 |
+| 健康 | GET | `/actuator/health` | 匿名 |
+
+> ⚠️ **计数勘误：原文档称“20 + 52”，新增接口表实际编号到 53（把 `/api/auth/captcha` 与 `/actuator/health` 一并列入）。**上表以路由为准完整列出，不把“20+52”作为接口总数承诺。兼容旧路由 `/api/admin/devices/stats/online` 是否启用，以当前 Controller/Knife4j 为准；规范路由为 `/online-stats`。
+
+---
+
+## 7. 接口详细契约
+
+### 7.1 认证模块
+
+#### 注册
+
+| 项 | 契约 |
+|---|---|
+| 方法 / URL | `POST /api/auth/register` |
+| 鉴权 | 匿名；成功后不自动登录 |
+| 入参 | JSON：`username` 必填（4–32 位字母/数字/下划线）；`password` 必填（8–64 位且含字母和数字）；`nickname` 可选 ≤64；`email` 可选邮箱格式 ≤128；`phone` 可选，符合手机号格式或空 |
+| 出参 | `data: { userId, username, nickname }` |
+| 常见错误 | `1001`/`1002`/`1003`、`2000`、`4500` |
+| 特殊规则 | 注册成功后另调登录接口 |
+
+```http
+POST /api/auth/register
+Content-Type: application/json
 ```
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| type | string | 否 | `image`（默认）；`sms`/`email` 为预留类型，当前返回 4033 |
-| target | string | 否 | 短信/邮箱接收目标，图片验证码无需传 |
-
-> **限流**：同一 IP 每分钟 ≤ 10 次、每小时 ≤ 100 次；同一设备每分钟 ≤ 5 次。超限返回 **HTTP 429**（`code=4600`），不返回具体触发维度，前端做按钮倒计时即可。
-
-响应 `data`：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| captchaId | string | 验证码唯一标识，登录时回传 |
-| captchaType | string | `image` |
-| imageBase64 | string | 图片 Base64，含 `data:image/png;base64,` 前缀，可直接作为 `img.src` |
-| expireIn | number | 有效期（秒），默认 300 |
 
 ```json
 {
-  "code": 200,
-  "message": "success",
-  "data": {
-    "captchaId": "8f3c2a9e4b7d41c6a1f0e5d2c9b8a7f6",
-    "captchaType": "image",
-    "imageBase64": "data:image/png;base64,iVBORw0KGgo...",
-    "expireIn": 300
+  "username": "test001",
+  "password": "abc12345",
+  "nickname": "测试",
+  "email": "a@example.com",
+  "phone": "13800138000"
+}
+```
+
+#### 获取验证码
+
+| 项 | 契约 |
+|---|---|
+| 方法 / URL | `POST /api/auth/captcha` |
+| 鉴权 | 匿名 |
+| 入参 | 可选 JSON：`type` 默认为 `image`；短信/邮件为预留类型；`target` 仅预留 |
+| 出参 | `captchaId`、`captchaType`、`imageBase64`、`expireIn` |
+| 常见错误 | `4033`、`4034`、HTTP 429 + `4600` |
+| 特殊规则 | 图片验证码默认 300 秒；请求频率限制见第 5 章 |
+
+```json
+{
+  "type": "image"
+}
+```
+
+响应 `imageBase64` 含 `data:image/png;base64,` 前缀，可直接用于图片显示。
+
+#### 登录
+
+| 项 | 契约 |
+|---|---|
+| 方法 / URL | `POST /api/auth/login` |
+| 鉴权 | 匿名 |
+| Header | 可选 `X-Device-Type`；推荐 `X-Device-Id` |
+| 入参 | JSON：`username`、`password`；启用验证码时还需 `captchaId`、`captchaCode` |
+| 出参 | `LoginResponse`：`token`、`refreshToken`、`username`、`nickname`、`avatar`、`roles`、`permissions`、`lastLoginTime`、`expiresAt` |
+| 常见错误 | `4010`、`4011`、`4013`、`4030`–`4032`、HTTP 429 + `4600`–`4602` |
+| 特殊规则 | CAPTCHA 校验成功后一次性失效；密码错误按账号锁定；限流先于验证码校验 |
+
+#### 刷新 Token
+
+| 项 | 契约 |
+|---|---|
+| 方法 / URL | `POST /api/auth/refresh` |
+| 鉴权 | 不要求 AccessToken |
+| 入参 | JSON：`refreshToken` |
+| 出参 | 新 `LoginResponse`，必须同时替换 `token` 与 `refreshToken` |
+| 常见错误 | `4012`、`4015` |
+| 特殊规则 | 旧 RefreshToken 原子消费，不能复用 |
+
+#### 登出
+
+| 项 | 契约 |
+|---|---|
+| 方法 / URL | `POST /api/auth/logout` |
+| 鉴权 | Authorization 可选；RefreshToken 可选 |
+| 入参 | 可选 JSON：`refreshToken` |
+| 出参 | `data: null` |
+| 特殊规则 | 若提供 AccessToken，后端尝试加入黑名单；提供 RefreshToken 时撤销该令牌 |
+
+### 7.2 用户个人中心模块
+
+| 方法 / URL | 鉴权 | 入参 | 出参 | 业务错误/规则 |
+|---|---|---|---|---|
+| `GET /api/user/profile` | 登录 | 无 | `UserProfileVO`：`userId`、`username`、`nickname`、`email`、`phone`、`avatar`、`status`、`roles`、`permissions`、`lastLoginTime`、`createTime` | 4014；读取当前用户 |
+| `PUT /api/user/profile` | 登录 | 可选 `nickname`、`email`、`phone`、`avatar` | 更新后的用户资料 | 1002/业务错误；头像 URL 需来自上传接口，空串可清除 |
+| `PUT /api/user/password`、`POST /api/user/password` | 登录 | `oldPassword`、`newPassword` | `data: null` | 参数/业务异常；新密码 8–64 位、含字母数字且不能与旧密码相同；撤销该用户 RefreshToken |
+| `GET /api/user/login-logs?pageNum=&pageSize=` | 登录 | 分页参数 | `Page<LoginLogVO>` | 4014；只返回当前用户记录 |
+
+**前端要求：**修改密码成功后清除本地双 Token 并跳转登录；改昵称/头像后刷新资料。
+
+### 7.3 用户设备模块
+
+| 方法 / URL | 鉴权 | 入参 | 出参 | 业务错误 / 规则 |
+|---|---|---|---|---|
+| `POST /api/user/devices/bind` | 登录 | `deviceId`、`bindCode` | `null` | `1003`、`4200`、`4204`–`4209`；设备 ID 与二维码绑定码均由后端校验 |
+| `POST /api/user/devices/unbind` | 登录 | `deviceId` | `null` | `1003`、`4209`；只解绑当前用户关系 |
+| `GET /api/user/devices/my?pageNum=&pageSize=` | 登录 | 分页 | `Page<DeviceInfoVO>` | 当前用户绑定设备；包含 OTA 四字段 |
+| `GET /api/user/devices/{deviceId}` | 登录 + 归属 | 路径设备 ID | `DeviceDetailVO` | `4200`、`4209`/`4210` |
+| `GET /api/user/devices/{deviceId}/online` | 登录 + 归属 | 路径设备 ID | `DeviceOnlineVO`：设备 ID、在线值、心跳时间、离线原因 | 在线状态需轮询，暂无 WS 在线/离线推送 |
+| `PUT /api/user/devices/{deviceId}` | 登录 + 归属 | 可选 `deviceName`（≤64）、`location`（≤128） | 更新后的设备信息 | 后端校验设备归属和字段约束 |
+
+`DeviceInfoVO` 的常用字段包括 `id`、`deviceId`、`deviceName`、`product`、`firmware`、`location`、`online`、在线/心跳时间、`uptime`、`capabilities`、`currentState`、`otaState`、`otaProgress`、`otaVersion`、`otaUpdateTime`。
+
+> ⚠️ **设备归属由后端强制校验。**前端可先做 MAC 格式检查，但不得将客户端校验当作授权。
+
+### 7.4 设备指令控制模块
+
+#### 下发单条控制指令
+
+| 项 | 契约 |
+|---|---|
+| 方法 / URL | `POST /api/user/devices/control` |
+| 鉴权 | 登录 + 设备绑定归属 |
+| 请求体 | `deviceId`、`action`、`target`、可选 `channel`、`params` |
+| 出参 | `data` 为字符串 `commandId`（当前 Controller 返回 `ApiResponse<String>`） |
+| 常见错误 | `4200`、`4201`、`4210`、参数业务错误 |
+| 特殊规则 | 接口成功不等于设备执行成功；等待 `command_result` 或轮询指令详情 |
+
+```json
+{
+  "deviceId": "B4BFE90CDBA1",
+  "action": "set",
+  "target": "led",
+  "channel": 1,
+  "params": {
+    "state": 1
   }
 }
 ```
 
-**请求头**：`X-Device-Type`（可选，`web`/`app`，默认 `web`）
+`target` 常见值：`mos`、`led`、`servo`、`relay`、`ota`、`config`。常见 `action`：`set`、`get`、`toggle`、`start`、`reset`、`cancel`。**后端当前只校验部分字段非空，并不对所有 action/target 组合做统一枚举校验；前端按 `capabilities` 控制 UI，设备端仍需校验自身支持范围。**
 
-**请求体**
+> ⚠️ **勘误：原文档对控制接口出参同时写过“返回 commandId”和“data:null”。**当前 `UserDeviceController` 返回 `ApiResponse<String>`，`data` 为 `commandId`；旧的 `data:null` 描述不适用于当前实现。接口成功仍不代表硬件执行成功。
 
-| 字段 | 类型 | 必填 |
-|------|------|------|
-| username | string | 是 |
-| password | string | 是 |
-| captchaId | string | `captcha.enabled=true` 时必填 |
-| captchaCode | string | `captcha.enabled=true` 时必填，忽略大小写 |
+#### 指令查询、统计、批量与取消
 
-**响应 `data`（LoginResponse）**
+| 方法 / URL | 鉴权 | 入参 | 出参 | 规则 |
+|---|---|---|---|---|
+| `GET /api/user/commands?deviceId=&status=&pageNum=&pageSize=` | 登录 | 可选设备、状态及分页 | 指令分页 | 不传设备时按当前用户绑定设备范围查询 |
+| `GET /api/user/commands/{commandId}` | 登录 | commandId | 指令详情 | 只能访问当前用户数据范围 |
+| `POST /api/user/commands/{commandId}/cancel` | 登录 | 路径 commandId | boolean | 仅 PENDING(0) 可取消；false 表示当前状态不可取消 |
+| `GET /api/user/devices/{deviceId}/commands?status=&pageNum=&pageSize=` | 登录 + 归属 | 状态/分页 | 指令分页 | 目标设备必须归属当前用户 |
+| `GET /api/user/devices/{deviceId}/commands/stats` | 登录 + 归属 | 路径 deviceId | `CommandStatsVO` | 包含待下发、已发、成功、失败、超时、取消、总数 |
+| `POST /api/user/devices/{deviceId}/commands/batch` | 登录 + 归属 | `items` 指令数组 | `string[]` commandId | 后端顺序生成/下发多条；不是设备原子批量命令 |
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| token | string | Access Token（注意字段名是 `token`，不是 `accessToken`） |
-| refreshToken | string | 刷新令牌，7 天 |
-| username | string | 用户名 |
-| nickname | string | 昵称 |
-| avatar | string \| null | 头像 URL，未设置时为 `null` |
-| roles | string[] | 如 `["USER"]` |
-| permissions | string[] | 权限码 |
-| lastLoginTime | string | `yyyy-MM-dd HH:mm:ss`，首次登录为 `null` |
-| expiresAt | string | `yyyy-MM-dd HH:mm:ss`，Access Token 过期时间 |
+批量请求示例：
 
-**错误码**：4010（用户名或密码错误）、4011（禁用）、4013（锁定）、4030（验证码过期）、4031（验证码错误）、4032（未填验证码）。
+```json
+{
+  "items": [
+    {
+      "action": "set",
+      "target": "mos",
+      "channel": 1,
+      "params": {
+        "state": 1
+      }
+    },
+    {
+      "action": "set",
+      "target": "led",
+      "channel": 1,
+      "params": {
+        "state": 0
+      }
+    }
+  ]
+}
+```
 
-> 验证码校验成功后立即失效，同一 `captchaId` 不能重复使用；连续输错 5 次验证码立即失效，需重新获取。
-> **限流**：登录请求在验证码校验之前先经过第二层限流（IP 10 次/分钟、50 次/小时；设备 5 次/分钟；账号 5 次/分钟），超限返回 **HTTP 429**。详见 [第 12 章](#12-三层限流与风控前端必读)。
+### 7.5 传感器、事件、告警模块
 
----
+| 方法 / URL | 鉴权 | 查询/请求参数 | 出参 | 业务规则 |
+|---|---|---|---|---|
+| `GET /api/user/devices/{deviceId}/sensors` | 登录 + 归属 | `sensorKey`、`type`、`from`、`to`、分页 | `Page<DeviceSensorRecord>` | 默认每页大小按接口实现 |
+| `GET /api/user/devices/{deviceId}/sensors/latest` | 登录 + 归属 | deviceId | 最新值列表 | 每个已知传感器的最新值 |
+| `GET /api/user/devices/{deviceId}/events` | 登录 + 归属 | `type`、`from`、`to`、分页 | 设备事件分页 | `type` 用于事件筛选 |
+| `GET /api/user/devices/{deviceId}/states` | 登录 + 归属 | `from`、`to`、分页 | 状态变更分页 | 返回状态历史 |
+| `GET /api/user/alerts` | 登录 | `deviceId`、`status`、`level`、`from`、`to`、分页 | 用户设备范围内告警分页 | 只能查询授权范围 |
+| `POST /api/user/alerts/{id}/ack` | 登录 + 告警设备归属 | 告警 ID | `null` | 标记为已确认；已解决状态重复确认幂等 |
+| `GET /api/admin/alerts` | 管理路径角色 + `alert:list` | 设备、状态、级别、时间、分页 | 告警分页 | 管理端全局查询 |
+| `PUT /api/admin/alerts/{id}/status` | 管理路径角色 + `alert:handle` | `status` 为 1 或 2 | `null` | 当前处理人取登录管理员 |
 
-### 5.3 刷新 Token ✅
+传感器记录常见字段：`id`、`deviceId`、`source`、`slaveAddress`、`sensorId`、`channel`、`sensorKey`、`sensorType`、`sensorValue`、`unit`、`extra`、`sensorData`、`timestamp`、`createTime`。
 
-`POST /api/auth/refresh`
+### 7.6 用户 OTA 升级模块
 
-**请求体**：`{ "refreshToken": "xxx" }`
+| 方法 / URL | 鉴权 | 入参 | 出参 | 规则/错误 |
+|---|---|---|---|---|
+| `GET /api/user/ota/check/{deviceId}` | 登录 + 归属 | deviceId | `hasNewVersion`、`firmwareId`、`latestVersion`、`releaseNotes`、`size` | 可能 `4200`、`4210`、`4104`、`4302` |
+| `POST /api/user/ota/start/{deviceId}` | 登录 + 归属 | 无请求体 | `null` | 可能 `4201`、`4300`–`4303`；不返回 commandId |
+| `GET /api/user/ota/progress/{deviceId}` | 登录 + 归属 | deviceId | `DeviceOtaProgressVO` | 轮询快照；无记录时 OTA 字段可为 null |
+| `GET /api/user/ota/records?deviceId=&pageNum=&pageSize=` | 登录 | `deviceId` 必填 | OTA 指令记录分页 | 只返回该设备 `target=ota` 记录，按创建时间倒序 |
+| `POST /api/user/ota/retry/{deviceId}` | 登录 + 归属 | deviceId | 按 Controller 返回 | 最近 OTA 状态仅 FAILED/TIMEOUT/CANCELLED 时允许重试 |
 
-**响应**：与登录相同的 `LoginResponse`（新的 `token` + 新的 `refreshToken`）。
+### 7.7 管理端—用户管理
 
-**错误码**：4012（无效/已过期/已被并发核销）、4015（用户不存在）。
+`/api/admin/**` 还需要 `ADMIN` 或 `OPS` 角色；以下细粒度权限以方法注解为准。
 
-> 旧 `refreshToken` 刷新后立即失效，前端必须用返回值覆盖两个 token。
+| 方法 / URL | 权限码 | 请求参数 / Body | 出参 | 规则 |
+|---|---|---|---|---|
+| `GET /api/admin/users` | `user:list` | `pageNum`、`pageSize`、`keyword`、`status`、`role` | 用户分页 | 支持用户名/昵称/手机号等筛选 |
+| `POST /api/admin/users` | `user:create` | 用户名、密码、资料、`roleCodes`、状态 | 新用户 ID | 角色为空时服务按业务默认值处理 |
+| `GET /api/admin/users/{id}` | `user:list` | id | `AdminUserDetailVO` | 用户详情 |
+| `PUT /api/admin/users/{id}` | `user:update` | 昵称、邮箱、手机号 | `null` | 资料字段校验 |
+| `PUT /api/admin/users/{id}/status` | `user:update` | `{"status":0}` 或 `{"status":1}` | `null` | 状态只允许有效值 |
+| `PUT /api/admin/users/{id}/roles` | `user:update` | `{"roleCodes":["OPS"]}` | `null` | 覆盖角色；不能为空 |
+| `GET /api/admin/users/{id}/devices` | `user:list` | 分页 | 用户设备分页 | 管理查询 |
+| `POST /api/admin/users/{id}/force-unbind` | `device:unbind` | `deviceId` | `null` | 解除该用户与设备绑定 |
+| `DELETE /api/admin/users/{id}` | `user:delete` | id | `null` | 逻辑删除；用户名可能加 `#DEL#` 前缀 |
 
----
+### 7.8 管理端—设备管理
 
-### 5.4 登出 ✅
+| 方法 / URL | 权限码 | 入参 | 出参 | 规则 |
+|---|---|---|---|---|
+| `GET /api/admin/devices` | `device:list` | `pageNum`、`pageSize`、`keyword` | `Page<AdminDeviceVO>` | keyword 可匹配 MAC/名称/产品 |
+| `POST /api/admin/devices` | `device:create` | `deviceId` 必填；名称、产品、位置可选 | `null` | MAC 格式与唯一性由后端检查 |
+| `GET /api/admin/devices/{id}` | `device:read` | id | `AdminDeviceVO` | 管理端设备详情 |
+| `PUT /api/admin/devices/{id}` | `device:update` | 设备名称、产品、位置 | `null` | 只更新支持字段 |
+| `DELETE /api/admin/devices/{id}` | `device:delete` | id | `null` | 删除设备记录并清理相关 Redis 绑定成员 |
+| `GET /api/admin/devices/{id}/bindings` | `device:read` | 分页 | 绑定关系列表 | 查绑定用户 |
+| `POST /api/admin/devices/{id}/unbind` | `device:unbind` | `userId` | `null` | 指定用户解绑 |
+| `GET /api/admin/devices/online-stats` | `device:list` | 无 | 在线统计 VO | 当前在线数据快照 |
+| `POST /api/admin/devices/{id}/command` | `command:send` | action/target/channel/params | commandId | 设备命令异步执行 |
+| `GET /api/admin/devices/export?keyword=` | `device:list` | 可选 keyword | CSV 文件流 | 不是 ApiResponse；客户端按 Blob 下载 |
 
-`POST /api/auth/logout`
+### 7.9 管理端—固件与 OTA 批量任务管理
 
-- 请求头 `Authorization`：可选，传了才把 AccessToken 加入黑名单
-- 请求体：`{ "refreshToken": "xxx" }`（可传 `null`）
+| 方法 / URL | 权限码 | 入参 | 出参 | 规则 |
+|---|---|---|---|---|
+| `POST /api/admin/ota/firmware/upload` | `firmware:upload` | multipart：`file`、`version`、`product`，可选 `releaseNotes`、`operator` | 固件上传响应 | `.bin`；摘要/大小由后端计算；受 multipart 与业务上限约束 |
+| `GET /api/admin/ota/firmware` | `ota:list` | 分页、product/status/keyword | 固件分页 | 新分页接口 |
+| `GET /api/admin/ota/firmware/list` | `ota:list` | 无 | 启用固件列表 | 兼容接口，不分页 |
+| `GET /api/admin/ota/firmware/{id}` | `ota:list` | id | 固件详情 | 不存在返回 `4101` |
+| `PUT /api/admin/ota/firmware/{id}/status` | `firmware:upload` | `status` 0/1 | `null` | 启用/禁用固件 |
+| `DELETE /api/admin/ota/firmware/{id}` | `firmware:delete` | id | `null` | 删除固件；有引用/文件问题时按服务端错误返回 |
+| `POST /api/admin/ota/batch-dispatch?firmwareId=&targetProduct=&operator=` | `ota:create` | 固件 ID 必填，产品和操作人可选 | 成功生成指令设备数 | 同步执行；无可下发设备时可返回 0 |
+| `GET /api/admin/ota/tasks` | `ota:list` | 分页、可选 status | OTA 任务分页 | 任务统计可能滞后一轮详情刷新 |
+| `GET /api/admin/ota/tasks/{id}` | `ota:list` | 任务 ID | 任务详情及设备状态 | 按 taskId 汇总子指令 |
+| `POST /api/admin/ota/tasks/{id}/cancel` | `ota:cancel` | task ID | 取消条数 | 只取消 PENDING 子指令 |
 
-**响应**：`data: null`
+### 7.10 管理端—角色、权限管理
 
-> 前端登出后清空本地 token；即使接口失败也建议本地清理。
+#### 角色
 
----
+| 方法 / URL | 权限码 | 入参 | 出参/规则 |
+|---|---|---|---|
+| `GET /api/admin/roles` | `role:list` | 分页、keyword、status | 角色分页 |
+| `GET /api/admin/roles/all` | `role:list` | 无 | 角色列表 |
+| `GET /api/admin/roles/{id}` | `role:list` | id | 角色详情 |
+| `GET /api/admin/roles/{id}/permissions` | `role:list` | id | 角色权限 |
+| `POST /api/admin/roles` | `role:create` | roleCode、roleName、description、status | 新角色 ID |
+| `PUT /api/admin/roles/{id}` | `role:update` | 同角色资料 | `null`；内置角色受保护 |
+| `PUT /api/admin/roles/{id}/status` | `role:update` | status 0/1 | `null`；内置角色不可禁用 |
+| `PUT /api/admin/roles/{id}/permissions` | `role:assign-permission` | `permissionIds`，空数组代表清空 | `null`；覆盖式分配 |
+| `DELETE /api/admin/roles/{id}` | `role:delete` | id | `null`；内置角色及已分配用户角色受保护 |
 
-### 5.5 绑定设备 ✅
+内置角色不能删除、修改编码或禁用；删除仍分配给用户的自定义角色会返回 `4402`。
 
-`POST /api/user/devices/bind`
+#### 权限
 
-**请求体**
+| 方法 / URL | 权限码 | 入参 | 出参/规则 |
+|---|---|---|---|
+| `GET /api/admin/permissions` | `permission:list` | 分页、keyword、permType、resource、status | 权限分页 |
+| `GET /api/admin/permissions/all` | `permission:list` | 无 | 权限列表 |
+| `GET /api/admin/permissions/{id}` | `permission:list` | id | 权限详情 |
+| `POST /api/admin/permissions` | `permission:create` | permCode、permName、permType、resource、action、description、status | 新权限 ID |
+| `PUT /api/admin/permissions/{id}` | `permission:update` | 权限资料 | `permCode` 不可修改，违反返回 `4024` |
+| `PUT /api/admin/permissions/{id}/status` | `permission:update` | status 0/1 | `null` |
+| `DELETE /api/admin/permissions/{id}` | `permission:delete` | id | 被角色引用时 `4022` |
 
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| deviceId | string | 是 | 设备 MAC（12 位十六进制，后端会统一大小写/去分隔符）；`@NotBlank` 校验，空值返回 1003 |
-| bindCode | string | 是 | 设备绑定码（机身二维码，6 位）；Service 层校验 |
+### 7.11 管理端—运维仪表盘、告警、审计日志、死信管理
 
-**响应**：`data: null`
+| 方法 / URL | 权限 | 入参 | 出参 | 注意事项 |
+|---|---|---|---|---|
+| `GET /api/admin/dashboard/summary` | `device:list` | 无 | `DashboardSummaryVO` | 汇总设备、指令、OTA、告警数据 |
+| `GET /api/admin/commands` | `device:list` | 分页、deviceId、status、from、to | 指令分页 | 管理查询 |
+| `GET /api/admin/alerts` | `alert:list` | 分页及设备、状态、级别、时间筛选 | 告警分页 | 管理全局范围 |
+| `PUT /api/admin/alerts/{id}/status` | `alert:handle` | status=1/2 | `null` | 操作人取登录管理员 |
+| `GET /api/admin/audit-logs` | `device:list` | 分页、deviceId、operator、source、时间筛选 | 指令流水分页 | 不是全操作审计 |
+| `GET /api/admin/dead-letters` | ADMIN | 分页 | 死信分页 | 访问报文应按敏感数据处理 |
+| `GET /api/admin/dead-letters/{id}` | ADMIN | id | 死信详情 | 原始 MQTT payload |
+| `POST /api/admin/dead-letters/{id}/replay` | ADMIN | id | `null` | 只重放允许处理的消息；先修复原因 |
+| `POST /api/admin/dead-letters/{id}/ignore` | ADMIN | id | `null` | status 置为 2，之后不可重放 |
 
-**错误码**：1003（deviceId 为空）、4200/4204/4205/4206/4207/4209
+### 7.12 通用能力接口
 
----
-
-### 5.6 解绑设备 ✅
-
-`POST /api/user/devices/unbind`
-
-**请求体**：`{ "deviceId": "A1B2C3D4E5F6" }`（`bindCode` 可忽略；`deviceId` 受 `@NotBlank` 校验）
-
-**响应**：`data: null`
-
-**错误码**：1003（deviceId 为空）、4209（未绑定）
-
----
-
-### 5.7 我的设备列表 ✅
-
-`GET /api/user/devices/my?pageNum=1&pageSize=10`
-
-**响应**：`Page<DeviceInfoVO>`，`records` 元素字段：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | number | 主键 |
-| deviceId | string | MAC |
-| deviceName | string | 设备名 |
-| product | string | 产品型号 |
-| firmware | string | 当前固件版本 |
-| location | string | 位置 |
-| online | number | `1` 在线 / `0` 离线 |
-| lastOnlineTime | string | ISO 时间 |
-| lastOfflineTime | string | ISO 时间 |
-| lastHeartbeatTime | string | 最后心跳 |
-| uptime | number | 运行时长（秒） |
-| capabilities | object | 能力集，JSON |
-| currentState | object | 当前状态，JSON（结构随设备而定） |
-| otaState | string | OTA 阶段（`accepted/downloading/...`），**本轮新增** |
-| otaProgress | number | OTA 进度 0~100，**本轮新增** |
-| otaVersion | string | 目标版本号，**本轮新增** |
-| otaUpdateTime | string | OTA 状态更新时间，**本轮新增** |
-| createTime / updateTime | string | ISO 时间 |
-
-> 本轮已为 `DeviceInfoVO` 补齐 OTA 四个字段，列表页可直接展示升级进度。
-
----
-
-### 5.8 控制设备 ✅
-
-`POST /api/user/devices/control`
-
-**响应**：`data` 为本次指令的 `commandId`（字符串）。
-
-> ⚠️ **重要**：该接口返回成功仅表示"指令已受理并进入下发流程"，**不代表设备已真正执行成功**。
-> 设备执行结果由设备 ACK 回执决定，前端需订阅 WebSocket `/topic/device/{deviceId}/command`
-> 的 `command_result` 消息（见 6.8），或用 `GET /api/user/commands/{commandId}` 轮询兜底。
-
-**请求体（DeviceControlRequest）**
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| deviceId | string | 是 | MAC |
-| action | string | 是 | 见下方取值 |
-| target | string | 是 | `mos` / `led` / `servo` / `relay` / `ota` / `config` |
-| channel | number | 否 | 通道号，`0` 表示全部（MOS 共 8 路，编号 1~8） |
-| params | object | 是 | 如 `{"state":1}`、`{"brightness":80}`、`{"angle":90}` |
-
-`action` 建议取值：`set` / `get` / `toggle` / `start` / `reset` / `cancel`
-
-**响应**：`data: null`（**指令是异步的**，接口成功只代表已入库并尝试下发，最终结果需通过 WebSocket 或指令查询接口获取）
-
-**错误码**：4200（设备不存在）、4201/4211（离线）、4210（未绑定）
-
-> ⚠️ 后端只校验 `action`/`target` 非空，不做枚举校验；前端需按设备 `capabilities` 动态渲染可用按钮，避免下发非法组合。
-
----
-
-### 5.9 检查设备是否有新固件 ✅
-
-`GET /api/user/ota/check/{deviceId}`
-
-**响应 `data`（OtaCheckResponse）**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| hasNewVersion | boolean | 是否有新版本 |
-| firmwareId | number | 新固件 ID |
-| latestVersion | string | 最新版本号 |
-| releaseNotes | string | 更新说明 |
-| size | number | 固件字节数 |
-
-**错误码**：4200、4210（未绑定）、4104（固件文件缺失）、4302（版本不兼容）
-
-> 完整的升级流程、状态机与实时数据处理见 [第 11 章](#11-ota-升级全流程与实时进度前端必读)。
+| 方法 / URL | 鉴权 | 入参 | 出参 | 规则 |
+|---|---|---|---|---|
+| `POST /api/common/upload/avatar` | 登录 | multipart 字段 `file` | AvatarUploadResponse，含头像 URL | 上传后再调用 profile 保存 URL |
+| `GET /api/common/dictionaries` | 登录 | 无 | 字典 Map | 供 UI 展示；以响应实际键和值为准 |
+| `GET /actuator/health` | 匿名 | 无 | Actuator 健康 JSON | details 默认不展示 |
 
 ---
 
-### 5.10 发起单设备升级 ✅
+## 8. WebSocket STOMP 实时推送
 
-`POST /api/user/ota/start/{deviceId}`
+### 8.1 能力和部署边界
 
-无请求体。**响应**：`data: null`
+- Endpoint：`/ws`，通过 SockJS 注册。
+- STOMP Simple Broker destinations：`/topic`、`/queue`；客户端应用前缀 `/app`。
+- 当前无 `@MessageMapping` 业务接收端点，前端只需连接和订阅，不需要发布业务消息。
+- 服务端没有显式覆盖 STOMP 心跳配置；客户端仍需配置心跳与代理超时。
 
-**错误码**：4200/4201/4210/4300/4301（已在升级）/4302/4303（已最新）
+> ⚠️ **风险提示：SimpleBroker 是单实例内存 Broker。**MQTT 在实例 B 消费、前端连接在实例 A 时，实例 A 不会自动收到 B 的推送。当前不能依赖多实例广播；水平扩容需引入共享消息代理/Broker Relay，并明确离线补偿。
 
-> 进度获取方式（本轮已补齐，二选一）：
-> 1. 轮询 `GET /api/user/ota/progress/{deviceId}`（见 8.5）；
-> 2. 订阅 WebSocket `/topic/device/{deviceId}/ota`（`type = ota_progress`，见 6.8）。
->
-> ⚠️ 该接口**不返回 commandId**。前端应**先订阅 WebSocket，再调用 start**；首个 `ota_progress` 或
-> `GET /progress` 返回中的 `commandId` 即本次升级的指令 ID，用它匹配推送与升级记录。
-> 详细时序见 [11.3](#113-触发升级推荐时序)。
+### 8.2 地址、依赖与连接时序
 
----
+| HTTP 地址 | SockJS 地址 |
+|---|---|
+| `http://localhost:8080` | `http://localhost:8080/ws` |
+| `https://iot.example.com` | `https://iot.example.com/ws`（底层使用 WSS） |
 
-### 5.11 删除用户 ✅（管理端）
-
-`DELETE /api/admin/users/{id}`　需要 `user:delete`
-
-**响应**：`data: null`（逻辑删除，用户名会被改写为 `#DEL#` 前缀）
-
----
-
-### 5.12 分页查询设备 ✅（管理端）
-
-`GET /api/admin/devices?pageNum=1&pageSize=10&keyword=xxx`　需要 `device:list`
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| pageNum | number | 否 | 默认 1 |
-| pageSize | number | 否 | 默认 10 |
-| keyword | string | 否 | MAC / 设备名 / 产品模糊匹配 |
-
-**响应**：`Page<AdminDeviceVO>`（本轮已由数据库实体改为专用 VO）
-
-`AdminDeviceVO` 字段：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | number | 主键 |
-| deviceId | string | MAC |
-| deviceName | string | 设备名 |
-| product | string | 产品型号 |
-| firmware | string | 当前固件版本 |
-| location | string | 位置 |
-| bindCode | string | 绑定码（管理端可见） |
-| groupId | number | 分组 ID |
-| online | boolean | 是否在线 |
-| offlineReason | string | 离线原因 |
-| lastOnlineTime / lastOfflineTime / lastHeartbeatTime | string | ISO 时间 |
-| uptime | number | 运行时长（秒） |
-| capabilities / currentState | object | JSON |
-| otaState / otaProgress / otaVersion / otaUpdateTime | - | OTA 状态 |
-| configVersion | number | 配置版本 |
-| createTime / updateTime | string | ISO 时间 |
-
----
-
-### 5.13 新增设备 ✅（管理端）
-
-`POST /api/admin/devices`　需要 `device:create`
-
-| 字段 | 类型 | 必填 |
-|------|------|------|
-| deviceId | string | 是（MAC） |
-| deviceName | string | 否 |
-| product | string | 否 |
-| location | string | 否 |
-
-**响应**：`data: null`　**错误码**：4204/4212
-
----
-
-### 5.14 删除设备 ✅（管理端）
-
-`DELETE /api/admin/devices/{id}`　需要 `device:delete`
-
-**响应**：`data: null`
-
-> 删除时会同时移除 Redis 绑定集合成员；已绑定的用户会失去该设备。
-
----
-
-### 5.15 上传固件 ✅（管理端）
-
-`POST /api/admin/ota/firmware/upload`　需要 `firmware:upload`
-`Content-Type: multipart/form-data`
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| file | file | 是 | 必须是 `.bin`，大小受 `spring.servlet.multipart` 限制（默认 16MB/20MB） |
-| version | string | 是 | 版本号（服务端只用它拼文件名，建议 `1.2.3` 这种格式） |
-| product | string | 是 | 适用产品型号 |
-| releaseNotes | string | 否 | 更新说明 |
-| operator | string | 否 | 操作人 |
-
-**响应 `data`（FirmwareUploadResponse）**：包含固件 ID、版本、URL、md5、sha256、大小等（以后端实际返回为准）。
-
-**错误码**：4000/4001/4002/4100（版本重复）/4103/4105/4106/4107
-
----
-
-### 5.16 固件列表 ✅（管理端）
-
-`GET /api/admin/ota/firmware/list`　需要 `ota:list`
-
-**响应 `data`: `FirmwareVO[]`**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | number | 固件 ID |
-| version | string | 版本号 |
-| product | string | 产品 |
-| releaseNotes | string | 说明 |
-| url | string | 下载地址 |
-| md5 | string | MD5 |
-| sha256 | string | SHA-256 |
-| size | number | 字节 |
-| sizeText | string | 已格式化（如 `1.2 MB`） |
-| uploadedBy | string | 上传人 |
-| uploadTime | string | ISO 时间 |
-| status | number | 状态（1 启用 / 0 禁用，以后端为准） |
-
-> 该接口**不分页**，返回全部启用固件；固件多时需后端加分页（见 8.8）。
-
----
-
-### 5.17 删除固件 ✅（管理端）
-
-`DELETE /api/admin/ota/firmware/{id}`　需要 `firmware:delete`
-
-**响应**：`data: null`　**错误码**：4101/4104
-
----
-
-### 5.18 批量下发 OTA ✅（管理端）
-
-`POST /api/admin/ota/batch-dispatch?firmwareId=1&targetProduct=XXX&operator=admin`　需要 `ota:create`
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| firmwareId | number | 是 | 固件 ID |
-| targetProduct | string | 否 | 限定产品型号；不传则按固件版本筛选 |
-| operator | string | 否 | 操作人 |
-
-**响应**：`data: number`（本次成功生成指令的设备数）
-
-> ⚠️ 该接口**同步执行**，设备量大时响应可能较慢。本轮已接入 `DeviceOtaTask`：每次批量下发都会生成 `taskId` 与任务记录，可在管理端 `GET /api/admin/ota/tasks` 查看任务进度（见 8.8）。
-
----
-
-### 5.19 死信列表 ✅（管理端）
-
-`GET /api/admin/dead-letters?pageNum=1&pageSize=10`　需要 `ROLE_ADMIN`
-
-**响应**：`Page<SysDeadLetter>`
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | number | 主键 |
-| topic | string | MQTT 主题 |
-| payload | string | 原始报文 |
-| errorMsg | string | 异常信息 |
-| isRetryable | number | 1 可重试 / 0 不可 |
-| status | number | 0 未处理 / 1 已重放成功 / 2 已忽略 |
-| retryCount | number | 重试次数 |
-| createTime / updateTime | string | ISO 时间 |
-
----
-
-### 5.20 重放死信 ✅（管理端）
-
-`POST /api/admin/dead-letters/{id}/replay`　需要 `ROLE_ADMIN`
-
-**响应**：`data: null`
-
----
-
-## 6. WebSocket 实时推送（前端接入指南）
-
-> 本章可独立作为前端接入规范。以下结论均按 `WebSocketConfig`、`WebSocketAuthInterceptor`、`WebSocketPushService` 当前实现逐项核对。
-
-### 6.1 服务端能力清单（✅ 全部已实现）
-
-| 项 | 当前实现 | 前端需要知道 |
-|----|----------|--------------|
-| 端点 | `/ws`，通过 `.withSockJS()` 注册 | 浏览器端**优先用 SockJS**；原生 `ws://` 直连在部分反向代理下会 404 |
-| 传输协议 | STOMP 1.2 over WebSocket | 必须按 STOMP 帧发送 `CONNECT` |
-| Broker | Spring `SimpleBroker`，启用 `/topic`、`/queue` | 仅内存，**不跨实例**（见 6.10 第 5 条） |
-| 应用前缀 | `/app` | 后端目前**没有** `@MessageMapping`，前端**不需要发消息**，只订阅 |
-| 跨域 | `cors.allowed-origins` 配置项 | 未加入白名单时握手直接被拒（HTTP 403） |
-| 连接鉴权 | `CONNECT` 帧校验 `Authorization` | 见 6.5 |
-| 订阅鉴权 | 仅对 `/topic/device/**` 做 "用户是否绑定该设备" 校验 | 见 6.7 |
-| 心跳 | 未显式配置，使用 Spring 默认 | 客户端仍要配 `heartbeatIncoming/Outgoing` 保活 |
-| 推送点 | 外设状态、传感器、告警、OTA 进度、控制指令结果 | 上下线**仍不推送**，需轮询；OTA 进度见 6.8 与第 11 章 |
-
-### 6.2 地址推导
-
-WebSocket 地址与 HTTP API **同源**，只换协议：
-
-| HTTP Base URL | WebSocket 地址 |
-|---------------|----------------|
-| `http://localhost:8080` | `ws://localhost:8080/ws` |
-| `https://iot.example.com` | `wss://iot.example.com/ws` |
-
-> 注意：**没有** `/api` 前缀，也**没有** context-path。错误写法：`/api/ws`、`/ws/websocket`（后者是 SockJS 内部路径，不要手写）。
-
-### 6.3 前置条件（满足这 3 条才能连上）
-
-1. **已通过 HTTP 登录拿到 `token`**（`POST /api/auth/login`），且 token 未过期。
-2. **前端域名已加入后端 `cors.allowed-origins`**，否则握手阶段就失败。
-3. 安装依赖：
+前端可使用：
 
 ```bash
-npm i @stomp/stompjs sockjs-client
-# TypeScript 项目再加
-npm i -D @types/sockjs-client
+npm install @stomp/stompjs sockjs-client
+npm install --save-dev @types/sockjs-client
 ```
 
-### 6.4 建立连接的完整步骤（7 步）
-
-```
-前端                                          后端
- 1. POST /api/auth/login              ──────▶  返回 token / refreshToken
- 2. new Client(...) + activate()
- 3. SockJS 握手（HTTP 升级）          ──────▶  /ws  校验 Origin
- 4. STOMP CONNECT 帧
-    headers: Authorization: Bearer xxx ──────▶  WebSocketAuthInterceptor
-                                                 ├─ 解析 JWT
-                                                 ├─ loadUserByUsername
-                                                 ├─ validateToken
-                                                 └─ 写入 sessionAttributes(userId, isAdmin)
- 5. CONNECTED 帧                     ◀──────
- 6. SUBSCRIBE
-    /topic/device/{mac}/state        ──────▶  校验绑定关系（bind_status=1）
-                                                 ├─ 管理员：放行
-                                                 └─ 普通用户：未绑定 → ERROR
- 7. MESSAGE 帧                       ◀──────  设备上传 MQTT → 后端推送
+```text
+前端登录取得 token
+  → SockJS 握手 /ws（Origin 必须被允许）
+  → STOMP CONNECT，Header Authorization（认证方案 + 空格 + token）
+  → 后端解析 JWT 并创建 STOMP Principal
+  → CONNECTED
+  → SUBSCRIBE /topic/device/{deviceId}/{type}
+  → 后端校验管理员角色或用户设备有效绑定
+  → MQTT Handler 产生消息，后端向对应 topic 推送
 ```
 
-**顺序不可颠倒**：必须先 `CONNECTED` 再 `SUBSCRIBE`；`activate()` 之后不要立刻订阅，要在 `onConnect` 回调里订阅。
+必须等 `CONNECTED` 后再订阅。SockJS 握手路径由客户端库处理，不要手工拼 `/ws/websocket`。
 
-### 6.5 连接参数要求（逐项）
+### 8.3 连接鉴权与订阅鉴权
 
-| 参数 | 要求 | 说明 |
-|------|------|------|
-| `webSocketFactory` | 使用 SockJS | 与 `brokerURL` **二选一**，同时设置会冲突 |
-| `connectHeaders.Authorization` | **必须** `Bearer ` + token（`Bearer` 后有 1 个空格） | 后端用 `startsWith("Bearer ")` 判断；漏空格直接报 "缺少 Authorization Token" |
-| Token 位置 | 只能放 STOMP 头 | **不支持** `?token=xxx` 查询参数，也不支持 Cookie |
-| `reconnectDelay` | `5000`（或设为 0 自行控制） | 内建重连不会自动刷新 token，见 6.10 |
-| `heartbeatIncoming` | `10000` | 客户端 10s 收心跳，用于发现假连接 |
-| `heartbeatOutgoing` | `10000` | 客户端 10s 发心跳，防止 Nginx 60s 空闲断开 |
-| `connectionTimeout` | `10000` | 超时视为失败并重连 |
-| `debug` | 联调时 `console.log` | 上线关闭，避免日志噪音 |
-| `beforeConnect` | 可用 async 刷新 token | 每次（重）连接前确保 token 有效 |
+- Token 只能放在 STOMP `CONNECT` Native Header，Authorization 值为 Bearer + 空格 + token；不支持 URL query token。
+- 管理员允许订阅 `/topic/**`。
+- 普通用户只允许订阅其有效绑定设备的以下精确主题类型：`state`、`sensor`、`alert`、`ota`、`command`。
+- 普通用户不允许通配设备主题；需逐台订阅。
+- 未认证、topic 格式错误或无设备归属时，服务端返回 STOMP ERROR 并关闭连接。
+- 鉴权在服务端强制执行；前端菜单/订阅筛选只是 UI 辅助。
 
-### 6.6 最小可用代码（可直接运行）
+### 8.4 全部设备 Topic
 
-```javascript
-import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+| Destination | `type` | 内容 |
+|---|---|---|
+| `/topic/device/{deviceId}/state` | `state` | 外设状态变化 |
+| `/topic/device/{deviceId}/sensor` | `sensor` | 传感器记录数组 |
+| `/topic/device/{deviceId}/alert` | `alert` | 告警记录 |
+| `/topic/device/{deviceId}/ota` | `ota_progress` | OTA 阶段进度 |
+| `/topic/device/{deviceId}/command` | `command_result` | 指令 ACK 处理结果 |
 
-export class DeviceWsClient {
-  constructor({ wsUrl, getToken, refreshToken, onState, onSensor, onAlert, onAuthFail }) {
-    this.wsUrl = wsUrl;                 // 例：http://localhost:8080/ws
-    this.getToken = getToken;           // () => localStorage.getItem('token')
-    this.refreshToken = refreshToken;   // async () => 新 token 或 throw
-    this.onState = onState;
-    this.onSensor = onSensor;
-    this.onAlert = onAlert;
-    this.onAuthFail = onAuthFail;       // 刷新失败 → 跳登录
-    this.subscriptions = new Map();     // deviceId -> [StompSubscription]
-    this.topics = new Set();            // 需要订阅的 deviceId 集合
-  }
+### 8.5 统一消息信封与类型示例
 
-  connect() {
-    this.client = new Client({
-      webSocketFactory: () => new SockJS(this.wsUrl),
-      connectHeaders: { Authorization: 'Bearer ' + this.getToken() },
-      reconnectDelay: 5000,
-      heartbeatIncoming: 10000,
-      heartbeatOutgoing: 10000,
-      connectionTimeout: 10000,
-      debug: () => {},                       // 联调时打开
-      beforeConnect: async () => {
-        // 每次（重）连前刷新 token，避免用过期 token 重连失败
-        const token = await this.refreshToken();
-        this.client.connectHeaders = { Authorization: 'Bearer ' + token };
-      },
-      onConnect: () => {
-        // 重连成功后必须重新订阅（STOMP 不会自动恢复）
-        this.topics.forEach((deviceId) => this._subscribe(deviceId));
-      },
-      onStompError: (frame) => {
-        const msg = frame.headers['message'] || frame.body || 'WebSocket 错误';
-        if (msg.includes('无权订阅')) {
-          console.warn('[WS] 越权订阅，请检查绑定关系：', msg);
-          return;                             // 不要重试，重连也没用
-        }
-        if (msg.includes('未认证') || msg.includes('Token')) {
-          this.onAuthFail?.(msg);             // 跳登录页
-        }
-      },
-      onWebSocketClose: (evt) => {
-        console.warn('[WS] 连接关闭', evt.code, evt.reason);
-        this.subscriptions.clear();
-      }
-    });
-    this.client.activate();
-  }
-
-  /** 订阅某台设备的五个主题（已订阅则跳过） */
-  subscribeDevice(deviceId) {
-    const mac = deviceId.toUpperCase();
-    this.topics.add(mac);
-    if (this.client?.connected) this._subscribe(mac);
-  }
-
-  unsubscribeDevice(deviceId) {
-    const mac = deviceId.toUpperCase();
-    this.topics.delete(mac);
-    (this.subscriptions.get(mac) || []).forEach((s) => s.unsubscribe());
-    this.subscriptions.delete(mac);
-  }
-
-  disconnect() {
-    this.topics.clear();
-    this.subscriptions.clear();
-    this.client?.deactivate();                // 登出/离开页面时调用
-  }
-
-  _subscribe(mac) {
-    if (this.subscriptions.has(mac)) return;
-    const base = `/topic/device/${mac}`;
-    const subs = [
-      this.client.subscribe(`${base}/state`, (m) => this._dispatch(mac, m)),
-      this.client.subscribe(`${base}/sensor`, (m) => this._dispatch(mac, m)),
-      this.client.subscribe(`${base}/alert`, (m) => this._dispatch(mac, m)),
-      this.client.subscribe(`${base}/ota`, (m) => this._dispatch(mac, m)),
-      this.client.subscribe(`${base}/command`, (m) => this._dispatch(mac, m))
-    ];
-    this.subscriptions.set(mac, subs);
-    console.info('[WS] 已订阅设备', mac);
-  }
-
-  /** 统一信封分发：{type, deviceId, timestamp, data} */
-  _dispatch(mac, m) {
-    let msg;
-    try {
-      msg = JSON.parse(m.body);
-    } catch (e) {
-      console.warn('[WS] 非 JSON 消息', m.body);
-      return;
-    }
-    const data = msg && msg.data !== undefined ? msg.data : msg; // 兼容旧扁平结构
-    switch (msg?.type) {
-      case 'state':        this.onState?.(mac, data); break;
-      case 'sensor':       this.onSensor?.(mac, data); break;
-      case 'alert':        this.onAlert?.(mac, data); break;
-      case 'ota_progress': this.onOtaProgress?.(mac, data); break;
-      case 'command_result': this.onCommandResult?.(mac, data); break;
-      default:             this.onUnknown?.(mac, msg);
-    }
-  }
-}
-```
-
-**使用（Vue / React 通用）**
-
-```javascript
-const ws = new DeviceWsClient({
-  wsUrl: 'http://localhost:8080/ws',
-  getToken: () => localStorage.getItem('token'),
-  refreshToken: async () => {
-    // 必须复用 HTTP 层的"刷新锁"，避免并发刷新把 refreshToken 用废
-    const res = await http.post('/api/auth/refresh', { refreshToken: localStorage.getItem('refreshToken') });
-    if (res.code !== 200) throw new Error('refresh failed');
-    localStorage.setItem('token', res.data.token);
-    localStorage.setItem('refreshToken', res.data.refreshToken);
-    return res.data.token;
-  },
-  onAuthFail: () => { localStorage.clear(); location.href = '/login'; },
-  onState: (mac, data) => console.log(mac, '状态变化', data),
-  onSensor: (mac, list) => console.log(mac, '传感器', list),
-  onAlert: (mac, alert) => console.log(mac, '告警', alert),
-  onOtaProgress: (mac, progress) => console.log(mac, 'OTA 进度', progress),
-  onCommandResult: (mac, result) => console.log(mac, '指令结果', result),
-  onUnknown: (mac, msg) => console.warn(mac, '未知消息类型', msg)
-});
-
-ws.connect();
-ws.subscribeDevice('B4BFE90CDBA1');
-```
-
-### 6.7 订阅规则与权限
-
-**destination 格式（必须完全一致，区分大小写）**
-
-```
-/topic/device/{deviceId}/state       外设状态变化（type=state）
-/topic/device/{deviceId}/sensor      传感器上报（type=sensor，data 为数组）
-/topic/device/{deviceId}/alert       告警（type=alert）
-/topic/device/{deviceId}/ota         OTA 进度（type=ota_progress）
-/topic/device/{deviceId}/command     控制指令执行结果（type=command_result，本轮新增）
-```
-
-| 规则 | 说明 |
-|------|------|
-| deviceId 取值 | 用接口返回的 `deviceId`（MAC）；后端统一标准化（去分隔符、转大写）后再匹配绑定记录 |
-| 管理员 | 拥有全部 `/topic/**` 订阅权限，不做设备归属校验 |
-| 普通用户 | 仅允许 `/topic/device/{deviceId}/{state\|sensor\|alert\|ota\|command}`，且必须有 `device_binding.bind_status = 1` 的有效绑定，否则 ERROR |
-| 主题类型校验 | 普通用户只允许 `state/sensor/alert/ota/command` 五种后缀，其它后缀视为非法地址 |
-| 未认证 | 若 `CONNECT` 未通过，`SUBSCRIBE` 一律被拒 |
-| 不支持通配 | 普通用户不能订阅 `/topic/device/*` 或一次性订阅多台，需逐台订阅 |
-| 不支持发送 | 后端无 `@MessageMapping`，前端 `publish` 不会生效 |
-
-> 订阅鉴权在 STOMP `SUBSCRIBE` 阶段统一处理：管理员放开全部主题，普通用户按"绑定关系 + 主题白名单"校验；非法地址与越权订阅都会收到 ERROR 帧并断开连接。
-
-### 6.8 推送内容（✅ 已按后端实现核对，统一信封）
-
-**所有主题共用同一信封结构**（`WebSocketMessageVO`），前端只需一层解析：
-
-```json
-{
-  "type": "state | sensor | alert | ota_progress | command_result",
-  "deviceId": "B4BFE90CDBA1",
-  "timestamp": "2026-11-05T10:30:00",
-  "data": { }
-}
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| type | string | 消息类型，前端据此分发 |
-| deviceId | string | 设备 MAC（大写） |
-| timestamp | string | 推送时间（ISO-8601） |
-| data | any | 业务数据，结构见下 |
-
-#### `state` —— 外设状态变化（topic `/state`）
-
-`data` 是扁平对象：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| target | string | `led` / `mos` / `servo` / `relay` 等 |
-| channel | number | 通道号；`null` 表示整体 |
-| state | number | `1` 开 / `0` 关（具体含义按 target 而定） |
+通用外层结构：
 
 ```json
 {
   "type": "state",
   "deviceId": "B4BFE90CDBA1",
   "timestamp": "2026-11-05T10:30:00",
-  "data": { "target": "led", "channel": 1, "state": 1 }
+  "data": {}
 }
 ```
 
-#### `sensor` —— 传感器数据（topic `/sensor`）
+#### `state`
 
-`data` 是**数组**，元素为 `DeviceSensorRecord`：
+`data` 为状态变更对象，字段依据设备目标而定：
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | number | 记录 ID |
-| deviceId | string | 设备 MAC |
-| source | string | 数据来源 |
-| slaveAddress | number | 从机地址（RS485） |
-| sensorId | number | 传感器编号 |
-| channel | number | 通道 |
-| sensorKey | string | 传感器键（如 `temperature`） |
-| sensorType | string | 类型（如 `temp`/`hum`） |
-| sensorValue | number | 数值 |
-| unit | string | 单位 |
-| extra | object | 扩展字段 |
-| sensorData | string | 原始数据串 |
-| timestamp | string | 采集时间（ISO-8601） |
-| createTime | string | 入库时间（ISO-8601） |
+```json
+{
+  "type": "state",
+  "deviceId": "B4BFE90CDBA1",
+  "timestamp": "2026-11-05T10:30:00",
+  "data": {
+    "target": "led",
+    "channel": 1,
+    "state": 1
+  }
+}
+```
+
+#### `sensor`
+
+`data` 为 `DeviceSensorRecord` 数组；元素常见字段为 `id`、`deviceId`、`source`、`slaveAddress`、`sensorId`、`channel`、`sensorKey`、`sensorType`、`sensorValue`、`unit`、`extra`、`sensorData`、`timestamp`、`createTime`。
 
 ```json
 {
   "type": "sensor",
   "deviceId": "B4BFE90CDBA1",
   "timestamp": "2026-11-05T10:30:00",
-  "data": [ { "deviceId": "B4BFE90CDBA1", "sensorKey": "temperature", "sensorValue": 25.3, "unit": "℃", "timestamp": "2026-11-05T10:30:00" } ]
+  "data": [
+    {
+      "deviceId": "B4BFE90CDBA1",
+      "sensorKey": "temp",
+      "sensorType": "temperature",
+      "sensorValue": 25.3,
+      "unit": "℃",
+      "timestamp": "2026-11-05T10:30:00"
+    }
+  ]
 }
 ```
 
-#### `alert` —— 告警（topic `/alert`）
+#### `alert`
 
-`data` 是单个 `DeviceAlertRecord`：
+`data` 为告警对象；常见字段：`id`、`deviceId`、`sensorKey`、`alertLevel`、`alertType`、`message`、`value`、`threshold`、`status`、`handledBy`、`handledTime`、`timestamp`、`createTime`。
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | number | 告警 ID |
-| deviceId | string | 设备 MAC |
-| sensorKey | string | 触发告警的传感器键 |
-| alertLevel | number | 告警级别 |
-| alertType | string | 告警类型 |
-| message | string | 告警文案 |
-| value | number | 触发值 |
-| threshold | number | 阈值 |
-| status | number | 状态码（0 待处理，与 `AlertStatus.PENDING` 一致） |
-| handledBy / handledTime | string | 处理人 / 处理时间（推送时为 `null`） |
-| timestamp / createTime | string | 触发时间 / 入库时间 |
+```json
+{
+  "type": "alert",
+  "deviceId": "B4BFE90CDBA1",
+  "timestamp": "2026-11-05T10:30:00",
+  "data": {
+    "id": 18,
+    "deviceId": "B4BFE90CDBA1",
+    "sensorKey": "temp",
+    "alertLevel": 2,
+    "alertType": "threshold",
+    "message": "温度超过阈值",
+    "value": 35.5,
+    "threshold": 35.0,
+    "status": 0
+  }
+}
+```
 
-> 告警查询与确认接口已补齐：`GET /api/user/alerts`、`POST /api/user/alerts/{id}/ack`（见 8.4）；管理端处理见 `/api/admin/alerts/{id}/status`。收到推送后前端应刷新或合并列表。
+#### `ota_progress`
 
-#### `ota_progress` —— OTA 实时进度（topic `/ota`）
-
-设备每进入一个升级阶段或进度有明显变化时上报，后端落库后立即转发给订阅者。
-**同一设备一次升级期间会收到多条**，`data` 始终是"最新快照"。
-
-`data` 字段：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| otaState | string | `accepted/downloading/verifying/flashing/rebooting/success/failed` |
-| otaStateText | string | 阶段中文文案（后端已转好，可直接展示） |
-| progress | number | 0~100（后端已夹紧；`success` 强制为 `100`） |
-| version | string | 目标版本号 |
-| commandId | string \| null | 关联 OTA 指令 ID；设备未上报时后端会回填最近活跃指令 |
-| error | string \| null | 失败原因（仅 `failed` 时通常有值，来自设备 `data.error` / `message`） |
-| reportTime | string \| null | 设备上报时间（ISO-8601，来自报文顶层 `timestamp`）；为 `null` 时说明设备未带时间 |
-
-> 外层信封的 `timestamp` 是**服务端推送时间**，`data.reportTime` 是**设备发生时间**，两者可用于判断
-> "设备是否长时间没上报"。前端排序/去重请优先使用 `data.reportTime`。
-> 完整状态机与处理建议见 [第 11 章](#11-ota-升级全流程与实时进度前端必读)。
+`data` 常见字段：`otaState`、`otaStateText`、`progress`、`version`、`commandId`、`error`、`reportTime`。外层时间是服务端推送时间，`reportTime` 来源于设备上报时间。
 
 ```json
 {
@@ -1205,47 +871,9 @@ ws.subscribeDevice('B4BFE90CDBA1');
 }
 ```
 
-失败示例：
+#### `command_result`
 
-```json
-{
-  "type": "ota_progress",
-  "deviceId": "B4BFE90CDBA1",
-  "timestamp": "2026-11-05T10:31:05",
-  "data": {
-    "otaState": "failed",
-    "otaStateText": "升级失败",
-    "progress": 92,
-    "version": "1.0.30",
-    "commandId": "b624660c30e546efb7808b746453c4d6",
-    "error": "固件校验失败（sha256 不匹配）",
-    "reportTime": "2026-11-05T10:31:03"
-  }
-}
-```
-
-> 断线期间可能丢失进度：重连后先用 `GET /api/user/ota/progress/{deviceId}` 拉一次快照，再继续接收推送。
-> 当收到 `success` / `failed` 后可停止轮询。
-
-#### `command_result` —— 控制指令执行结果（topic `/command`，本轮新增）
-
-`data` 为 `CommandResultVO`，对应设备 ACK 回执处理后的最终状态：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| commandId | string | 指令 ID（与 `POST /control` 返回值一致） |
-| deviceId | string | 设备 MAC |
-| action | string | `set/get/toggle/...` |
-| target | string | `mos/led/servo/relay/ota/config` |
-| channel | number | 通道号；`0` 表示全部 |
-| status | number | 0 待下发 / 1 已下发 / 2 成功 / 3 失败 / 4 超时 / 5 取消 / 6 已接收 |
-| statusText | string | 状态文案（可直接展示） |
-| success | boolean \| null | `true` 成功；`false` 失败/超时/取消；`null` 执行中（如 OTA 已接收） |
-| errorMsg | string \| null | 失败原因 |
-| responsePayload | object \| null | 设备 ACK 的 `data`（如 `{"state":1,"brightness":80}`） |
-| ackTime | string \| null | 设备响应时间（ISO-8601） |
-
-**成功示例**
+`data` 为 `CommandResultVO`。主要字段：`commandId`、`deviceId`、`action`、`target`、`channel`、`status`、`statusText`、`success`、`errorMsg`、`responsePayload`、`ackTime`。
 
 ```json
 {
@@ -1256,911 +884,412 @@ ws.subscribeDevice('B4BFE90CDBA1');
     "commandId": "b624660c30e546efb7808b746453c4d6",
     "deviceId": "B4BFE90CDBA1",
     "action": "set",
-    "target": "mos",
-    "channel": 0,
+    "target": "led",
+    "channel": 1,
     "status": 2,
     "statusText": "成功",
     "success": true,
     "errorMsg": null,
-    "responsePayload": { "state": 1 },
+    "responsePayload": {
+      "state": 1
+    },
     "ackTime": "2026-11-05T13:47:34"
   }
 }
 ```
 
-**失败示例**
+**交互顺序：**先订阅 `/command`，再调用控制 API；收到 API 返回的 commandId 后匹配 `command_result`。指令状态以服务端查询结果为准；`responsePayload` 由固件决定。
 
-```json
-{
-  "type": "command_result",
-  "deviceId": "B4BFE90CDBA1",
-  "timestamp": "2026-11-05T13:47:34",
-  "data": {
-    "commandId": "b624660c30e546efb7808b746453c4d6",
-    "status": 3,
-    "statusText": "失败",
-    "success": false,
-    "errorMsg": "设备执行失败：通道无响应"
-  }
+### 8.6 STOMP 错误帧
+
+| 场景 | 错误内容/信号 | 处理 |
+|---|---|---|
+| CONNECT 缺少 Authorization Token | `缺少 Authorization Token` | 检查 STOMP Native Header 和空格 |
+| Token 无效或过期 | `认证失败，Token无效或已过期` | 刷新后重新 CONNECT；刷新失败转登录 |
+| 未认证即订阅 | `未认证，禁止订阅` | 等待 CONNECTED，不要提前订阅 |
+| 未绑定设备 | `无权订阅该设备的数据` | 不重试；引导绑定或切换设备 |
+| 非法 destination | 订阅地址不合法/不能为空 | 修正 topic，不要重试原地址 |
+| 握手跨域失败 | HTTP 403，无 STOMP ERROR 帧 | 检查 CORS Origin、代理及握手请求 |
+
+### 8.7 保活、重连、Token 过期与最小示例
+
+- 推荐客户端心跳 `heartbeatIncoming/Outgoing: 10000`，连接超时约 10 秒。
+- 重连后必须重新订阅；连接建立时的 Token 不会自动更新。
+- Token 过期时现有连接不会被主动强制断开，但断线重连需使用新 Token。
+- 建议退避重连；权限错误/未绑定错误不要无限重试。
+- 当前 SimpleBroker 多实例限制见 [第 11 章](#11-系统已知限制与注意事项)。
+
+最小示例（调用方需提供复用 HTTP 刷新锁的 `getValidAccessToken`，并实现 `dispatchDeviceMessage` 消息处理函数）：
+
+```javascript
+import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
+
+async function connectDeviceWs() {
+  const client = new Client({
+    webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+    connectHeaders: {},
+    reconnectDelay: 5000,
+    heartbeatIncoming: 10000,
+    heartbeatOutgoing: 10000,
+    connectionTimeout: 10000,
+    beforeConnect: async () => {
+      const token = await getValidAccessToken();
+      client.connectHeaders = {
+        Authorization: 'Bearer ' + token
+      };
+    },
+    onConnect: () => {
+      const base = '/topic/device/B4BFE90CDBA1';
+      for (const suffix of ['state', 'sensor', 'alert', 'ota', 'command']) {
+        client.subscribe(`${base}/${suffix}`, (frame) => {
+          dispatchDeviceMessage(JSON.parse(frame.body));
+        });
+      }
+    },
+    onStompError: (frame) => {
+      console.error(frame.headers.message, frame.body);
+    }
+  });
+  client.activate();
+  return client;
 }
+
+connectDeviceWs().catch(console.error);
 ```
 
-**推荐交互顺序（务必按此实现）**
+`await` 需放在 async 初始化函数中执行。生产使用 HTTPS 时替换为对应 HTTPS SockJS 地址。登出时调用 `client.deactivate()`。
 
-1. **先订阅** `/topic/device/{deviceId}/command`，再调用 `POST /api/user/devices/control`，避免极快的 ACK 丢失；
-2. 调用控制接口拿到 `commandId`，先把按钮置为"下发中"；
-3. 收到 `command_result` 且 `commandId` 匹配后，按 `success` 更新 UI，并可用 `responsePayload` 立即刷新外设状态；
-4. 前端设置兜底超时（建议 10 秒）：仍未收到结果则轮询 `GET /api/user/commands/{commandId}`，以接口状态为准；
-5. 指令若最终 `TIMEOUT(4)`，由后端定时任务落库，**不会额外推送**，需依赖第 4 步的轮询兜底。
+### 8.8 调试与验收
 
-> 说明：设备执行成功后通常还会单独上报 `/state`（`type=state`），这是更新 `current_state` 的权威来源；`command_result` 只表示"该条指令执行结果"，两者独立，前端可同时处理。
-> `responsePayload` 结构由设备固件决定，前端应按 `target` 做容错展示。
-
-> 说明：在线/离线状态暂未通过 WebSocket 推送，前端可用 5.7/8.2 的在线接口轮询。
-
-### 6.9 错误帧对照表（⚠️ 必读）
-
-后端抛出 `MessagingException` 后，Spring 会下发 **ERROR 帧并关闭连接**。前端按 `frame.headers.message` 匹配：
-
-| 触发场景 | ERROR message | 前端动作 |
-|----------|---------------|----------|
-| CONNECT 未带 `Authorization` 或格式不是 `Bearer ` | `缺少 Authorization Token` | 检查 header；刷新 token 后重连 |
-| Token 解析失败 / 过期 / 用户被删 | `认证失败，Token无效或已过期` | 刷新 token；失败则跳登录 |
-| 连接未认证就订阅 | `未认证，禁止订阅` | 不应出现；说明 CONNECT 未成功 |
-| 订阅未绑定的设备 | `无权订阅该设备的数据` | **不要重试**，提示"请先绑定设备" |
-| 跨域未放行 | 握手 HTTP 403（无 STOMP 帧） | 联系后端加 `cors.allowed-origins` |
-
-**注意**：ERROR 帧到达后连接即断开，`onWebSocketClose` 会紧跟触发；如果是"越权订阅"，应立即 `unsubscribeDevice` 并从待订阅集合中移除，否则重连后会再次触发。
-
-### 6.10 保活、重连与 Token 过期
-
-1. **心跳**：客户端 `heartbeatIncoming/Outgoing = 10000`。Nginx 默认 `proxy_read_timeout 60s`，10s 心跳可避免被断开；若前面还有网关，需允许 `Upgrade: websocket` 并放宽超时。
-2. **重连退避**：建议 `1s → 2s → 5s → 10s → 30s` 封顶；`@stomp/stompjs` 内建 `reconnectDelay` 是固定间隔，需要指数退避时在 `onWebSocketClose` 里自己调整值。
-3. **Token 过期**：已建立的连接**不会**因 token 过期而断开（只在 CONNECT 时校验）。但一旦重连就会失败，所以重连前必须走 `beforeConnect` 刷新。
-4. **刷新失败**：`/api/auth/refresh` 返回 4012（refreshToken 失效）→ 停止重连、清空本地、跳登录，避免"无限重连"。
-5. **多副本限制（重要）**：后端用的是内存 SimpleBroker。若后端部署多个实例，WebSocket 连接落在 A 实例、而 MQTT 消息在 B 实例处理，A 上的用户**收不到推送**。当前方案只适用于单实例部署；扩容需加 Redis 广播或外部 Broker Relay。
-6. **页面切换**：`visibilitychange` 隐藏时可保留连接；`offline` 事件主动 `deactivate()`，`online` 时重建。
-7. **多标签页**：同一浏览器多标签会各自建立连接（各自消耗一条 session）；如需限制，可用 `BroadcastChannel` 选主，只让一个标签保持连接。
-8. **登出**：先 `ws.disconnect()` 再调 `/api/auth/logout`，避免连接残留。
-
-### 6.11 调试方法
-
-| 手段 | 用法 |
-|------|------|
-| Chrome DevTools | Network → 筛选 WS → 点开连接 → Messages，可看到 `CONNECT`/`CONNECTED`/`SUBSCRIBE`/`MESSAGE`/`ERROR` 原始帧 |
-| `debug` 回调 | `debug: (str) => console.log('[STOMP]', str)`，联调必开 |
-| 后端日志 | 搜 `WebSocket 认证成功` / `用户越权订阅被拦截`，可对照前端时间点 |
-| 验证推送链路 | 用 MQTT 客户端向 `device/{mac}/sensor` 发一条报文，观察浏览器是否收到 MESSAGE |
-
-**常见现象排查**
-
-| 现象 | 可能原因 |
-|------|----------|
-| 握手 403 | 前端域名不在 `cors.allowed-origins` |
-| 连上立即断开，ERROR "缺少 Authorization Token" | `Bearer` 后少空格 / header 没传 |
-| CONNECTED 但没有消息 | 订阅的 MAC 与实际设备不一致（大小写/分隔符）；或设备未上线 |
-| 订阅后 ERROR "无权订阅" | 当前用户未绑定该设备（管理员除外） |
-| 一段时间后静默断开 | 代理空闲超时，未开心跳 |
-
-### 6.12 前端验收清单
-
-- [ ] 登录后 `activate()`，3 秒内收到 `CONNECTED`（Network 里可见）
-- [ ] `onConnect` 中完成订阅，订阅后能收到至少一条 `state`/`sensor`
-- [ ] 用未绑定账号订阅他人设备，能收到 `无权订阅该设备的数据` 且**不自动重试**
-- [ ] 手动失效 token 后重连，能触发刷新；刷新失败跳登录且停止重连
-- [ ] 断网 30 秒恢复后，连接自动重建且**重新订阅成功**
-- [ ] 页面隐藏/恢复、多标签页表现符合预期
-- [ ] 登出后连接已断开（Network 中 WS 状态为 closed）
-- [ ] 解析 `state`/`sensor`/`alert` 三种结构不报错，且对未知字段容错
+- 浏览器 DevTools → Network → WS/SockJS 请求，检查握手与 STOMP CONNECTED/SUBSCRIBE/MESSAGE/ERROR 帧。
+- 开发时开启 STOMP `debug` 回调；生产关闭调试日志，避免输出敏感消息。
+- MQTT 设备未在线、消息未到服务端、topic 不匹配、订阅未授权都可能导致无推送。
+- 断线重连后，控制结果可通过指令详情轮询；OTA 进度先获取 HTTP 快照再继续订阅。
 
 ---
 
-## 7. 枚举字典
+## 9. OTA 升级完整业务流程与状态机
 
-### 7.1 设备在线状态 ✅
+### 9.1 端到端数据流
 
-| 值 | 含义 |
-|----|------|
-| 1 | 在线 |
-| 0 | 离线 |
-
-### 7.2 指令状态（`device_command.status`）✅
-
-| 值 | 常量 | 含义 |
-|----|------|------|
-| 0 | PENDING | 待下发 |
-| 1 | SENT | 已下发 |
-| 2 | SUCCESS | 成功 |
-| 3 | FAILED | 失败 |
-| 4 | TIMEOUT | 超时 |
-| 5 | CANCELLED | 已取消 |
-| 6 | ACCEPTED | 设备已受理（OTA 场景） |
-
-> 前端统计时注意：`ACCEPTED` 属于"进行中"，不是终态。
-
-### 7.3 OTA 阶段状态（`otaState`，字符串）✅
-
-| 值 | 中文 | 典型进度区间 | 终态 |
-|----|------|-------------|------|
-| `accepted` | 已接受 | 0~5 | 否 |
-| `downloading` | 下载中 | 5~80 | 否 |
-| `verifying` | 校验中 | 80~90 | 否 |
-| `flashing` | 写入中 | 90~98 | 否 |
-| `rebooting` | 重启中 | 98~99 | 否 |
-| `success` | 升级成功 | 100（后端强制） | 是 |
-| `failed` | 升级失败 | 任意 | 是 |
-
-> 进行中：`accepted/downloading/verifying/flashing/rebooting`；终态：`success/failed`。
-> 状态码统一小写，设备上报大写时后端会自动归一化。中文文案也随推送返回（`otaStateText`）。
-
-### 7.4 固件状态（`FirmwareVO.status`）⚠️
-
-`1` 启用、`0` 禁用（以 `DeviceFirmwareUploadServiceImpl` 写入值为准，前端按数值展示即可）。
-
-### 7.5 死信状态 ✅
-
-| 值 | 含义 |
-|----|------|
-| 0 | 未处理 |
-| 1 | 已重放成功 |
-| 2 | 已忽略 |
-
-### 7.6 离线原因（`offlineReason`）⚠️ 待后端确认
-
-当前已知会出现 `MQTT_LWT`（遗嘱消息）与心跳超时原因，具体枚举未统一导出。前端请**按字符串直接展示**并预留默认文案，不要硬编码判断。
-
-### 7.7 绑定状态 ⚠️ 内部字段
-
-`device_binding.bind_status`：`1` 表示有效绑定（0 / 其他值前端不需要关心，接口已过滤）。
-
-### 7.8 告警级别与状态 ✅
-
-**告警级别 `alertLevel`**
-
-| 值 | 含义 |
-|----|------|
-| 1 | 提示 |
-| 2 | 一般 |
-| 3 | 严重 |
-
-**告警状态 `status`**
-
-| 值 | 含义 | 可执行操作 |
-|----|------|------------|
-| 0 | 未处理 | `POST /api/user/alerts/{id}/ack`、`PUT /api/admin/alerts/{id}/status` |
-| 1 | 已确认 | 管理端可改为 2 |
-| 2 | 已解决 | 再次确认会幂等成功 |
-
-> 级别与状态也可从 `GET /api/common/dictionaries` 的 `alertLevel` / `alertStatus` 获取，避免前端硬编码。
-
----
-
-## 8. 本轮新增接口详情（✅ 全部已实现）
-
-> 本章原为"未实现接口建议契约"，本轮 **8.1～8.12 全部落地**。以下路径、参数、响应字段均按当前代码核对，前端可直接联调。
-
-### 8.1 用户中心 ✅
-
-| 接口 | 说明 |
-|------|------|
-| ✅ `GET /api/user/profile` | 获取当前用户资料 |
-| ✅ `PUT /api/user/profile` | 修改昵称/邮箱/手机号，返回最新资料 |
-| ✅ `PUT / POST /api/user/password` | 修改密码，成功后强制下线 |
-| ✅ `GET /api/user/login-logs?pageNum=&pageSize=` | 我的登录记录 |
-
-**GET /api/user/profile → `UserProfileVO`**
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| userId | number | 用户 ID |
-| username | string | 用户名 |
-| nickname | string | 昵称 |
-| email | string | 邮箱 |
-| phone | string | 手机号 |
-| avatar | string \| null | 头像 URL；未设置时 `null`（先调上传接口，再通过 PUT profile 保存） |
-| status | number | 1 启用 / 0 禁用 |
-| roles | string[] | 角色编码 |
-| permissions | string[] | 权限码 |
-| lastLoginTime | string | 上次登录时间 |
-| createTime | string | 注册时间 |
-
-**PUT /api/user/profile** 请求体 `UserProfileUpdateRequest`（均可选，传 `null` 表示不改）：
-
-| 字段 | 校验 |
-|------|------|
-| nickname | ≤64 位 |
-| email | 邮箱格式，≤128 位 |
-| phone | `^1[3-9]\d{9}$` 或空 |
-| avatar | `/files/avatar/{uuid}.jpg\|png\|webp`（来自上传接口）或空串（清除头像） |
-
-**PUT/POST /api/user/password** 请求体 `PasswordChangeRequest`：
-
-| 字段 | 校验 |
-|------|------|
-| oldPassword | 必填；与原密码不匹配返回业务异常 |
-| newPassword | 8~64 位，必须同时含字母和数字；不得与原密码相同 |
-
-> 修改成功后会将该用户所有 RefreshToken 置为 `revoked`，**前端必须清空本地 token 并跳登录页**。
-
-**GET /api/user/login-logs → `Page<LoginLogVO>`**：`id`、`username`、`ip`、`userAgent`、`status`、`message`、`loginTime`。
-
----
-
-### 8.2 用户设备 ✅
-
-| 接口 | 说明 |
-|------|------|
-| ✅ `GET /api/user/devices/{deviceId}` | 设备详情（`DeviceDetailVO`） |
-| ✅ `GET /api/user/devices/{deviceId}/online` | 轻量在线查询（`DeviceOnlineVO`） |
-| ✅ `PUT /api/user/devices/{deviceId}` | 修改设备名/位置 |
-| ✅ `GET /api/user/devices/{deviceId}/commands?status=&pageNum=&pageSize=` | 该设备指令历史 |
-
-**`DeviceDetailVO`**
-
-| 字段 | 类型 |
-|------|------|
-| id / deviceId / deviceName / product / firmware / location | - |
-| online | boolean |
-| offlineReason | string |
-| lastOnlineTime / lastOfflineTime / lastHeartbeatTime | string |
-| uptime | number |
-| capabilities / currentState | object |
-| configVersion | number |
-| otaState / otaProgress / otaVersion / otaUpdateTime | OTA 状态 |
-| bindTime | string |
-| createTime | string |
-
-**`DeviceOnlineVO`**：`deviceId`、`online`(boolean)、`lastHeartbeatTime`、`offlineReason`。
-
-**PUT 请求体 `UserDeviceUpdateRequest`**：`deviceName`（≤64）、`location`（≤128），均可选。
-
-> 所有用户侧设备接口都会校验"该设备当前确实绑定在当前登录用户名下"，未绑定返回 4209/4210。
-
----
-
-### 8.3 指令中心 ✅
-
-| 接口 | 说明 |
-|------|------|
-| ✅ `GET /api/user/commands?deviceId=&status=&pageNum=&pageSize=` | 我的指令列表 |
-| ✅ `GET /api/user/commands/{commandId}` | 指令详情 |
-| ✅ `POST /api/user/commands/{commandId}/cancel` | 取消未完成指令，返回 `true/false` |
-| ✅ `GET /api/user/devices/{deviceId}/commands/stats` | 各状态数量 |
-| ✅ `POST /api/user/devices/{deviceId}/commands/batch` | 批量控制 |
-
-**指令对象 `DeviceCommand` 主要字段**：`id`、`commandId`、`deviceId`、`action`、`target`、`channel`、`params`、`status`、`retryCount`、`maxRetry`、`errorMsg`、`responsePayload`、`operator`、`source`、`expireTime`、`sendTime`、`ackTime`、`createTime`、`updateTime`。
-
-`GET /api/user/commands` 的 `deviceId` 可选；**不传时返回当前用户全部已绑定设备的指令**（内部先解析绑定集合）。
-
-取消规则：只有 `PENDING(0)` 的指令可取消；返回 `false` 表示不可取消（已下发/已终态/OTA 已受理）。
-
-> 指令执行结果的实时通知：订阅 `/topic/device/{deviceId}/command` 的 `command_result`（见 6.8）；断线或超时场景用本组接口轮询兜底。
-
-**`CommandStatsVO`**：`pending/sent/success/failed/timeout/cancelled/total`（均为 number）。
-
-**批量控制** `POST /api/user/devices/{deviceId}/commands/batch`：
-
-```json
-{
-  "items": [
-    { "action": "set", "target": "mos", "channel": 1, "params": { "state": 1 } },
-    { "action": "set", "target": "led", "channel": 1, "params": { "state": 0 } }
-  ]
-}
+```text
+前端 GET /api/user/ota/check/{deviceId}
+  → 服务端确认设备、固件、版本条件
+  → 前端先订阅 /topic/device/{deviceId}/ota（建议同时订阅 /command）
+  → 前端 POST /api/user/ota/start/{deviceId}
+  → 服务端创建 device_command 并发布 device/{mac}/command
+  → 设备 ACK 和 device/{mac}/ota_progress 上报
+  → MQTT Handler 更新 device_info / device_command
+  → WebSocket 推送 ota_progress / command_result
+  → 前端终态刷新设备与 OTA 历史；断线用 HTTP 快照补齐
 ```
 
-返回 `data` 为 `string[]`（每条指令的 `commandId`，按提交顺序）。
+### 9.2 `otaState` 状态机
 
-> 批量控制不是"设备侧一次执行"，而是后端顺序下发多条指令；任一条失败会抛业务异常并整体回滚。
-
----
-
-### 8.4 传感器 / 事件 / 告警 ✅
-
-| 接口 | 说明 |
-|------|------|
-| ✅ `GET /api/user/devices/{deviceId}/sensors?sensorKey=&type=&from=&to=&pageNum=&pageSize=` | 传感器历史（默认每页 20） |
-| ✅ `GET /api/user/devices/{deviceId}/sensors/latest` | 各传感器最新值 |
-| ✅ `GET /api/user/devices/{deviceId}/events?type=&from=&to=&pageNum=&pageSize=` | 设备事件 |
-| ✅ `GET /api/user/devices/{deviceId}/states?from=&to=&pageNum=&pageSize=` | 状态变更历史 |
-| ✅ `GET /api/user/alerts?deviceId=&status=&level=&from=&to=&pageNum=&pageSize=` | 我的告警列表（默认每页 10） |
-| ✅ `POST /api/user/alerts/{id}/ack` | 标记已处理（status→1） |
-
-**传感器历史**返回 `Page<DeviceSensorRecord>`：`id`、`deviceId`、`source`、`slaveAddress`、`sensorId`、`channel`、`sensorKey`、`sensorType`、`sensorValue`、`unit`、`extra`、`sensorData`、`timestamp`、`createTime`。
-
-> `type` 与 `sensorKey` 都可作为筛选条件：`sensorKey` 精确匹配传感器键，`type` 匹配 `sensor_type`。
-
-**最新值 `SensorLatestVO`**：`sensorKey`、`sensorType`、`sensorName`、`unit`、`value`(number)、`timestamp`。
-
-**事件 `DeviceEventRecord`**：`id`、`deviceId`、`type`、`event`、`code`、`message`、`context`、`target`、`channel`、`triggerSource`、`payload`、`timestamp`、`createTime`。
-
-**状态历史 `DeviceStateRecord`**：`id`、`deviceId`、`target`、`channel`、`params`(object)、`timestamp`、`createTime`。
-
-**告警 `DeviceAlertRecord`**：`id`、`deviceId`、`sensorKey`、`alertLevel`(1/2/3)、`alertType`、`message`、`value`、`threshold`、`status`(0 未处理/1 已确认/2 已解决)、`handledBy`、`handledTime`、`timestamp`、`createTime`。
-
-确认告警规则：
-- 只有"当前用户已绑定设备"产生的告警才能确认；
-- `status=2` 再次调用会**幂等成功**（不报错）；
-- 确认后 `status=1`、`handledBy=当前用户`、`handledTime=当前时间`。
-
----
-
-### 8.5 OTA ✅
-
-| 接口 | 说明 |
-|------|------|
-| ✅ `GET /api/user/ota/progress/{deviceId}` | 进度轮询（`DeviceOtaProgressVO`） |
-| ✅ `GET /api/user/ota/records?deviceId=&pageNum=&pageSize=` | 升级历史（`OtaRecordVO`） |
-| ✅ `POST /api/user/ota/retry/{deviceId}` | 失败重试 |
-
-**`DeviceOtaProgressVO`**（`GET /api/user/ota/progress/{deviceId}` 的 `data`）：
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| deviceId | string | 设备 MAC |
-| otaState | string \| null | OTA 阶段（`accepted/.../failed`），无升级记录时为 `null` |
-| otaStateText | string \| null | 阶段中文文案 |
-| otaProgress | number \| null | 0~100 |
-| otaVersion | string \| null | 目标版本号 |
-| commandId | string \| null | 最近一次 OTA 指令 ID |
-| commandStatus | number \| null | 指令状态（见 7.2） |
-| commandStatusText | string \| null | 指令状态文案 |
-| errorMsg | string \| null | 失败原因（来自 OTA 指令） |
-| otaUpdateTime | string \| null | OTA 状态最后更新时间 |
-| running | boolean | 是否升级进行中 |
-| finished | boolean | 是否已到终态（成功/失败） |
-| serverTime | string | 服务端当前时间，用于计算数据新鲜度 |
-
-> 轮询建议：`running=true` 时每 1~2 秒拉一次；收到 `finished=true` 后停止。
-> WebSocket 断线重连后先调用本接口补齐快照，再继续接收 `ota_progress`。
-
-**`OtaRecordVO`**：`id`、`commandId`、`deviceId`、`version`、`status`(number)、`statusText`、`otaState`、`progress`、`errorMsg`、`createTime`、`sendTime`、`ackTime`。
-
-> `records` 的 `deviceId` 为**必填**（不传返回参数错误）；记录按创建时间倒序，只返回 `target=ota` 的指令。
-> `otaState` / `progress` 仅在记录版本等于设备当前 `otaVersion` 时填充（即"最近一次升级"）。
-
-重试规则：仅当该设备最近一条 OTA 指令处于 `FAILED(3) / TIMEOUT(4) / CANCELLED(5)` 时才允许重试；否则返回业务异常（避免重复升级）。
-
----
-
-### 8.6 管理端：用户管理 ✅（全部需要 ADMIN 角色）
-
-| 接口 | 权限码 | 说明 |
-|------|--------|------|
-| ✅ `GET /api/admin/users?pageNum=&pageSize=&keyword=&status=&role=` | `user:list` | 用户列表 |
-| ✅ `POST /api/admin/users` | `user:create` | 新增用户并分配角色 |
-| ✅ `GET /api/admin/users/{id}` | `user:list` | 用户详情 |
-| ✅ `PUT /api/admin/users/{id}` | `user:update` | 编辑资料 |
-| ✅ `PUT /api/admin/users/{id}/status` | `user:update` | 启用/禁用 |
-| ✅ `PUT /api/admin/users/{id}/roles` | `user:update` | 分配角色 |
-| ✅ `GET /api/admin/users/{id}/devices?pageNum=&pageSize=` | `user:list` | 用户绑定设备 |
-| ✅ `POST /api/admin/users/{id}/force-unbind` | `device:unbind` | 强制解绑 |
-
-**列表筛选参数**：`keyword`（用户名/昵称/手机号模糊）、`status`(0/1)、`role`（角色编码，兼容旧参数名 `roleCode`）。
-
-**`AdminUserVO`**：`id`、`username`、`nickname`、`email`、`phone`、`status`、`roles`、`lastLoginTime`、`createTime`。
-
-**`AdminUserDetailVO`** = 上述字段 + `deviceCount`(number)、`loginCount`(number)、`permissions`(string[])、`updateTime`。
-
-**请求体**
-
-- `POST /api/admin/users` →
-
-```json
-{
-  "username": "operator01",
-  "password": "Passw0rd123",
-  "nickname": "运维一号",
-  "email": "ops01@example.com",
-  "phone": "13800138000",
-  "roleCodes": ["OPS"],
-  "status": 1
-}
-```
-
-  字段约束：`username` 4-32 位字母/数字/下划线；`password` 8-64 位且同时包含字母和数字；`roleCodes` 为空时默认分配 `USER`；`status` 缺省为 1。
-  返回 `data` 为新用户 ID（number）。
-
-- `PUT /{id}` → `{ nickname?, email?, phone? }`
-- `PUT /{id}/status` → `{ "status": 0 | 1 }`
-- `PUT /{id}/roles` → `{ "roleCodes": ["ADMIN"] }`（不能为空；会整体替换角色）
-- `POST /{id}/force-unbind` → `{ "deviceId": "A1B2C3D4E5F6" }`
-
-> 强制解绑会把绑定记录置为解绑状态，并从 Redis 绑定集合移除该 MAC，便于设备转绑其他用户。
-
----
-
-### 8.7 管理端：设备管理 ✅
-
-| 接口 | 权限码 | 说明 |
-|------|--------|------|
-| ✅ `GET /api/admin/devices/{id}` | `device:read` | 设备详情（`AdminDeviceVO`） |
-| ✅ `PUT /api/admin/devices/{id}` | `device:update` | 编辑设备名/产品/位置 |
-| ✅ `GET /api/admin/devices/{id}/bindings?pageNum=&pageSize=` | `device:read` | 绑定用户列表 |
-| ✅ `POST /api/admin/devices/{id}/unbind` | `device:unbind` | 解绑指定用户 |
-| ✅ `GET /api/admin/devices/online-stats`（兼容 `/stats/online`） | `device:list` | 在线统计 |
-| ✅ `POST /api/admin/devices/{id}/command` | `command:send` | 管理员下发指令 |
-| ✅ `GET /api/admin/devices/export?keyword=` | `device:list` | 导出 CSV |
-
-**在线统计 `DeviceOnlineStatsVO`**：`total`、`online`、`offline`、`abnormal`（标记在线但心跳超时的设备数）。
-
-**绑定列表 `DeviceBindingVO`**：`bindingId`、`userId`、`username`、`nickname`、`bindTime`、`bindStatus`。
-
-**请求体**
-
-- `PUT /{id}` → `{ deviceName?, product?, location? }`
-- `POST /{id}/unbind` → `{ "userId": 12 }`
-- `POST /{id}/command` →
-
-```json
-{ "action": "set", "target": "mos", "channel": 1, "params": { "state": 1 } }
-```
-
-  返回 `data` 为 `commandId`（字符串）。
-
-**导出说明**：直接返回 `text/csv` 文件流（不是 JSON），带 UTF-8 BOM，列头为
-`ID,设备MAC,设备名称,产品,固件版本,位置,绑定码,在线状态,最后在线时间,最后心跳时间,创建时间`。
-前端需用 `responseType: 'blob'` 并用 `Content-Disposition: attachment;filename=devices.csv` 触发下载。
-
----
-
-### 8.8 管理端：固件与 OTA 任务 ✅
-
-| 接口 | 权限码 | 说明 |
-|------|--------|------|
-| ✅ `GET /api/admin/ota/firmware?pageNum=&pageSize=&product=&status=&keyword=` | `ota:list` | 固件分页 |
-| ✅ `GET /api/admin/ota/firmware/{id}` | `ota:list` | 固件详情 |
-| ✅ `PUT /api/admin/ota/firmware/{id}/status` | `firmware:upload` | 启用/禁用 |
-| ✅ `GET /api/admin/ota/tasks?pageNum=&pageSize=&status=` | `ota:list` | 批量任务列表 |
-| ✅ `GET /api/admin/ota/tasks/{id}` | `ota:list` | 任务详情 |
-| ✅ `POST /api/admin/ota/tasks/{id}/cancel` | `ota:cancel` | 取消未下发子任务 |
-
-**`FirmwareVO`**：`id`、`version`、`product`、`releaseNotes`、`url`、`md5`、`sha256`、`size`、`sizeText`、`uploadedBy`、`uploadTime`、`status`。
-
-**`OtaTaskVO`**：`id`、`firmwareId`、`targetVersion`、`totalCount`、`successCount`、`failedCount`、`pendingCount`、`status`、`operator`、`createTime`、`updateTime`。
-
-**`OtaTaskDetailVO`** = `OtaTaskVO` + `devices: OtaTaskDeviceVO[]`：
-
-| 字段 | 说明 |
-|------|------|
-| deviceId / deviceName / firmware | 设备信息 |
-| otaState / otaProgress | 设备实时 OTA 状态 |
-| commandStatus / commandStatusText | 指令状态码与文案 |
-| errorMsg | 失败原因 |
-| updateTime | 更新时间 |
-
-**请求体**：`PUT /firmware/{id}/status` → `{ "status": 0 | 1 }`。
-
-**任务与指令关联方式（重要）**：`batch-dispatch` 会生成 `taskId` 并写入每条 OTA 指令的 `params.taskId`；任务详情按该 `taskId` 过滤子指令并回写统计（成功/失败/待处理）。取消任务只会把仍为 `PENDING(0)` 的子指令改为 `CANCELLED(5)`，返回取消条数。
-
-**批量下发返回**：`data` 为本次成功生成指令的设备台数（number）。若所有设备都已有未完成 OTA 指令，返回 `0` 且**不会**创建空任务。
-
----
-
-### 8.9 管理端：运维与审计 ✅
-
-| 接口 | 权限码 | 说明 |
-|------|--------|------|
-| ✅ `GET /api/admin/dashboard/summary` | `device:list` | 首页概览 |
-| ✅ `GET /api/admin/commands?pageNum=&pageSize=&deviceId=&status=&from=&to=` | `device:list` | 全局指令 |
-| ✅ `GET /api/admin/alerts?pageNum=&pageSize=&deviceId=&status=&level=&from=&to=` | `alert:list` | 全局告警 |
-| ✅ `PUT /api/admin/alerts/{id}/status` | `alert:handle` | 处理告警 |
-| ✅ `GET /api/admin/audit-logs?pageNum=&pageSize=&deviceId=&operator=&source=&from=&to=` | `device:list` | 操作审计 |
-| ✅ `GET /api/admin/dead-letters/{id}` | ADMIN | 死信详情 |
-| ✅ `POST /api/admin/dead-letters/{id}/ignore` | ADMIN | 忽略死信 |
-
-**`DashboardSummaryVO`**：`deviceTotal`、`onlineCount`、`offlineCount`、`todayCommandCount`、`todayFailedCount`、`failureRate`(number, 百分比两位小数)、`otaRunningCount`、`unhandledAlertCount`。
-
-**处理告警**：`PUT /alerts/{id}/status` → `{ "status": 1 | 2 }`（1 已确认 / 2 已解决），处理人取当前登录管理员。
-
-**审计日志说明（已知限制）**：项目暂无独立审计表，`/audit-logs` 复用 `device_command` 流水，返回 `Page<DeviceCommand>`；筛选参数中 `operator` 为操作人、`source` 为 `WEB/API/SCHEDULE/SYSTEM`。
-
-**忽略死信**：`POST /dead-letters/{id}/ignore` 将 `status` 置为 `2`（已忽略），之后不能再重放。
-
----
-
-### 8.10 通用能力 ✅
-
-| 接口 | 说明 |
-|------|------|
-| ✅ `POST /api/common/upload/avatar` | 头像上传（`multipart/form-data`，字段名 `file`） |
-| ✅ `GET /api/common/dictionaries` | 字典下发 |
-| ✅ `GET /actuator/health` | 健康检查（免认证） |
-| ✅ WebSocket 统一信封 | 已统一为 `{type, deviceId, timestamp, data}`（见 6.8） |
-
-**头像上传限制**：≤2MB；仅 `image/jpeg` / `image/png` / `image/webp`；返回 `{ url, size, contentType }`，其中 `url` 形如 `/files/avatar/{uuid}.jpg`，可直接用于 `<img src>`。
-
-**头像持久化流程（已补齐）：**
-
-1. `POST /api/common/upload/avatar` 拿到 `url`；
-2. 调用 `PUT /api/user/profile`，请求体带上 `{ "avatar": "<上一步的 url>" }`；
-3. 后端把 URL 写入 `sys_user.avatar`，再次登录/刷新时 `LoginResponse.avatar` 与 `GET /api/user/profile` 的 `avatar` 都会返回该地址；
-4. 传 `"avatar": ""` 表示清除头像；替换头像时后端会在事务提交后删除旧文件。
-
-> `avatar` 只接受本服务上传接口返回的地址（`/files/avatar/{uuid}.jpg\|png\|webp`），传外部链接会返回参数校验错误。
-
-**字典结构**（`data` 为对象）：
-
-| key | 结构 |
-|-----|------|
-| roles | `[{code,name}]`（来自 `sys_role`） |
-| userStatus | `[{value:1,label:"启用"},{value:0,label:"禁用"}]` |
-| deviceOnline | `[{value:1,label:"在线"},{value:0,label:"离线"}]` |
-| commandStatus | `[{value,label}]`（与 `DeviceCommandStatus` 一致） |
-| otaState | `[{value:"accepted",label:"已接受"} …]` |
-| alertLevel | `[{value:1,label:"提示"},{value:2,label:"一般"},{value:3,label:"严重"}]` |
-| alertStatus | `[{value:0,label:"未处理"},{value:1,label:"已确认"},{value:2,label:"已解决"}]` |
-| products | `string[]`（设备表去重后的产品型号） |
-
----
-
-### 8.11 管理端：角色管理 ✅（全部需要 ADMIN 角色）
-
-| 接口 | 权限码 | 说明 |
-|------|--------|------|
-| ✅ `GET /api/admin/roles?pageNum=&pageSize=&keyword=&status=` | `role:list` | 角色分页（编码/名称模糊） |
-| ✅ `GET /api/admin/roles/all` | `role:list` | 全部角色（下拉选择） |
-| ✅ `GET /api/admin/roles/{id}` | `role:list` | 角色详情（含权限） |
-| ✅ `POST /api/admin/roles` | `role:create` | 新增角色 |
-| ✅ `PUT /api/admin/roles/{id}` | `role:update` | 编辑角色 |
-| ✅ `PUT /api/admin/roles/{id}/status` | `role:update` | 启用/禁用角色 |
-| ✅ `DELETE /api/admin/roles/{id}` | `role:delete` | 删除角色 |
-| ✅ `GET /api/admin/roles/{id}/permissions` | `role:list` | 查询角色权限 |
-| ✅ `PUT /api/admin/roles/{id}/permissions` | `role:assign-permission` | 覆盖式分配权限 |
-
-**`AdminRoleVO`**：`id`、`roleCode`、`roleName`、`description`、`status`、`builtIn`(1 内置/0 自定义)、`userCount`、`permissionCount`、`createTime`、`updateTime`。
-
-**`AdminRoleDetailVO`** = 上述字段 + `permissionIds`(number[])、`permCodes`(string[])。
-
-**请求体**
-
-- `POST /api/admin/roles` / `PUT /api/admin/roles/{id}` →
-
-```json
-{
-  "roleCode": "AUDITOR",
-  "roleName": "审计员",
-  "description": "只读查看设备与告警",
-  "status": 1
-}
-```
-
-  约束：`roleCode` 3-32 位，以大写字母开头，仅包含大写字母、数字、下划线；`roleName` 必填且 ≤64 位。
-  返回 `data` 为新建角色 ID（number）。
-
-- `PUT /api/admin/roles/{id}/status` → `{ "status": 0 | 1 }`
-- `PUT /api/admin/roles/{id}/permissions` → `{ "permissionIds": [1, 2, 9] }`（传空数组表示清空）
-
-**内置角色保护（重要）**：`builtIn=1` 的角色（ADMIN/OPS/USER）不允许删除、不允许修改 `roleCode`、不允许禁用；前端应对这些操作置灰。
-删除自定义角色前需先解除该角色与用户的绑定，否则返回 `4402`。
-
----
-
-### 8.12 管理端：权限管理 ✅（全部需要 ADMIN 角色）
-
-| 接口 | 权限码 | 说明 |
-|------|--------|------|
-| ✅ `GET /api/admin/permissions?pageNum=&pageSize=&keyword=&permType=&resource=&status=` | `permission:list` | 权限分页 |
-| ✅ `GET /api/admin/permissions/all` | `permission:list` | 全部权限（授权树/分组） |
-| ✅ `GET /api/admin/permissions/{id}` | `permission:list` | 权限详情 |
-| ✅ `POST /api/admin/permissions` | `permission:create` | 新增权限 |
-| ✅ `PUT /api/admin/permissions/{id}` | `permission:update` | 编辑权限 |
-| ✅ `PUT /api/admin/permissions/{id}/status` | `permission:update` | 启用/禁用权限 |
-| ✅ `DELETE /api/admin/permissions/{id}` | `permission:delete` | 删除权限 |
-
-**`AdminPermissionVO`**：`id`、`permCode`、`permName`、`permType`、`resource`、`action`、`description`、`status`、`roleCount`、`createTime`、`updateTime`。
-
-**请求体**
-
-- `POST /api/admin/permissions` / `PUT /api/admin/permissions/{id}` →
-
-```json
-{
-  "permCode": "report:export",
-  "permName": "导出报表",
-  "permType": "API",
-  "resource": "report",
-  "action": "export",
-  "description": "导出运营报表",
-  "status": 1
-}
-```
-
-  约束：`permCode` 必须符合 `resource:action` 小写格式；`permType` 取值 `MENU` / `BUTTON` / `API` / `ACTION`；`resource`、`action` 不传时自动从 `permCode` 拆分。
-  返回 `data` 为新建权限 ID（number）。
-
-- `PUT /api/admin/permissions/{id}/status` → `{ "status": 0 | 1 }`
-
-**规则（重要）**：
-- **权限编码创建后不可修改**，修改时传不同 `permCode` 会返回 `4024`。
-- 权限被任一角色引用时禁止删除（`4022`），需先在角色授权中移除。
-- 权限删除为逻辑删除，前端列表不再展示。
-
----
-
-### 8.13 已知限制（本轮实现后仍存在）
-
-| # | 限制 | 影响 | 前端应对 |
-|---|------|------|----------|
-| 1 | ~~用户资料无 `avatar` 字段~~ | ✅ 已补齐：`sys_user.avatar` 已持久化，登录与资料接口均返回 | 上传后调用 `PUT /api/user/profile` 保存 `avatar` |
-| 2 | 无独立审计表 | `/audit-logs` 只能反映"指令类操作" | 页面标题注明"指令审计"，不要承诺覆盖所有操作 |
-| 3 | OTA 任务统计在详情查询时回写 | 列表页统计可能滞后一次刷新 | 进入详情/刷新后为准；列表展示 `pendingCount` 仅作参考 |
-| 4 | 在线/离线无 WebSocket 推送 | 状态卡片不能实时变 | 轮询 `/{deviceId}/online` 或 `/online-stats` |
-| 5 | WebSocket 使用内存 Broker | 多实例部署会丢推送 | 单实例部署；扩容前接入 Redis/外部 Broker |
-| 6 | 指令 `TIMEOUT(4)` 仅落库、不推送 | 设备长时间不 ACK 时前端收不到终态 | 前端 10 秒兜底超时后轮询 `GET /api/user/commands/{commandId}` |
-
----
-
-## 9. 前端对接风险与待确认项
-
-> 表中标"已解决"的项是本轮后端补齐的，前端可按新契约实现。
-
-| # | 问题 | 状态 | 前端应对 / 建议 |
-|---|------|------|-----------------|
-| 1 | 业务异常返回 **HTTP 200** | 保持 | 统一拦截器判断 `code !== 200` |
-| 2 | 控制指令不返回 commandId | **已解决** | `POST /control` 返回 commandId；订阅 `command_result` 获取设备执行结果，轮询为兜底 |
-| 3 | `/my` 不含 OTA 字段、进度不可见 | **已解决** | `/my` 已含 OTA 四字段；进度见 `/progress` 或 WS `ota_progress` |
-| 4 | 传感器/事件/告警无查询接口 | **已解决** | 使用 8.4 接口画历史曲线与告警列表 |
-| 5 | `bind`/`unbind` 无 `@Valid` | **已解决** | `deviceId` 已加 `@NotBlank`；前端仍建议做 MAC 格式校验 |
-| 6 | `action`/`target` 无枚举校验 | 保持 | 按 `capabilities` 渲染；维护前端白名单 |
-| 7 | `GET /api/admin/devices` 返回实体 | **已解决** | 现返回 `AdminDeviceVO`，字段稳定 |
-| 8 | 刷新 Token 不可并发 | 保持 | **必须加刷新锁**（见 3.3） |
-| 9 | WebSocket 推送无统一信封 | **已解决** | 统一 `{type, deviceId, timestamp, data}`，见 6.8 |
-| 10 | 离线原因枚举未导出 | 保持 | 字符串直出 + 默认兜底文案 |
-| 11 | 固件列表不分页 | **已解决** | 新增 `/api/admin/ota/firmware` 分页；旧 `/firmware/list` 保留兼容 |
-| 12 | 死信接口只用 `hasRole('ADMIN')` | 保持 | 前端菜单按角色控制即可 |
-| 13 | ~~头像 URL 无法持久化~~ | **已解决** | 上传后调用 `PUT /api/user/profile` 保存 `avatar`，登录与资料接口都会返回 |
-| 14 | 审计日志仅覆盖指令流水 | **已知限制** | 页面注明口径，避免误解为全量审计 |
-
----
-
-## 10. 联调检查清单
-
-### 后端需先确认
-- [ ] CORS 白名单是否包含前端本地地址
-- [ ] 开发环境是否启用 `dev` profile（默认 dev，注意别连到生产库）
-- [ ] Knife4j 是否可访问：`/doc.html`
-- [ ] `GET /actuator/health` 是否返回 `{"status":"UP"}`
-- [ ] MQTT Broker 是否可连（心跳/在线状态才能在页面上体现）
-- [ ] 测试账号是否有 `ADMIN` 角色与所需权限码（`user:list`、`device:list`、`ota:list` 等）
-
-### 前端实现清单
-- [ ] 统一响应拦截（`code !== 200`）
-- [ ] 401 → 刷新（含刷新锁）→ 重放；4012 → 跳登录
-- [ ] Token 存储与过期前 5 分钟自动刷新
-- [ ] 登录失败锁定提示（4013，15 分钟）
-- [ ] 设备列表/详情/控制按钮按 `capabilities` 渲染
-- [ ] 控制指令后用 `commandId` 匹配 `command_result`，并以轮询为兜底
-- [ ] WebSocket：CONNECT 带 `Authorization`、订阅 `state/sensor/alert/ota/command` 五个主题、断线重连后重新订阅
-- [ ] 控制指令前先订阅 `/command`，用 `commandId` 匹配结果并处理失败/超时兜底
-- [ ] WebSocket 消息按统一信封 `type` 分发
-- [ ] 传感器历史/最新值、告警列表与确认已接入
-- [ ] OTA 进度用 WS + `/progress` 双通道兜底
-- [ ] 管理端菜单按 `permissions` 渲染，死信页按角色
-- [ ] 设备导出使用 blob 下载（非 JSON）
-- [ ] OTA 上传限制 `.bin` + 大小校验
-- [ ] 分页统一 `pageNum/pageSize`，读 `records/total`
-
----
-
-## 11. OTA 升级全流程与实时进度（前端必读）
-
-### 11.1 数据流总览
-
-```
-前端                后端                      设备
- │  POST /start ──────▶ 写 device_command ──▶ MQTT device/{mac}/command (target=ota)
- │                                                │
- │                                                ├─▶ device/{mac}/ack {success:true, data:{toVersion:...}}
- │                                                │      └─▶ 指令状态 SENT → ACCEPTED（推送 command_result）
- │                                                │
- │                                                ├─▶ device/{mac}/ota_progress（多次）
- │                                                │      └─▶ 更新 device_info.ota_state/ota_progress/ota_version
- │                                                │      └─▶ 推进指令状态（ACCEPTED/SUCCESS/FAILED）
- │ ◀── WS /topic/device/{mac}/ota (ota_progress) ─┘      └─▶ 推送前端
- │
- │  GET /api/user/ota/progress/{deviceId} ─▶ device_info + 最近指令快照（轮询兜底）
-```
-
-后端职责：
-- 设备上报的每个阶段都会**落库**（`device_info.ota_state / ota_progress / ota_version / ota_update_time`）；
-- 同一条数据**立即**通过 WebSocket 转发，前端无需等到轮询；
-- 设备未发 ACK 时，依据进度把 `device_command` 推进到 `ACCEPTED / SUCCESS / FAILED`，保证"升级记录"与"实时进度"一致。
-
-### 11.2 状态机
-
-```
+```text
 accepted → downloading → verifying → flashing → rebooting → success
-    └─────────────── 任意阶段失败 ───────────────┴─▶ failed
+    └──────────────── 任意升级阶段失败 ───────────────────→ failed
 ```
 
-| 阶段 | 中文 | 前端建议文案 |
-|------|------|-------------|
-| `accepted` | 已接受 | 设备已受理升级请求 |
-| `downloading` | 下载中 | 正在下载固件 |
-| `verifying` | 校验中 | 正在校验固件完整性 |
-| `flashing` | 写入中 | 正在写入固件，请勿断电 |
-| `rebooting` | 重启中 | 设备重启中，连接可能短暂中断 |
-| `success` | 升级成功 | 升级完成，版本已更新 |
-| `failed` | 升级失败 | 升级失败，可查看原因后重试 |
+| 状态 | 含义 | 终态 |
+|---|---|---|
+| `accepted` | 已接受 | 否 |
+| `downloading` | 下载中 | 否 |
+| `verifying` | 校验中 | 否 |
+| `flashing` | 写入中 | 否 |
+| `rebooting` | 重启中 | 否 |
+| `success` | 升级成功 | 是 |
+| `failed` | 升级失败 | 是 |
 
-规则（后端已实现，前端可按此展示）：
-- `progress` 永远在 `0~100`；`success` 强制 `100`；
-- `failed` 时 `error` 一般非空；
-- 到达 `success/failed` 后，同一 `commandId` 不会回退（指令层面是"终态粘性"）；
-- 命令状态 `SUCCESS/FAILED` 与 `TIMEOUT/CANCELLED` 都视为终态，前端应停止进度动画。
+后端把状态归一化为小写，将进度限制在 0–100；`success` 强制为 100。运行态超过约 5 分钟没有更新会进入僵死状态处理逻辑。设备上报的阶段可在未收到 ACK 时推进 OTA 指令状态；指令终态不会被迟到的中间进度覆盖。
 
-### 11.3 触发升级（推荐时序）
+### 9.3 单设备升级时序
 
-1. `GET /api/user/ota/check/{deviceId}` 判断是否有新版本（拿到 `firmwareId / latestVersion`）。
-2. **先连 WebSocket**，订阅 `/topic/device/{deviceId}/ota`（强烈建议同时订阅 `/command`）。
+1. `GET /api/user/ota/check/{deviceId}` 获取是否有新版本及固件信息。
+2. 建立 WebSocket 并订阅 `/ota`（建议同时订阅 `/command`）。
 3. 调用 `POST /api/user/ota/start/{deviceId}`。
-4. 从首个 `ota_progress` 或 `GET /progress` 中拿到 `commandId`，把它作为本次升级的关联 ID。
-5. 进度展示：以 WS 为主通道，`GET /progress` 为兜底（重连、页面重新打开时必须先拉一次快照）。
-6. 收到 `success` / `failed` → 停止轮询，刷新设备列表（`firmware` 已由后端同步）与升级记录。
+4. 此接口不返回 commandId；从后续 OTA 进度或 `GET /progress` 快照获取关联 commandId。
+5. 以 `ota_progress` 驱动阶段/进度展示；断线、重连、重新打开页面时用 `GET /progress` 恢复快照。
+6. 到 `success`/`failed` 后停止进度轮询，刷新设备固件与升级记录。
 
-错误码速查：
-- `4301` 已在升级中 → 禁止再点，按 `GET /progress` 展示当前进度；
-- `4201` 设备离线 → 提示设备需在线才能升级；
-- `4303` 已是最新版本 → 隐藏升级按钮；
-- `4300` 触发失败 → 允许重试（`POST /api/user/ota/retry/{deviceId}`，仅当最近一次为失败/超时/取消时可用）。
+### 9.4 批量 OTA 任务
 
-### 11.4 实时数据的正确消费方式
+- 管理端 `POST /api/admin/ota/batch-dispatch` 按固件/产品筛选设备并同步生成命令，响应为成功生成命令的设备数量。
+- 后端生成 `device_ota_task`，批次 `taskId` 与子指令关联。
+- `GET /api/admin/ota/tasks` 查询任务列表；`GET /tasks/{id}` 查询设备级详情。
+- 取消任务只处理仍处于 `PENDING(0)` 的子指令；已发给设备的命令不能通过任务取消撤回。
+- 批量派发是同步请求，设备数量较大时可能耗时；任务统计可能滞后一轮刷新。
 
-| 要点 | 说明 |
-|------|------|
-| 以 `data.reportTime` 排序 | 外层 `timestamp` 是服务端推送时间，设备时间才是业务时间 |
-| 同一 `commandId` 内进度不回退 | 极端情况下可对 `progress` 取 `Math.max`，避免 UI 抖动 |
-| `otaState` 已归一化 | 后端统一小写；文案直接用 `otaStateText` |
-| 终态停止动画 | `success/failed` 到达后停止计时器与轮询 |
-| 断线补齐 | 重连后先 `GET /progress` 再继续订阅，避免中间阶段丢失 |
-| 多设备 | 以 `deviceId + commandId` 为键维护各自进度，不要用全局单例 |
+### 9.5 状态、指令结果与轮询兜底
 
-最小处理示例（JavaScript）：
+OTA 阶段状态和设备命令状态是两套状态：
 
-```js
-const otaStore = new Map(); // key = deviceId
+- `otaState` 表示固件升级阶段。
+- `device_command.status` 表示命令生命周期；`ACCEPTED(6)` 代表设备已受理但仍可能升级中。
+- `ota_progress` 用于阶段与百分比；`command_result` 用于命令回执结果。
 
-function onOtaProgress(mac, data) {
-  const key = mac;
-  const prev = otaStore.get(key);
-  let next = { ...(prev || {}), ...data, deviceId: mac };
+轮询策略建议：进行中每 1–2 秒请求一次；首次打开页面/重连后立即请求；`finished=true` 或 OTA 达到终态后停止。以 `deviceId + commandId` 关联同一次升级，设备时间优先使用 `reportTime`。
 
-  // 终态粘性：已成功/失败则忽略迟到的中间态
-  if (prev && (prev.otaState === 'success' || prev.otaState === 'failed')) {
-    return;
-  }
-  // 进度不回退（同一次升级）
-  if (prev && prev.commandId && prev.commandId === data.commandId) {
-    next.progress = Math.max(prev.progress ?? 0, data.progress ?? 0);
-  }
-  otaStore.set(key, next);
-  renderOtaCard(next); // otaStateText + progress + error
+### 9.6 重试、取消及异常状态
 
-  if (next.otaState === 'success' || next.otaState === 'failed') {
-    stopPolling(mac);
-    refreshDevice(mac);   // firmware / otaVersion 已更新
-    refreshOtaRecords(mac);
-  }
-}
+- 用户端重试：最近一次 OTA 指令为 `FAILED(3)`、`TIMEOUT(4)`、`CANCELLED(5)` 时允许。
+- 管理端取消：仅取消任务中的 PENDING 子指令。
+- `4301`：已存在运行中升级；应展示当前进度而不是重复点击。
+- `4201`：设备离线；上线状态通过 HTTP 轮询确认。
+- `4302`：产品/版本不兼容；`4303`：已是最新版本。
+- **TIMEOUT(4) 仅落库、不额外推送。**前端应在等待超时后调用 `GET /api/user/commands/{commandId}` 或 OTA progress 接口确认最终状态。
 
-function onOtaPush(msg) { // msg = {type, deviceId, timestamp, data}
-  if (msg.type === 'ota_progress') onOtaProgress(msg.deviceId, msg.data);
+---
+
+## 10. 枚举与字典说明
+
+`GET /api/common/dictionaries` 用于向 UI 下发角色、状态、OTA、告警和产品等展示字典。建议前端优先读取并缓存字典，避免重复维护映射；字典只用于展示，不代替后端业务校验。枚举编码和值以接口响应及当前枚举源码为准。
+
+| 字典 | 编码 |
+|---|---|
+| 设备在线状态 | `0` 离线、`1` 在线、`2` 故障（列表字段也可能以 boolean/number 表达，以具体 VO 为准） |
+| 指令状态 | `0` PENDING、`1` SENT、`2` SUCCESS、`3` FAILED、`4` TIMEOUT、`5` CANCELLED、`6` ACCEPTED |
+| OTA 阶段 | `accepted`、`downloading`、`verifying`、`flashing`、`rebooting`、`success`、`failed` |
+| OTA 批量任务 | `0` 进行中、`1` 完成、`2` 取消 |
+| 固件启用状态 | `0` 禁用、`1` 启用 |
+| 告警级别 | `1` 提示、`2` 一般、`3` 严重 |
+| 告警状态 | `0` 未处理、`1` 已确认、`2` 已解决 |
+| 死信状态 | `0` 未处理、`1` 重放成功、`2` 已忽略 |
+| 绑定状态 | `1` 有效、`0` 已解绑（内部数据库字段） |
+
+**易混淆项：**OTA 阶段字符串不是 command status 数字；告警状态与设备在线状态共用数字但语义完全不同。离线原因以字符串形式返回，前端应为未知值提供兜底文案。
+
+---
+
+## 11. 系统已知限制与注意事项
+
+| 限制 | 影响范围 | 应对方案 |
+|---|---|---|
+| WebSocket 使用内存 SimpleBroker | 多实例时跨实例推送不可达，消息可能丢失 | 当前按单实例部署；扩容前引入共享 Broker/Relay |
+| 指令 TIMEOUT 只落库、不推送 | 前端可能收不到最终超时状态 | 设置 UI 等待上限后轮询 command 详情 |
+| 在线/离线状态不经 WebSocket 推送 | 在线状态卡片不能依赖 WS 实时刷新 | 轮询用户设备 online 或管理端 online-stats |
+| 审计日志复用 `device_command` | 只覆盖指令相关记录，不是全操作审计 | 页面和报表明确标注“指令审计”；需要完整审计应新增独立审计能力 |
+| 用户界面权限仅是 UI 控制 | 直接构造请求仍可绕过菜单限制 | 服务端每次 HTTP 请求和 STOMP SUBSCRIBE 都要鉴权 |
+| CORS 请求头清单缺少 `X-Device-Id` / `X-Device-Type` | 浏览器跨域预检可能失败，设备维度限流头无法到达 | 后端更新 allowed headers，并在部署环境验证 OPTIONS |
+| 批量 OTA 同步派发 | 目标设备多时接口响应慢 | 前端显示处理中；后续可改异步任务队列 |
+| 设备 `action`/`target` 组合未完全枚举校验 | 错误组合可能到达设备端 | UI 按 capabilities 限定；固件端仍需校验 |
+| OTA 管理任务统计可能滞后 | 列表与设备最新状态短暂不一致 | 查询详情/刷新列表；逐设备进度用 OTA progress 查询 |
+| 业务异常大多 HTTP 200 | 客户端仅看 HTTP 状态会误判成功 | 必须判断统一响应 `code` |
+| 数据库未采用迁移框架 | 已部署数据库不会自动应用新表/权限种子 | 先备份并制定增量 SQL，避免直接重放初始化脚本 |
+| `4601` 对应人机验证标记，当前无 challenge API | 前端无法完成服务端挑战闭环 | 暂停重试并提示；由后端另行定义可用挑战契约 |
+| 测试账号明文密码未在 SQL 中定义 | 初始化数据库的 admin 密码不可由文档确认 | 通过受控密码初始化/重置流程获得测试凭据 |
+
+---
+
+## 12. 联调与验收 Checklist
+
+### 12.1 后端与运维
+
+- [ ] 确认当前实例使用正确 `dev`/`prod` profile，生产密钥不使用仓库默认值。
+- [ ] 检查 MySQL Schema 与部署版本 SQL 一致，已备份并有增量迁移方案。
+- [ ] 检查 Redis 连接与限流/令牌功能。
+- [ ] 检查 MQTT runtime（8883）与 provision（8884）连接、证书、账号、ACL、订阅 topic/QoS。
+- [ ] 确认前端 Origin 已加入 `cors.allowed-origins`。
+- [ ] 确认 CORS 允许真实请求头 `Authorization`、`Content-Type` 以及前端使用的 `X-Device-Id` / `X-Device-Type`。
+- [ ] 验证 `GET /actuator/health` 返回健康状态。
+- [ ] 开发环境可访问 `/doc.html`；生产确认 Knife4j/OpenAPI 已关闭。
+- [ ] 固件上传目录可写，固件下载 URL 可被设备访问。
+- [ ] 如部署多实例，已确认 WebSocket 跨实例推送限制及临时部署方案。
+
+### 12.2 前端实现
+
+- [ ] HTTP 拦截器按 `code === 200` 判断业务成功，并单独处理 HTTP 401/403/429。
+- [ ] AccessToken 使用 Authorization Header，值为 Bearer + 一个空格 + token。
+- [ ] 401 并发请求共用刷新锁，刷新成功同时覆盖两个 Token，失败停止重试并跳登录。
+- [ ] 验证码、登录请求携带同一个持久化 `X-Device-Id`。
+- [ ] 验证码一次性消费；4030/4031 后重新获取。
+- [ ] 4600/4601/4602 分别展示频率限制、人机风控、网络受限提示。
+- [ ] 4013 展示服务端返回的剩余锁定时间。
+- [ ] 菜单/按钮按 `permissions` 做 UI 控制，但不将 UI 当作后端授权。
+- [ ] 设备控制按 `capabilities` 渲染，并先订阅 `/command` 再发命令。
+- [ ] 控制结果按 `commandId` 匹配 `command_result`；超时后轮询命令详情。
+- [ ] WebSocket CONNECT 在 Native Header 中传 Authorization（Bearer + 空格 + token）；仅在 CONNECTED 后订阅。
+- [ ] WebSocket 重连前确保 Token 有效；重连后恢复订阅。
+- [ ] 用户重连/重新打开 OTA 页面时先 GET progress 快照，再消费推送。
+- [ ] 在线/离线状态通过 HTTP 轮询更新。
+- [ ] 分页使用 `pageNum/pageSize`，读取 `records/total`。
+- [ ] 设备导出以 Blob 处理；头像/固件上传使用 multipart 正确字段名。
+
+### 12.3 硬件与 MQTT
+
+- [ ] Topic 中 MAC 与报文 `device` 字段一致，设备 ID 格式符合注册要求。
+- [ ] 注册签名材料 `deviceId|timestamp|nonce` 与设备私钥签名匹配。
+- [ ] 使用注册响应中的 MQTT 连接信息，不复用服务器端账号或凭据。
+- [ ] 按注册响应的 `will` 配置 presence topic、QoS、retain、payload。
+- [ ] 验证 heartbeat、presence、state、sensor、event、ack、ota_progress 报文及时间戳单位。
+- [ ] ACK 原样回传服务端 `commandId`，重复/非法 ACK 不造成错误状态覆盖。
+- [ ] OTA 上报合法 `otaState`、0–100 progress、目标 version 和失败原因。
+- [ ] 验证格式错误消息进入死信表，修复后可重放或标记忽略。
+
+---
+
+## 13. 数据库核心表简要说明
+
+初始化脚本为 `web-module/src/main/resources/sql/smart_device.sql`。具体列以脚本和实体类为准。
+
+| 表 | 核心用途与关键字段 |
+|---|---|
+| `sys_user` | 用户名、密码哈希、昵称、联系方式、头像、状态、`deleted` |
+| `sys_role` | 角色编码/名称、状态、`built_in`、`deleted` |
+| `sys_role_info` | 用户-角色关系；`user_id + role_id` 唯一 |
+| `sys_permission` | 权限码、类型、资源、动作、状态、逻辑删除 |
+| `sys_role_permission` | 角色-权限关系；角色与权限组合唯一 |
+| `sys_refresh_token` | 用户、RefreshToken SHA-256 哈希、到期、撤销、设备类型 |
+| `sys_login_log` | 用户名、IP、UA、成功/失败、时间 |
+| `device_info` | MAC、产品、固件、公钥、绑定码、在线信息、capabilities/current_state JSON、OTA 状态、`deleted` |
+| `device_binding` | device_id、user_id、bind_status、绑定/解绑时间；active_device_id 生成列确保设备只有一条有效绑定 |
+| `device_mqtt_auth` | 设备 MQTT 用户名、密码哈希与盐、启用状态 |
+| `device_sensor` | 传感器元数据与设备、传感器键、类型、数据来源、单位 |
+| `device_sensor_record` | 传感器历史值、来源/从机/通道、采集时间、扩展 JSON |
+| `device_heartbeat_record` | 心跳历史数据 |
+| `device_state_record` | 状态变化历史 |
+| `device_event_record` | 设备事件/错误、代码、上下文、原始 JSON |
+| `device_alert_record` | 告警级别、类型、value/threshold、处理状态和操作人 |
+| `device_command` | 唯一 commandId、deviceId、action/target/channel、params JSON、状态、ACK/重试时间 |
+| `device_firmware` | 固件版本/产品、URL/路径、MD5/SHA-256、大小、状态 |
+| `device_ota_task` | 批量任务 ID、固件版本、总量/成功/失败/待处理数、状态 |
+| `sys_dead_letter` | MQTT topic、原始 payload、异常摘要、可重试标记、状态、重试次数 |
+
+### 13.1 逻辑删除、唯一约束与内置角色
+
+- MyBatis-Plus 默认逻辑删除字段 `deleted`，通常 0 未删除、1 已删除；`device_info.deleted` 为 BIGINT，非零值可承载删除时间戳/ID。
+- 不是所有表都带 `deleted`。设备绑定使用 `bind_status` 记录解绑，不能当作逻辑删除。
+- `device_info.device_id + deleted`、`bind_code + deleted` 有唯一索引；`device_binding.active_device_id` 对有效绑定唯一。
+- `device_command.command_id`、固件 `(version, product)`、角色码、权限码、RefreshToken 哈希有唯一约束。
+- `ADMIN`、`OPS`、`USER` 是 SQL 中 `built_in=1` 的内置角色；服务层禁止删除、改编码或禁用等受保护操作。
+
+### 13.2 数据形状示例
+
+以下字段结构对应 SQL 表 `device_sensor_record`：
+
+```json
+{
+  "device_id": "B4BFE90CDBA1",
+  "source": "slave",
+  "slave_address": 1,
+  "sensor_key": "temp",
+  "sensor_type": "temperature",
+  "sensor_value": 35.5,
+  "unit": "℃",
+  "timestamp": "2026-11-05 15:49:37.316"
 }
 ```
 
-### 11.5 轮询兜底
+`device_command` 关键字段示例：
 
-`GET /api/user/ota/progress/{deviceId}` 返回 [8.5](#85-ota-) 中的 `DeviceOtaProgressVO`。
+```json
+{
+  "command_id": "example-command-id",
+  "device_id": "B4BFE90CDBA1",
+  "action": "set",
+  "target": "led",
+  "channel": 1,
+  "params": {
+    "state": 1
+  },
+  "status": 0,
+  "source": "WEB"
+}
+```
 
-| 场景 | 建议 |
-|------|------|
-| 升级进行中 | 1~2 秒轮询一次 |
-| 页面首次打开 / 重连 | 立即拉一次，恢复快照 |
-| `finished=true` | 停止轮询 |
-| `serverTime - otaUpdateTime > 5 分钟` 且 `running=true` | 展示"升级可能已超时"，建议用户稍后重试；后端超过 5 分钟会自动清理僵死状态 |
-
-> 后端清理僵死状态后再次发起升级不会被 `4301` 拦截；指令超时（`TIMEOUT`）时 `device_info` 的 OTA 字段也会被清空。
-
-### 11.6 与 `command_result` 的关系
-
-- `ota_progress` 负责**阶段与百分比**；
-- `command_result` 负责**指令最终结果**（`status=2` 成功 / `3` 失败 / `4` 超时 / `5` 取消；`6` 表示 OTA 已受理、仍在执行）。
-
-前端建议：进度条用 `ota_progress`；"升级任务成功/失败"徽标以 `command_result` 或 `/progress.finished` 为准，二者会保持一致。
-
-### 11.7 升级记录与重试
-
-- `GET /api/user/ota/records?deviceId=...`：按时间倒序；`statusText`、`errorMsg` 可直接展示；
-- 最近一条记录会带 `otaState/progress`（与设备当前 `otaVersion` 匹配时）；
-- 重试：`POST /api/user/ota/retry/{deviceId}`，仅当最近一条为 `FAILED/TIMEOUT/CANCELLED` 时可用。
-
-### 11.8 管理端实时查看
-
-管理端订阅方式与用户端完全一致：管理员可订阅 `/topic/device/{任意设备}/ota`，不受绑定关系限制。
-管理端批量任务（`/api/admin/ota/tasks*`）展示的是任务维度统计；单台设备的实时进度仍以 `ota_progress` 与 `/progress` 为准。
+示例值仅说明字段，不代表该行已存在。
 
 ---
 
-## 附：本轮实现结果汇总（原建议清单）
+## 14. 后端配置文件说明
 
-| 优先级 | 接口 | 状态 |
-|--------|------|------|
-| **P0** | `GET /api/user/profile` | ✅ 已实现 |
-| **P0** | 设备详情（含 OTA 字段） | ✅ 已实现 |
-| **P0** | 指令列表 / 指令详情 | ✅ 已实现 |
-| **P0** | 传感器最新值 + 历史 | ✅ 已实现 |
-| **P0** | 告警列表 + 标记处理 | ✅ 已实现 |
-| **P0** | 管理端用户列表/详情/启停/改角色 | ✅ 已实现 |
-| **P0** | 管理端设备详情/编辑/绑定查询 | ✅ 已实现 |
-| **P1** | 指令取消、指令统计、批量控制 | ✅ 已实现 |
-| **P0** | OTA 进度轮询、升级记录、重试 | ✅ 已实现（并新增 WS 推送） |
-| **P1** | OTA 任务列表/详情/取消 | ✅ 已实现 |
-| **P1** | 全局指令/告警查询、审计日志 | ✅ 已实现 |
-| **P2** | 字典、头像上传、健康检查、WebSocket 统一信封 | ✅ 已实现 |
+| 配置文件 | 主要内容 |
+|---|---|
+| `application.yml` | 端口、MySQL/Druid、Redis 池、Jackson 时区、Multipart、MyBatis-Plus、MQTT Topic/QoS、验证码、JWT、Knife4j、Actuator |
+| `application-dev.yml` | 本地 MySQL/Redis/MQTT、证书、开发 CORS Origin、固件目录与 URL |
+| `application-prod.yml` | 生产 DB/Redis/MQTT 环境变量、生产 Origin、文件目录、日志、关闭 Knife4j/Springdoc |
 
-> 本轮共新增 **52 个接口**，后端已通过 `mvnw compile` 编译验证；文档与实际路径已逐项核对。
+### 14.1 重点配置项
+
+- **MySQL**：生产使用 `DB_HOST`、`DB_USERNAME`、`DB_PASSWORD`；开发可覆盖 `DEV_DB_USER`、`DEV_DB_PASS`。
+- **Redis**：生产使用 `REDIS_HOST`、`REDIS_PASSWORD`。
+- **MQTT**：运行时 Broker 8883、注册 Broker 8884；生产变量包括 `MQTT_HOST`、`MQTT_USERNAME`、`MQTT_PASSWORD`、`MQTT_PROVISION_USERNAME`、`MQTT_PROVISION_PASSWORD`。CA、客户端证书和密码路径需与部署一致。
+- **CORS**：`cors.allowed-origins` 必须填写正式前端 Origin。源码允许 Header 列表还需确认是否包含业务自定义 Header。
+- **限流开关**：当前 yml 未定义统一限流开关。**不得在部署文档中声称可通过配置关闭**；是否启用由当前服务实现决定。
+- **Knife4j**：dev 可用；prod `knife4j.enable=false` 且关闭 OpenAPI/Swagger。
+- **文件上传**：默认单文件上限 `16MB`、请求上限 `20MB`；固件和头像目录由配置指定，需保证写入权限与外部下载可达。
+- **JWT**：通过 `JWT_SECRET` 注入强随机生产密钥；不能使用仓库中的开发默认值。
+- **WebSocket**：端点 `/ws`，Origin 采用配置的跨域白名单；Nginx 代理需支持 Upgrade 和 SockJS 回退路径。
+
+### 14.2 凭据管理
+
+仓库开发配置含本地演示默认账号/密码及开发 JWT 默认值，不得复制到生产。生产数据库密码、MQTT 密码、证书私钥、JWT 密钥应通过部署密钥管理注入并进行轮换，不提交到源码仓库。
 
 ---
 
-## 12. 三层限流与风控（前端必读）
+## 15. 部署与 Nginx 配置要求
 
-> 服务端已实现三层独立限流，各层互不替代。所有超限响应均为 **HTTP 429**，响应体仍是统一 `ApiResponse`；前端需同时判断 HTTP 状态码与 `code`。
+### 15.1 部署前检查
 
-### 12.1 设备指纹 `X-Device-Id`
+1. 准备 MySQL、Redis、MQTT TLS 运行时/注册 Broker 和证书。
+2. 按当前 Schema 版本备份并执行审核过的数据库初始化/增量脚本。
+3. 设置 `SPRING_PROFILES_ACTIVE=prod` 和所需环境变量。
+4. 准备固件存储目录、头像目录和可被设备访问的下载域名。
+5. 配置 HTTPS、CORS Origin 白名单并关闭生产 Knife4j/OpenAPI。
+6. 当前实现适用于单实例 WebSocket 推送；多实例部署前先解决 Broker 广播问题。
 
-- 前端首次访问时生成稳定 UUID，持久化到 `localStorage`，之后所有 `/api/auth/captcha`、`/api/auth/login` 请求都带上 `X-Device-Id`。
-- 未携带时后端降级用客户端 IP 作为设备标识，设备维度阈值会与 IP 维度叠加，更严格。
-- 设备指纹仅用于限流，不参与身份认证。
+### 15.2 Nginx WebSocket 与 SockJS
 
-### 12.2 第一层：验证码获取限流
+需转发 `/ws` 及 `/ws/**` SockJS HTTP 回退请求，保留 HTTP/1.1 Upgrade，并设置长读超时。以下为配置要点，域名、证书和 upstream 需替换：
 
-接口：`POST /api/auth/captcha`
+```nginx
+location /ws/ {
+    proxy_pass http://127.0.0.1:8080/ws/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+}
 
-| 维度 | 阈值 | 超限动作 |
-|------|------|----------|
-| 同一 IP | 每分钟 ≤ 10 次 | HTTP 429 + `4600` |
-| 同一 IP | 每小时 ≤ 100 次 | HTTP 429 + `4600` |
-| 同一设备指纹 | 每分钟 ≤ 5 次 | HTTP 429 + `4600` |
+location = /ws {
+    return 301 /ws/;
+}
+```
 
-> 超限不返回空图、不暴露具体维度；前端收到 429 后停止自动刷新并倒计时。
+若实际 SockJS 配置或代理 path mapping 不同，应以浏览器 Network 中 SockJS 实际请求路径和后端 endpoint 为准，避免错误地只代理原生 WebSocket Upgrade。
 
-### 12.3 第二层：登录请求限流（验证码校验之前）
+### 15.3 HTTP、静态文件、CORS 与生产文档
 
-接口：`POST /api/auth/login`
+- API 代理保留 Host、客户端 IP 和协议头；真实 IP 仅信任受控的代理链路。
+- 头像 URL 路径为后端静态资源映射；固件 `base-url` 必须指向可被设备访问的文件服务。确认 Nginx/static location 与后端目录映射对应，不能仅代理 API 后就假设固件文件可下载。
+- CORS 白名单由应用配置；Nginx 转发不应重复写入冲突的 `Access-Control-Allow-*` 头。
+- 生产必须关闭 Knife4j、Swagger UI 和 OpenAPI 文档端点。
+- 配置前端实际需要的 `Authorization`、`Content-Type`、`X-Device-Id` 等 Header；当前后端 CORS 配置尚未放行设备指纹 Header。
+- 上传请求大小限制需同时满足 Nginx body size 与 Spring Multipart/固件业务大小限制。
 
-| 维度 | 阈值 | 触发动作 | 响应 |
-|------|------|----------|------|
-| 同一 IP | 每分钟 > 10 次 | 临时封 IP 15 分钟 | 429 + `4600`；再次请求返回 429 + `4602` |
-| 同一 IP | 每小时 > 50 次 | 升级人机验证 | 429 + `4601` |
-| 同一设备指纹 | 每分钟 > 5 次 | 升级人机验证 | 429 + `4601` |
-| 同一账号 | 每分钟 > 5 次 | 仅频率限制，不锁定账号 | 429 + `4600` |
+---
 
-> 本层发生在验证码校验之前，即使验证码正确也会被拦截；超限不写明细日志。
+## 16. 常见故障排查指南
 
-### 12.4 第三层：失败计数与风控升级
-
-| 失败类型 | 计数维度 | 触发动作 |
-|----------|----------|----------|
-| 验证码错误 / 已过期 | IP、设备 | 1 小时内累计 20 次 → `4601` 强制人机验证；累计 50 次 → 临时封 IP 15 分钟 |
-| 账号不存在 | IP、设备 | 同验证码错误，防用户枚举 |
-| 密码错误 | 账号 | 5 次 → 锁定 15 分钟；10 次 → 锁定 1 小时 |
-| 验证码错误 | 账号 | **不计入**，不触发账号锁定 |
-
-关键区别：
-- 验证码错误是"人机识别失败"，风险信号归属 IP/设备，不归属账号；
-- 密码错误才是"身份认证失败"，按账号计数并锁定；
-- 账号锁定返回 `4013`，`message` 中包含剩余分钟数；登录成功后账号失败计数自动清零；
-- IP/设备风控计数不会因某次成功登录而清零。
-
-### 12.5 前端处理建议
-
-| HTTP 状态 | code | 建议处理 |
-|-----------|------|----------|
-| 429 | `4600` | 按钮倒计时（60 秒），提示"请求过于频繁，请稍后再试" |
-| 429 | `4601` | 展示滑块/行为验证组件（后端已预留标记）；暂未接入时提示稍后重试 |
-| 429 | `4602` | 提示"当前网络访问受限，请稍后再试"，不要提示"被封 IP" |
-| 200 | `4013` | 账号锁定，直接展示 `message` 中的剩余分钟数 |
-| 200 | `4030/4031` | 验证码失效或错误，自动刷新验证码图片 |
-
-> 建议前端在登录、获取验证码请求上统一封装 429 处理，避免每个页面重复实现。
+| 现象 | 常见根因 | 排查步骤 | 处理 |
+|---|---|---|---|
+| 浏览器 CORS 403 / OPTIONS 失败 | Origin 不在白名单；或自定义 Header 不在 allowed headers | Network 查看 OPTIONS 的 `Access-Control-Request-Headers`；核对 `cors.allowed-origins` 与 `CorsConfig` Header 列表 | 后端配置正确 Origin 和 Header；重点检查 `X-Device-Id`、`X-Device-Type` |
+| WebSocket 握手 HTTP 403 | WebSocket Origin 未允许、Nginx 未正确代理 `/ws`/SockJS 路径 | 查看握手状态、Origin、代理 access/error log；区分 HTTP 握手失败与 STOMP ERROR | 配置 CORS Origin、Upgrade 头及 `/ws/**` 代理；不能只检查 STOMP Token |
+| WebSocket CONNECT 后立即断开 | `Authorization` 缺失、Token 空格错误、JWT 无效/过期 | 浏览器 STOMP debug 与后端 `WebSocketAuthInterceptor` 日志 | CONNECT Native Header 使用 Authorization（Bearer + 空格 + token）；刷新后重连 |
+| 订阅 STOMP ERROR“无权订阅设备” | 用户无有效设备绑定、订阅主题格式错误或使用通配符 | 检查当前账号绑定关系、deviceId 规范化结果及完整 destination | 绑定设备后逐个订阅合法后缀；不要反复重试越权主题 |
+| HTTP 刷新返回 `4012` | RefreshToken 已过期/撤销/已消费，或多个并发请求共用一个 token 刷新 | 检查 refresh 请求数量、刷新锁及本地双 Token 是否同步替换 | 清空凭据重新登录；前端统一使用单飞刷新锁 |
+| 收到 4014 后仍循环重试 | 刷新接口也被拦截或刷新失败后仍重放请求 | 检查 HTTP 拦截器对 refresh endpoint 的排除规则及重试标记 | refresh endpoint 不进入同一递归刷新逻辑；失败后停止队列并转登录 |
+| OTA 已启动但 WebSocket 无进度 | 未提前订阅、订阅错设备/主题、设备未发 `ota_progress`、MQTT 没到达消费端 | 先调用 progress API；核对 `/topic/device/{mac}/ota`、MQTT `device/{mac}/ota_progress`、后端 Handler 日志 | 重连后先拉快照；检查设备固件、Broker ACL、MQTT 订阅和死信 |
+| OTA progress 只有部分阶段/页面重连后空白 | WS 中断期间 SimpleBroker 不缓存历史消息 | 调用 `GET /api/user/ota/progress/{deviceId}` 与 records | 以 HTTP 快照补齐；终态后停止轮询 |
+| 指令已受理但 UI 未显示 TIMEOUT | TIMEOUT 定时任务只更新数据库，不推送 command_result | 调用 `GET /api/user/commands/{commandId}` 检查状态；核对 command timeout 任务日志 | 前端在等待超时后轮询，不等待 WS 超时通知 |
+| MQTT 死信持续增加 | 报文 JSON/字段不符合 Handler、设备 ID 与 Topic 不一致、DB/依赖异常、重放后根因未修复 | 按死信 topic、errorMsg、retryable、payload 查看；核对对应 Handler 日志和 Broker | 先修复根因并验证单条；仅对可重试消息重放；无法修复或无效消息标记 ignore |
+| MQTT 死信重放失败 | 报文不可重试或 `IllegalArgumentException`，状态已忽略/已处理 | 查看 `isRetryable`、status、retryCount、原始报文 | 修复格式/数据后按业务规则处理；不要对 poison message 无限重放 |
+| 业务失败但 HTTP 显示 200 | `GlobalExceptionHandler` 对业务异常按 HTTP 200 返回 | 检查响应体 `code`、`message` | 前端按 `code === 200` 判断成功 |
+| 设备在线/离线不即时变化 | 当前没有在线状态 WebSocket 推送 | 查询设备 online 接口/管理端 online-stats，检查心跳和 presence | 使用轮询；检查 Broker LWT 与设备 heartbeat |
+| 头像/固件上传失败或设备下载失败 | Multipart/Nginx 限制、目录权限、URL/静态映射错误 | 对照上传错误码、应用日志、文件系统和下载 URL | 检查 Nginx body size、Spring 限额、目录权限和静态文件路径 |
+| 生产环境无法打开 Knife4j | 生产有意关闭 Springdoc/Knife4j | 确认 `prod` profile 与 `knife4j.enable=false` | 使用开发/受控环境调试；不要为线上排障长期开放文档端点 |
