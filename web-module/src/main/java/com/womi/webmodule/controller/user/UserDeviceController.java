@@ -46,9 +46,6 @@ public class UserDeviceController {
     /**
      * 查询我的设备列表（只返回自己绑定的设备）
      */
-    /**
-     * 查询我的设备列表（只返回自己绑定的设备）
-     */
     @GetMapping("/my")
     public ApiResponse<Page<DeviceInfoVO>> getMyDevices(
             @AuthenticationPrincipal SecurityUser securityUser,
